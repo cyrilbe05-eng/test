@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { requireAuth } from '../_helpers/auth'
-import { dbQuery } from '../_helpers/db'
-import type { Deadline } from '../../src/types'
+import { requireAuth } from '../../_helpers/auth'
+import { dbQuery } from '../../_helpers/db'
+import type { Deadline } from '../../../src/types'
 
 interface DeadlineRow extends Deadline {
   member_full_name: string
@@ -10,7 +10,7 @@ interface DeadlineRow extends Deadline {
 }
 
 /**
- * GET /api/deadlines/[projectId]
+ * GET /api/deadlines/project/[projectId]
  * Returns all deadlines for a project.
  * - Admin: all deadlines
  * - Team: only their own deadline for this project

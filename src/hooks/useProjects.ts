@@ -32,7 +32,7 @@ export function useProjectFiles(projectId: string | undefined) {
     enabled: !!projectId,
     queryFn: () =>
       apiFetch<(ProjectFile & { profiles: { full_name: string } })[]>(
-        `/api/project-files/${projectId}`
+        `/api/project-files/project/${projectId}`
       ),
   })
 }
