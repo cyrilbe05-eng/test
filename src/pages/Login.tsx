@@ -90,7 +90,7 @@ export default function Login() {
       if (signIn!.status === 'complete') {
         await signIn!.finalize()
         await new Promise(r => setTimeout(r, 500))
-        window.location.href = '/'
+        window.location.href = '/login'
       } else {
         toast.error('Could not verify code. Please try again.')
       }
