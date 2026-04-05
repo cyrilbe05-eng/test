@@ -89,6 +89,7 @@ export default function Login() {
       }
       if (signIn!.status === 'complete') {
         await signIn!.finalize()
+        await new Promise(r => setTimeout(r, 500))
         window.location.href = '/'
       } else {
         toast.error('Could not verify code. Please try again.')
@@ -111,7 +112,7 @@ export default function Login() {
 
         <div className="clay-card p-7">
           {needsMfa ? (
-            <form onSubmit={handleSubmitCode(onSubmitCode)} className="space-y-5">
+            <form onSubmit={handleSubmitCode(onSubmitCode)} className="space-y-5" autoComplete="off">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">Check your email</p>
                 <p className="text-xs text-muted-foreground">Enter the 6-digit code sent to your email address.</p>
