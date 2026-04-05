@@ -50,16 +50,25 @@ export default function Login() {
     setLoading(true)
 
     try {
-      const result = await signIn!.create({
+      const { error } = await signIn!.password({
         identifier: data.email,
         password: data.password,
       })
 
-      if (result.status === 'complete') {
+      if (error) {
+        toast.error('Invalid email or password')
+        return
+      }
+
+      if (signIn!.status === 'complete') {
+        await signIn!.finalize()
         navigate('/', { replace: true })
-      } else if (result.status === 'needs_second_factor') {
-        // Request email OTP
-        await signIn!.prepareSecondFactor({ strategy: 'email_code' })
+      } else if (signIn!.status === 'needs_second_factor') {
+        const { error: mfaError } = await signIn!.mfa.sendEmailCode()
+        if (mfaError) {
+          toast.error('Failed to send verification code')
+          return
+        }
         setNeedsMfa(true)
       } else {
         toast.error('Sign-in could not be completed. Please try again.')
@@ -74,11 +83,13 @@ export default function Login() {
   const onSubmitCode = async (data: CodeData) => {
     setLoading(true)
     try {
-      const result = await signIn!.attemptSecondFactor({
-        strategy: 'email_code',
-        code: data.code,
-      })
-      if (result.status === 'complete') {
+      const { error } = await signIn!.mfa.verifyEmailCode({ code: data.code })
+      if (error) {
+        toast.error('Invalid or expired code')
+        return
+      }
+      if (signIn!.status === 'complete') {
+        await signIn!.finalize()
         navigate('/', { replace: true })
       } else {
         toast.error('Could not verify code. Please try again.')
