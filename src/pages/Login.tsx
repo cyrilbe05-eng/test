@@ -62,7 +62,7 @@ export default function Login() {
 
       if (signIn!.status === 'complete') {
         await signIn!.finalize()
-        navigate('/', { replace: true })
+        window.location.href = '/'
       } else if (signIn!.status === 'needs_second_factor') {
         const { error: mfaError } = await signIn!.mfa.sendEmailCode()
         if (mfaError) {
@@ -90,7 +90,7 @@ export default function Login() {
       }
       if (signIn!.status === 'complete') {
         await signIn!.finalize()
-        navigate('/', { replace: true })
+        window.location.href = '/'
       } else {
         toast.error('Could not verify code. Please try again.')
       }
@@ -122,7 +122,7 @@ export default function Login() {
                 <input
                   type="text"
                   inputMode="numeric"
-                  autoComplete="one-time-code"
+                  autoComplete="off"
                   {...registerCode('code')}
                   className="w-full px-3.5 py-2.5 bg-muted border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 text-sm transition-all tracking-widest"
                   placeholder="123456"
