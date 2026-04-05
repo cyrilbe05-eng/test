@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import pinguExcited from '@/assets/pingu-excited.png'
 import { useSignIn } from '@clerk/react'
 import { useForm } from 'react-hook-form'
@@ -22,7 +22,6 @@ type CodeData = z.infer<typeof codeSchema>
 export default function Login() {
   const [loading, setLoading] = useState(false)
   const [needsMfa, setNeedsMfa] = useState(false)
-  const navigate = useNavigate()
   const { signIn, fetchStatus } = useSignIn()
   const { user, profile, loading: authLoading } = useAuth()
 
