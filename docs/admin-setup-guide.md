@@ -21,10 +21,10 @@ How to create the first admin user (or any future admin).
 ```sql
 INSERT INTO profiles (id, role, full_name, email, phone, plan_id, client_id_label, password_changed, disabled, created_at, updated_at)
 VALUES (
-  'user_XXXXXXXXXXXXXXXXXXXXXXXXXX',
+  'user_3Bx4ugVG0Xu81Sp0ls8jYicW3X2',
   'admin',
-  'Your Name',
-  'your@email.com',
+  'Cyril Baouab',
+  'cyril@projectpingu.com',
   NULL,
   NULL,
   NULL,
