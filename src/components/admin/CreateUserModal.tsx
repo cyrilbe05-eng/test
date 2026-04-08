@@ -46,9 +46,11 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
   const onSubmit = async (data: FormData) => {
     setLoading(true)
     try {
+      const payload = { ...data }
+      if (payload.role !== 'client') delete payload.plan_id
       const result = await apiFetch<{ id: string; email: string; temporary_password: string }>('/api/users/create', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       })
       onCreated()
       setCredentials({
