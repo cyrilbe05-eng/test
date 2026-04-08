@@ -1,13 +1,31 @@
-import { createClerkClient, verifyToken } from '@clerk/backend'
+import { SignJWT, jwtVerify } from 'jose'
+import { hash, compare } from 'bcryptjs'
 import type { IncomingMessage } from 'http'
 import { dbQuery } from './db'
 import type { Profile } from '../../src/types'
 
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! })
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET!)
 
 export interface AuthContext {
   clerkUserId: string
   profile: Profile
+}
+
+export async function signJwt(payload: { sub: string; role: string }): Promise<string> {
+  return new SignJWT({ role: payload.role })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(payload.sub)
+    .setIssuedAt()
+    .setExpirationTime('30d')
+    .sign(JWT_SECRET)
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  return hash(password, 12)
+}
+
+export async function comparePassword(password: string, hashed: string): Promise<boolean> {
+  return compare(password, hashed)
 }
 
 export async function requireAuth(req: IncomingMessage): Promise<AuthContext> {
@@ -20,8 +38,8 @@ export async function requireAuth(req: IncomingMessage): Promise<AuthContext> {
 
   let clerkUserId: string
   try {
-    const payload = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY! })
-    clerkUserId = payload.sub
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+    clerkUserId = payload.sub as string
   } catch {
     throw Object.assign(new Error('Unauthorized'), { status: 401 })
   }
@@ -43,6 +61,7 @@ export function requireRole(profile: Profile, ...roles: Profile['role'][]) {
   }
 }
 
+// Kept for backwards compat — no longer used but avoids import errors
 export function createClerkAdmin() {
-  return clerk
+  return null
 }

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { useClerk } from '@clerk/react'
+import { useNavigate } from 'react-router-dom'
+import { clearToken } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
 import pinguWave from '@/assets/pingu-wave.png'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
@@ -121,16 +123,16 @@ function Thread({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function ClientMessages() {
-  const { signOut } = useClerk()
   const { profile } = useAuth()
   const { data: connections } = useConnections()
   const { data: groups } = useGroups()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
 
   const [activeConvId, setActiveConvId] = useState<ConversationId>(null)
 
-  const handleSignOut = async () => {
-    await signOut()
-    toast.success('Signed out')
+  const handleSignOut = () => {
+    clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
   }
 
   // Filter to only conversations this client is part of

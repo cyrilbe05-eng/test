@@ -1,5 +1,5 @@
-import { useUser } from '@clerk/react'
 import { useQuery } from '@tanstack/react-query'
+import { getToken } from '@/lib/auth'
 import { useApiFetch } from '@/lib/api'
 import type { Profile } from '@/types'
 
@@ -10,30 +10,32 @@ interface AuthState {
 }
 
 export function useAuth(): AuthState {
-  const { isLoaded, isSignedIn, user } = useUser()
   const apiFetch = useApiFetch()
+  const token = getToken()
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ['profile', user?.id],
-    enabled: isLoaded && isSignedIn && !!user,
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ['profile', token],
+    enabled: !!token,
     queryFn: () => apiFetch<Profile>('/api/profiles/me'),
     staleTime: 60_000,
+    retry: false,
   })
 
-  if (!isLoaded || (isSignedIn && profileLoading)) {
+  if (!token) {
+    return { user: null, profile: null, loading: false }
+  }
+
+  if (isLoading) {
     return { user: null, profile: null, loading: true }
   }
 
-  if (!isSignedIn || !user) {
+  if (!profile) {
     return { user: null, profile: null, loading: false }
   }
 
   return {
-    user: {
-      id: user.id,
-      email: user.primaryEmailAddress?.emailAddress ?? '',
-    },
-    profile: profile ?? null,
-    loading: !profile,
+    user: { id: profile.id, email: profile.email },
+    profile,
+    loading: false,
   }
 }

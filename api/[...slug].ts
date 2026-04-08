@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { requireAuth, requireRole, createClerkAdmin } from './_helpers/auth'
+import { requireAuth, requireRole, createClerkAdmin, signJwt, hashPassword, comparePassword } from './_helpers/auth'
 import { dbQuery, dbExecute, newId, nowIso } from './_helpers/db'
 import { getPresignedUploadUrl, getPresignedDownloadUrl, deleteObject } from './_helpers/r2'
 import { ok, err, handleError } from './_helpers/respond'
@@ -2909,6 +2909,56 @@ async function handleAdminLibrary(req: VercelRequest, res: VercelResponse) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleAuthLogin(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { email, password } = req.body as { email: string; password: string }
+    if (!email || !password) { res.status(400).json({ error: 'Email and password required' }); return }
+
+    const rows = await dbQuery<Profile & { password_hash: string | null }>(
+      'SELECT * FROM profiles WHERE email = ? AND disabled = 0',
+      [email.toLowerCase().trim()]
+    )
+    const user = rows[0]
+    if (!user) { res.status(401).json({ error: 'Invalid email or password' }); return }
+
+    if (!user.password_hash) { res.status(401).json({ error: 'Account not yet activated. Contact your administrator.' }); return }
+
+    const valid = await comparePassword(password, user.password_hash)
+    if (!valid) { res.status(401).json({ error: 'Invalid email or password' }); return }
+
+    const token = await signJwt({ sub: user.id, role: user.role })
+    const { password_hash: _ph, ...profile } = user
+    res.json({ token, profile: { ...profile, password_changed: Boolean(profile.password_changed), disabled: Boolean(profile.disabled) } })
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+async function handleAuthChangePassword(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { clerkUserId } = await requireAuth(req)
+    const { password } = req.body as { password: string }
+    if (!password || password.length < 12) { res.status(400).json({ error: 'Password must be at least 12 characters' }); return }
+
+    const hash = await hashPassword(password)
+    await dbExecute(
+      'UPDATE profiles SET password_hash = ?, password_changed = 1, updated_at = ? WHERE id = ?',
+      [hash, nowIso(), clerkUserId]
+    )
+    const rows = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [clerkUserId])
+    const p = rows[0]
+    res.json({ ...p, password_changed: Boolean(p.password_changed), disabled: Boolean(p.disabled) })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN ROUTER
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -3194,6 +3244,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ;(req as any).query = { ...(req.query || {}), projectId: slug[1], fileId: slug[2] }
       return handleDownload(req, res)
     }
+    res.status(404).json({ error: 'Not found' }); return
+  }
+
+  // ── auth ───────────────────────────────────────────────────────────────────
+  if (slug[0] === 'auth') {
+    if (slug[1] === 'login') return handleAuthLogin(req, res)
+    if (slug[1] === 'change-password') return handleAuthChangePassword(req, res)
     res.status(404).json({ error: 'Not found' }); return
   }
 

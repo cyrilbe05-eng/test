@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useClerk } from '@clerk/react'
+import { useNavigate } from 'react-router-dom'
+import { clearToken } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
 import pinguPhone from '@/assets/pingu-phone.png'
 import { useApiFetch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -54,9 +56,10 @@ function SidebarButton({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function TeamGallery() {
-  const { signOut } = useClerk()
   const { profile } = useAuth()
   const apiFetch = useApiFetch()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
 
   const { data: users = [] } = useQuery<Profile[]>({
     queryKey: ['users'],
@@ -70,9 +73,8 @@ export default function TeamGallery() {
 
   const activeOwnerId = selectedClientId ?? clients[0]?.id ?? null
 
-  const handleSignOut = async () => {
-    await signOut()
-    toast.success('Signed out')
+  const handleSignOut = () => {
+    clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
   }
 
   return (

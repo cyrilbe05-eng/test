@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
-import { useClerk } from '@clerk/react'
+import { useNavigate } from 'react-router-dom'
+import { clearToken } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
 import pinguWave from '@/assets/pingu-wave.png'
 import {
@@ -52,8 +54,9 @@ function MiniBarChart({ data, color = 'bg-primary' }: { data: { label: string; v
 }
 
 export default function ClientAnalytics() {
-  const { signOut } = useClerk()
   const { profile } = useAuth()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
   const { pathname } = useLocation()
   const apiFetch = useApiFetch()
 
@@ -61,7 +64,7 @@ export default function ClientAnalytics() {
   const [customFrom, setCustomFrom] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'))
   const [customTo, setCustomTo] = useState(format(new Date(), 'yyyy-MM-dd'))
 
-  const handleSignOut = async () => { await signOut(); toast.success('Signed out') }
+  const handleSignOut = () => { clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true }) }
 
   // ─── Data fetching ──────────────────────────────────────────────────────────
   const { data: projects = [], isLoading } = useProjects()

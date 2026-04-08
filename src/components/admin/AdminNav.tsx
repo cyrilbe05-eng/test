@@ -1,9 +1,10 @@
-import { useClerk } from '@clerk/react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { useAuth } from '@/hooks/useAuth'
 import { ThemeToggle } from '@/lib/theme'
+import { clearToken } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
 import pinguSuit from '@/assets/pingu-suit.png'
 
 const NAV_LINKS = [
@@ -17,13 +18,16 @@ const NAV_LINKS = [
 ]
 
 export function AdminNav() {
-  const { signOut } = useClerk()
   const { profile } = useAuth()
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
 
-  const handleSignOut = async () => {
-    await signOut()
+  const handleSignOut = () => {
+    clearToken()
+    qc.clear()
     toast.success('Signed out')
+    navigate('/login', { replace: true })
   }
 
   return (

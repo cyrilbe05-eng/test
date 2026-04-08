@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { useClerk } from '@clerk/react'
+import { useNavigate } from 'react-router-dom'
+import { clearToken } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import pinguWave from '@/assets/pingu-wave.png'
 import { useApiFetch } from '@/lib/api'
@@ -11,9 +13,10 @@ import { toast } from 'sonner'
 import type { Plan } from '@/types'
 
 export default function ClientGallery() {
-  const { signOut } = useClerk()
   const { profile, loading } = useAuth()
   const apiFetch = useApiFetch()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
 
   const { data: plan } = useQuery<Plan>({
     queryKey: ['plan', profile?.plan_id],
@@ -21,9 +24,8 @@ export default function ClientGallery() {
     enabled: !!profile?.plan_id,
   })
 
-  const handleSignOut = async () => {
-    await signOut()
-    toast.success('Signed out')
+  const handleSignOut = () => {
+    clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
   }
 
   if (loading || !profile) {

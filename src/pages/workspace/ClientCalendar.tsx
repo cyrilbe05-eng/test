@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
-import { useClerk } from '@clerk/react'
+import { useNavigate } from 'react-router-dom'
+import { clearToken } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
 import pinguWave from '@/assets/pingu-wave.png'
 import {
@@ -399,9 +401,10 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function ClientCalendar() {
-  const { signOut } = useClerk()
   const { profile } = useAuth()
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
   const [viewDate, setViewDate] = useState(new Date())
   const [createDay, setCreateDay] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -422,7 +425,7 @@ export default function ClientCalendar() {
 
   const days = eachDayOfInterval({ start: startOfWeek(startOfMonth(viewDate)), end: endOfWeek(endOfMonth(viewDate)) })
   const eventsForDay = (day: Date) => { const s = format(day, 'yyyy-MM-dd'); return events.filter((e) => e.date === s) }
-  const handleSignOut = async () => { await signOut(); toast.success('Signed out') }
+  const handleSignOut = () => { clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true }) }
 
   return (
     <div className="min-h-screen bg-background">

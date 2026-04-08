@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useUser } from '@clerk/react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,6 +7,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { useApiFetch } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
+import { getToken } from '@/lib/auth'
 
 const passwordSchema = z
   .string()
@@ -29,7 +29,6 @@ type FormData = z.infer<typeof schema>
 export default function ChangePassword() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
-  const { user } = useUser()
   const { profile } = useAuth()
   const apiFetch = useApiFetch()
   const qc = useQueryClient()
@@ -41,31 +40,21 @@ export default function ChangePassword() {
   } = useForm<FormData>({ resolver: zodResolver(schema) })
 
   const onSubmit = async (data: FormData) => {
-    if (!user) return
     setLoading(true)
-
     try {
-      await user.updatePassword({ newPassword: data.password, currentPassword: undefined })
-    } catch (e: any) {
-      toast.error(e?.errors?.[0]?.message ?? 'Failed to update password')
-      setLoading(false)
-      return
-    }
-
-    try {
-      await apiFetch('/api/profiles/me', {
-        method: 'PATCH',
-        body: JSON.stringify({ password_changed: true }),
+      await apiFetch('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ password: data.password }),
       })
-      qc.invalidateQueries({ queryKey: ['profile'] })
+      qc.invalidateQueries({ queryKey: ['profile', getToken()] })
       toast.success('Password updated successfully!')
       const roleHome: Record<string, string> = { admin: '/admin', team: '/team', client: '/workspace' }
       navigate(profile ? roleHome[profile.role] ?? '/workspace' : '/workspace', { replace: true })
-    } catch {
-      toast.error('Password updated but failed to save state. Please contact support.')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to update password')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   return (

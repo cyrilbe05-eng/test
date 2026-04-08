@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { ClerkProvider } from '@/integrations/clerk/ClerkProvider'
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
 
@@ -124,8 +123,7 @@ function DemoApp() {
 // ─── Production App ───────────────────────────────────────────────────────────
 function ProductionApp() {
   return (
-    <ClerkProvider>
-      <BrowserRouter>
+    <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
@@ -158,8 +156,7 @@ function ProductionApp() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
-    </ClerkProvider>
+    </BrowserRouter>
   )
 }
 

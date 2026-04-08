@@ -1,5 +1,6 @@
-import { useClerk } from '@clerk/react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { clearToken } from '@/lib/auth'
+import { useQueryClient } from '@tanstack/react-query'
 import pinguPhone from '@/assets/pingu-phone.png'
 import { useProjects } from '@/hooks/useProjects'
 import { ProjectCard } from '@/components/project/ProjectCard'
@@ -18,14 +19,14 @@ const teamLinks = [
 ]
 
 export default function TeamDashboard() {
-  const { signOut } = useClerk()
   const { data: projects, isLoading } = useProjects()
   const { profile } = useAuth()
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
 
-  const handleSignOut = async () => {
-    await signOut()
-    toast.success('Signed out')
+  const handleSignOut = () => {
+    clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
   }
 
   const active = (projects ?? []).filter((p) => p.status !== 'client_approved')
