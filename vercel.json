@@ -2,6 +2,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "routes": [
+    { "handle": "filesystem" },
     { "src": "/api/cron/(.*)", "dest": "/api/cron/$1" },
     { "src": "/api/(.*)", "dest": "/api/[...slug]" },
     { "src": "/(.*)", "dest": "/index.html" }
