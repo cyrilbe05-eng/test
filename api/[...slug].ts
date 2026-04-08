@@ -2937,6 +2937,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  // ── auth ───────────────────────────────────────────────────────────────────
+  if (slug[0] === 'auth') {
+    if (slug[1] === 'login') return handleAuthLogin(req, res)
+    if (slug[1] === 'change-password') return handleAuthChangePassword(req, res)
+    res.status(404).json({ error: 'Not found' }); return
+  }
+
   // ── users ──────────────────────────────────────────────────────────────────
   if (slug[0] === 'users') {
     if (slug.length === 1) {
@@ -3210,13 +3217,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ;(req as any).query = { ...(req.query || {}), projectId: slug[1], fileId: slug[2] }
       return handleDownload(req, res)
     }
-    res.status(404).json({ error: 'Not found' }); return
-  }
-
-  // ── auth ───────────────────────────────────────────────────────────────────
-  if (slug[0] === 'auth') {
-    if (slug[1] === 'login') return handleAuthLogin(req, res)
-    if (slug[1] === 'change-password') return handleAuthChangePassword(req, res)
     res.status(404).json({ error: 'Not found' }); return
   }
 
