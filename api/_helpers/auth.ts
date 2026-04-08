@@ -2,8 +2,8 @@ import { SignJWT, jwtVerify } from 'jose'
 import bcrypt from 'bcryptjs'
 const { hash, compare } = bcrypt
 import type { IncomingMessage } from 'http'
-import { dbQuery } from './db'
-import type { Profile } from '../../src/types'
+import { dbQuery } from './db.js'
+import type { Profile } from '../../src/types/index.js'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET!)
 

@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { requireAuth, requireRole, signJwt, hashPassword, comparePassword } from './_helpers/auth'
-import { dbQuery, dbExecute, newId, nowIso } from './_helpers/db'
-import { getPresignedUploadUrl, getPresignedDownloadUrl, deleteObject } from './_helpers/r2'
-import { ok, err, handleError } from './_helpers/respond'
-import { sanitizeFileName } from '../src/lib/utils'
+import { requireAuth, requireRole, signJwt, hashPassword, comparePassword } from './_helpers/auth.js'
+import { dbQuery, dbExecute, newId, nowIso } from './_helpers/db.js'
+import { getPresignedUploadUrl, getPresignedDownloadUrl, deleteObject } from './_helpers/r2.js'
+import { ok, err, handleError } from './_helpers/respond.js'
+import { sanitizeFileName } from '../src/lib/utils.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
