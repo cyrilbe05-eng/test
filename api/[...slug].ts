@@ -2929,7 +2929,14 @@ async function handleAuthChangePassword(req: VercelRequest, res: VercelResponse)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const slug = (req.query.slug as string[]) || []
+  // When routed via explicit routes rule, slug may be a string like "auth/login"
+  // or an array. Normalize to always be a string array.
+  const rawSlug = req.query.slug
+  const slug: string[] = Array.isArray(rawSlug)
+    ? rawSlug
+    : typeof rawSlug === 'string'
+      ? rawSlug.split('/').filter(Boolean)
+      : (req.url?.replace(/^\/api\//, '').split('/').filter(Boolean) ?? [])
 
   // Block cron routes — they have their own dedicated file
   if (slug[0] === 'cron') {
