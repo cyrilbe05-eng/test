@@ -6,6 +6,9 @@ npm-debug.log*
 # Dependency directories
 node_modules/
 dist/
+
+# API build artifact generated during Vercel build
+api/[...slug].mjs
 dist-ssr/
 *.local
 
