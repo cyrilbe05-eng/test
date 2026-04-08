@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { requireAuth, requireRole, createClerkAdmin, signJwt, hashPassword, comparePassword } from './_helpers/auth'
+import { requireAuth, requireRole, signJwt, hashPassword, comparePassword } from './_helpers/auth'
 import { dbQuery, dbExecute, newId, nowIso } from './_helpers/db'
 import { getPresignedUploadUrl, getPresignedDownloadUrl, deleteObject } from './_helpers/r2'
 import { ok, err, handleError } from './_helpers/respond'
@@ -121,44 +121,26 @@ async function handleCreateUser(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ error: 'plan_id required for client role' }); return
     }
 
-    const tempPassword = generatePassword(16)
-    const clerk = createClerkAdmin()
-
-    // Non-fatal: allowlist may not be enabled in this Clerk instance
-    try {
-      await clerk.allowlistIdentifiers.createAllowlistIdentifier({
-        identifier: email,
-        notify: false,
-      })
-    } catch {
-      // Allowlist not enabled — continue
-    }
-
-    const clerkUser = await clerk.users.createUser({
-      emailAddress: [email],
-      password: tempPassword,
-      firstName: full_name.split(' ')[0],
-      lastName: full_name.split(' ').slice(1).join(' ') || undefined,
-      publicMetadata: { role },
-    })
-
-    const clerkUserId = clerkUser.id
+    const userId = newId()
     const now = nowIso()
+    const tempPassword = generatePassword(16)
+    const tempHash = await hashPassword(tempPassword)
 
     await dbExecute(
       `INSERT INTO profiles
-         (id, role, full_name, email, phone, plan_id, client_id_label, password_changed, disabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
+         (id, role, full_name, email, phone, plan_id, client_id_label, password_hash, password_changed, disabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
       [
-        clerkUserId, role, full_name, email,
+        userId, role, full_name, email,
         phone ?? null,
         plan_id ?? null,
         role === 'client' ? (client_id_label ?? null) : null,
+        tempHash,
         now, now,
       ]
     )
 
-    res.status(201).json({ id: clerkUserId, email, temporary_password: tempPassword })
+    res.status(201).json({ id: userId, email, temporary_password: tempPassword })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
@@ -225,18 +207,6 @@ async function handleDeleteUser(req: VercelRequest, res: VercelResponse) {
     await dbExecute('DELETE FROM chat_messages WHERE sender_id = ? AND group_id IS NOT NULL', [targetId])
     await dbExecute('DELETE FROM chat_groups WHERE created_by = ?', [targetId])
     await dbExecute('DELETE FROM profiles WHERE id = ?', [targetId])
-
-    const clerk = createClerkAdmin()
-    try {
-      const allowlist = await clerk.allowlistIdentifiers.getAllowlistIdentifierList()
-      const entry = allowlist.data.find((e) => e.identifier === target.email)
-      if (entry) {
-        await clerk.allowlistIdentifiers.deleteAllowlistIdentifier(entry.id)
-      }
-    } catch {
-      // Non-fatal
-    }
-    await clerk.users.deleteUser(targetId)
 
     res.json({ ok: true })
   } catch (e: any) {
@@ -306,10 +276,6 @@ async function handleDisableUser(req: VercelRequest, res: VercelResponse) {
       'UPDATE profiles SET disabled = 1, updated_at = ? WHERE id = ?',
       [nowIso(), targetId]
     )
-
-    const clerk = createClerkAdmin()
-    const sessions = await clerk.sessions.getSessionList({ userId: targetId, status: 'active' })
-    await Promise.all(sessions.data.map((s) => clerk.sessions.revokeSession(s.id)))
 
     res.json({ ok: true })
   } catch (e: any) {

@@ -9,7 +9,8 @@
       "Bash(\"c:\\\\Users\\\\WiktorWojtan\\\\OneDrive -:*)",
       "Bash(rm \"c:/Users/WiktorWojtan/OneDrive - BG2V AVOCATS ASSOCIES/Documents/GitHub/Cyril-Client-Dashboard/api/deadlines/[projectId].ts\")",
       "Bash(rm \"c:/Users/WiktorWojtan/OneDrive - BG2V AVOCATS ASSOCIES/Documents/GitHub/Cyril-Client-Dashboard/api/project-files/[projectId]/index.ts\")",
-      "Bash(rmdir \"c:/Users/WiktorWojtan/OneDrive - BG2V AVOCATS ASSOCIES/Documents/GitHub/Cyril-Client-Dashboard/api/project-files/[projectId]\")"
+      "Bash(rmdir \"c:/Users/WiktorWojtan/OneDrive - BG2V AVOCATS ASSOCIES/Documents/GitHub/Cyril-Client-Dashboard/api/project-files/[projectId]\")",
+      "Bash(npm run:*)"
     ]
   }
 }
