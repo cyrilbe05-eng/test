@@ -8,7 +8,7 @@
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "functions": {
-    "api/[...slug].ts": {
+    "api/[...slug].mts": {
       "maxDuration": 60
     },
     "api/cron/budget-nudge.ts": {

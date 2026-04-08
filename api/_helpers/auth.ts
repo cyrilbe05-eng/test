@@ -2,8 +2,6 @@ import { SignJWT, jwtVerify } from 'jose'
 import bcrypt from 'bcryptjs'
 const { hash, compare } = bcrypt
 import type { IncomingMessage } from 'http'
-
-const scryptAsync = promisify(scrypt)
 import { dbQuery } from './db.js'
 import type { Profile } from '../../src/types/index.js'
 
