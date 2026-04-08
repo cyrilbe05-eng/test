@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose'
-import { hash, compare } from 'bcryptjs'
+import bcrypt from 'bcryptjs'
+const { hash, compare } = bcrypt
 import type { IncomingMessage } from 'http'
 import { dbQuery } from './db'
 import type { Profile } from '../../src/types'
