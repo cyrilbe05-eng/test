@@ -7,6 +7,7 @@ export function useGalleryFiles(ownerId?: string) {
   return useQuery({
     queryKey: ['gallery_files', ownerId],
     enabled: !!ownerId,
+    staleTime: 0,
     queryFn: () =>
       apiFetch<GalleryFile[]>(`/api/gallery?ownerId=${ownerId}`),
   })
@@ -17,6 +18,7 @@ export function useGalleryFolders(ownerId?: string) {
   return useQuery({
     queryKey: ['gallery_folders', ownerId],
     enabled: !!ownerId,
+    staleTime: 0,
     queryFn: () =>
       apiFetch<GalleryFolder[]>(`/api/gallery/folders?ownerId=${ownerId}`),
   })
@@ -32,7 +34,7 @@ export function useCreateFolder() {
         body: JSON.stringify({ ownerId, name, parentId }),
       }),
     onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: ['gallery_folders', variables.ownerId] })
+      qc.refetchQueries({ queryKey: ['gallery_folders', variables.ownerId] })
     },
   })
 }
@@ -47,7 +49,7 @@ export function useRenameFolder() {
         body: JSON.stringify({ name }),
       }),
     onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: ['gallery_folders', variables.ownerId] })
+      qc.refetchQueries({ queryKey: ['gallery_folders', variables.ownerId] })
     },
   })
 }
@@ -59,8 +61,8 @@ export function useDeleteFolder() {
     mutationFn: ({ id }: { id: string; ownerId: string }) =>
       apiFetch(`/api/gallery/folders/${id}`, { method: 'DELETE' }),
     onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: ['gallery_folders', variables.ownerId] })
-      qc.invalidateQueries({ queryKey: ['gallery_files', variables.ownerId] })
+      qc.refetchQueries({ queryKey: ['gallery_folders', variables.ownerId] })
+      qc.refetchQueries({ queryKey: ['gallery_files', variables.ownerId] })
     },
   })
 }
@@ -75,7 +77,7 @@ export function useMoveFile() {
         body: JSON.stringify({ folderId }),
       }),
     onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: ['gallery_files', variables.ownerId] })
+      qc.refetchQueries({ queryKey: ['gallery_files', variables.ownerId] })
     },
   })
 }
@@ -87,7 +89,7 @@ export function useDeleteGalleryFile() {
     mutationFn: ({ id }: { id: string; ownerId: string }) =>
       apiFetch(`/api/gallery/${id}`, { method: 'DELETE' }),
     onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: ['gallery_files', variables.ownerId] })
+      qc.refetchQueries({ queryKey: ['gallery_files', variables.ownerId] })
     },
   })
 }

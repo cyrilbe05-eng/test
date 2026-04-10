@@ -535,7 +535,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
       }
     }
     // Always refresh the file list after upload attempts
-    qc.invalidateQueries({ queryKey: ['gallery_files', ownerId] })
+    qc.refetchQueries({ queryKey: ['gallery_files', ownerId] })
     if (successCount > 0) {
       toast.success(`${successCount} file${successCount > 1 ? 's' : ''} uploaded`)
     }
