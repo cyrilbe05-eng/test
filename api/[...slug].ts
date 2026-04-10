@@ -2965,7 +2965,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ? rawSlug
     : typeof rawSlug === 'string'
       ? rawSlug.split('/').filter(Boolean)
-      : (req.url?.replace(/^\/api\//, '').split('/').filter(Boolean) ?? [])
+      : (req.url?.replace(/^\/api\//, '').split('?')[0].split('/').filter(Boolean) ?? [])
 
   // Block cron routes — they have their own dedicated file
   if (slug[0] === 'cron') {
