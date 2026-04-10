@@ -494,6 +494,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
     setUploading(true)
     let successCount = 0
     for (const file of Array.from(files)) {
+      const mimeType = file.type || 'application/octet-stream'
       try {
         // 1. Get presigned upload URL
         const { uploadUrl, storageKey } = await apiFetch<{ uploadUrl: string; storageKey: string }>(
@@ -502,7 +503,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
             method: 'POST',
             body: JSON.stringify({
               fileName: file.name,
-              mimeType: file.type,
+              mimeType,
               fileSize: file.size,
               folderId: currentFolderId,
               ownerId,
@@ -510,17 +511,18 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
           }
         )
         // 2. PUT file directly to R2
-        await fetch(uploadUrl, {
+        const r2Res = await fetch(uploadUrl, {
           method: 'PUT',
           body: file,
-          headers: { 'Content-Type': file.type },
+          headers: { 'Content-Type': mimeType },
         })
+        if (!r2Res.ok) throw new Error(`R2 upload failed (${r2Res.status})`)
         // 3. Register in DB
         await apiFetch('/api/gallery/register', {
           method: 'POST',
           body: JSON.stringify({
             fileName: file.name,
-            mimeType: file.type,
+            mimeType,
             fileSize: file.size,
             storageKey,
             folderId: currentFolderId,
@@ -528,13 +530,14 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
           }),
         })
         successCount++
-      } catch {
-        toast.error(`Failed to upload ${file.name}`)
+      } catch (err) {
+        toast.error(`Failed to upload ${file.name}: ${(err as Error).message}`)
       }
     }
+    // Always refresh the file list after upload attempts
+    qc.invalidateQueries({ queryKey: ['gallery_files', ownerId] })
     if (successCount > 0) {
       toast.success(`${successCount} file${successCount > 1 ? 's' : ''} uploaded`)
-      qc.invalidateQueries({ queryKey: ['gallery_files', ownerId] })
     }
     setUploading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
