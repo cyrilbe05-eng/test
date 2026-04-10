@@ -1,13 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { clearToken } from '@/lib/auth'
-import { useQueryClient } from '@tanstack/react-query'
-import pinguWave from '@/assets/pingu-wave.png'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
-import { NotificationBell } from '@/components/notifications/NotificationBell'
-import { ThemeToggle } from '@/lib/theme'
 import { useAuth } from '@/hooks/useAuth'
+import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { cn } from '@/lib/utils'
 import {
   useConnections,
@@ -126,14 +121,8 @@ export default function ClientMessages() {
   const { profile } = useAuth()
   const { data: connections } = useConnections()
   const { data: groups } = useGroups()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
 
   const [activeConvId, setActiveConvId] = useState<ConversationId>(null)
-
-  const handleSignOut = () => {
-    clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
-  }
 
   // Filter to only conversations this client is part of
   const myConnections = (connections ?? []).filter(
@@ -146,22 +135,8 @@ export default function ClientMessages() {
   const hasConversations = myConnections.length > 0 || myGroups.length > 0
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between" style={{ height: '52px' }}>
-          <div className="flex items-center gap-2.5">
-            <img src={pinguWave} alt="Pingu Studio" className="w-8 h-8 object-contain rounded-lg" />
-            <span className="font-heading font-semibold text-sm">Pingu Studio</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {profile && <NotificationBell userId={profile.id} />}
-            <ThemeToggle />
-            <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted">Sign out</button>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex h-[calc(100vh-52px)]">
+    <ClientLayout>
+      <div className="flex h-full" style={{ minHeight: 'calc(100vh - 52px)' }}>
         {/* Sidebar */}
         <aside className="w-72 border-r border-border bg-card/60 flex flex-col flex-shrink-0">
           <div className="p-4 border-b border-border">
@@ -253,6 +228,6 @@ export default function ClientMessages() {
           )}
         </main>
       </div>
-    </div>
+    </ClientLayout>
   )
 }

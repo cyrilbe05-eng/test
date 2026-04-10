@@ -1,13 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { clearToken } from '@/lib/auth'
-import { useQueryClient } from '@tanstack/react-query'
-import pinguPhone from '@/assets/pingu-phone.png'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
-import { NotificationBell } from '@/components/notifications/NotificationBell'
-import { ThemeToggle } from '@/lib/theme'
 import { useAuth } from '@/hooks/useAuth'
+import { TeamLayout } from '@/components/workspace/TeamLayout'
 import { cn } from '@/lib/utils'
 import {
   useConnections,
@@ -126,14 +121,8 @@ export default function TeamMessages() {
   const { profile } = useAuth()
   const { data: connections } = useConnections()
   const { data: groups } = useGroups()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
 
   const [activeConvId, setActiveConvId] = useState<ConversationId>(null)
-
-  const handleSignOut = () => {
-    clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
-  }
 
   // Filter to only conversations this user is part of
   const myConnections = (connections ?? []).filter(
@@ -144,23 +133,8 @@ export default function TeamMessages() {
   )
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between" style={{ height: '52px' }}>
-          <div className="flex items-center gap-2.5">
-            <img src={pinguPhone} alt="Pingu Studio" className="w-8 h-8 object-contain rounded-lg" />
-            <span className="font-heading font-semibold text-sm">Pingu Studio</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {profile && <NotificationBell userId={profile.id} />}
-            <ThemeToggle />
-            <span className="text-sm text-muted-foreground hidden sm:block">{profile?.full_name}</span>
-            <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted">Sign out</button>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex h-[calc(100vh-52px)]">
+    <TeamLayout>
+      <div className="flex h-full" style={{ minHeight: 'calc(100vh - 52px)' }}>
         {/* Sidebar */}
         <aside className="w-72 border-r border-border bg-card/60 flex flex-col flex-shrink-0">
           <div className="p-4 border-b border-border">
@@ -248,6 +222,6 @@ export default function TeamMessages() {
           )}
         </main>
       </div>
-    </div>
+    </TeamLayout>
   )
 }

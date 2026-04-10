@@ -1,9 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { clearToken } from '@/lib/auth'
-import { useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
-import pinguWave from '@/assets/pingu-wave.png'
+import { Link } from 'react-router-dom'
 import {
   format,
   startOfWeek,
@@ -15,23 +11,13 @@ import {
   isWithinInterval,
   parseISO,
 } from 'date-fns'
-import { toast } from 'sonner'
-import { NotificationBell } from '@/components/notifications/NotificationBell'
-import { ThemeToggle } from '@/lib/theme'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
 import { cn } from '@/lib/utils'
 import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
+import { ClientLayout } from '@/components/workspace/ClientLayout'
 import type { Project, TimelineComment, Plan } from '@/types'
-
-const clientLinks = [
-  { to: '/workspace', label: 'Projects', exact: true },
-  { to: '/workspace/gallery', label: 'Gallery' },
-  { to: '/workspace/calendar', label: 'Calendar' },
-  { to: '/workspace/messages', label: 'Messages' },
-  { to: '/workspace/analytics', label: 'Analytics' },
-]
 
 type Timeframe = 'week' | 'month' | 'custom'
 
@@ -55,16 +41,11 @@ function MiniBarChart({ data, color = 'bg-primary' }: { data: { label: string; v
 
 export default function ClientAnalytics() {
   const { profile } = useAuth()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
-  const { pathname } = useLocation()
   const apiFetch = useApiFetch()
 
   const [timeframe, setTimeframe] = useState<Timeframe>('month')
   const [customFrom, setCustomFrom] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'))
   const [customTo, setCustomTo] = useState(format(new Date(), 'yyyy-MM-dd'))
-
-  const handleSignOut = () => { clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true }) }
 
   // ─── Data fetching ──────────────────────────────────────────────────────────
   const { data: projects = [], isLoading } = useProjects()
@@ -158,29 +139,7 @@ export default function ClientAnalytics() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between" style={{ height: '52px' }}>
-          <div className="flex items-center gap-2.5">
-            <img src={pinguWave} alt="Pingu Studio" className="w-8 h-8 object-contain rounded-lg" />
-            <span className="font-heading font-semibold text-sm">Pingu Studio</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {profile && <NotificationBell userId={profile.id} />}
-            <ThemeToggle />
-            <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted">Sign out</button>
-          </div>
-        </div>
-      </header>
-
-      <nav className="border-b border-border bg-background">
-        <div className="max-w-5xl mx-auto px-6 flex gap-1 h-10 items-center">
-          {clientLinks.map(({ to, label, exact }) => {
-            const isActive = exact ? pathname === to : pathname.startsWith(to)
-            return <Link key={to} to={to} className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>{label}</Link>
-          })}
-        </div>
-      </nav>
+    <ClientLayout>
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -370,6 +329,6 @@ export default function ClientAnalytics() {
           </>
         )}
       </main>
-    </div>
+    </ClientLayout>
   )
 }

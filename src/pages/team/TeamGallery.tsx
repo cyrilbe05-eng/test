@@ -1,18 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import { clearToken } from '@/lib/auth'
-import { useQueryClient } from '@tanstack/react-query'
-import pinguPhone from '@/assets/pingu-phone.png'
 import { useApiFetch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
-import { NotificationBell } from '@/components/notifications/NotificationBell'
-import { ThemeToggle } from '@/lib/theme'
 import { Gallery } from '@/components/gallery/Gallery'
-import { toast } from 'sonner'
+import { TeamLayout } from '@/components/workspace/TeamLayout'
 import type { Profile } from '@/types'
-
-// ─── Sidebar button ───────────────────────────────────────────────────────────
 
 function SidebarButton({
   label,
@@ -53,13 +45,9 @@ function SidebarButton({
   )
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
-
 export default function TeamGallery() {
   const { profile } = useAuth()
   const apiFetch = useApiFetch()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
 
   const { data: users = [] } = useQuery<Profile[]>({
     queryKey: ['users'],
@@ -67,36 +55,13 @@ export default function TeamGallery() {
   })
 
   const clients = users.filter((u) => u.role === 'client')
-
-  // null = "all files" view (show first client by default), string = specific client id
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
-
   const activeOwnerId = selectedClientId ?? clients[0]?.id ?? null
 
-  const handleSignOut = () => {
-    clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
-  }
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-screen-2xl mx-auto px-6 flex items-center justify-between" style={{ height: '52px' }}>
-          <div className="flex items-center gap-2.5">
-            <img src={pinguPhone} alt="Pingu Studio" className="w-8 h-8 object-contain rounded-lg" />
-            <span className="font-heading font-semibold text-sm">Pingu Studio</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {profile && <NotificationBell userId={profile.id} />}
-            <ThemeToggle />
-            <span className="text-sm text-muted-foreground hidden sm:block">{profile?.full_name}</span>
-            <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted">Sign out</button>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex" style={{ minHeight: 'calc(100vh - 52px)' }}>
-        {/* Sidebar */}
+    <TeamLayout>
+      <div className="flex h-full" style={{ minHeight: 'calc(100vh - 52px)' }}>
+        {/* Client sidebar */}
         <aside className="w-60 flex-shrink-0 border-r border-border bg-card/50 flex flex-col">
           <div className="px-4 py-4 border-b border-border">
             <h2 className="font-heading font-semibold text-sm tracking-tight">Client Galleries</h2>
@@ -138,6 +103,6 @@ export default function TeamGallery() {
           )}
         </main>
       </div>
-    </div>
+    </TeamLayout>
   )
 }

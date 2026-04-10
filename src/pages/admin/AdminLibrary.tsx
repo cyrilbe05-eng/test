@@ -4,7 +4,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useApiFetch } from '@/lib/api'
-import { AdminNav } from '@/components/admin/AdminNav'
+import { AdminLayout } from '@/components/admin/AdminLayout'
 
 interface LibraryFile {
   id: string
@@ -106,10 +106,8 @@ export default function AdminLibrary() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminNav />
-
-      <main className="max-w-screen-2xl mx-auto px-6 py-8 space-y-8">
+    <AdminLayout>
+      <main className="px-6 py-8 space-y-8">
         {/* Storage overview */}
         <section>
           <h2 className="text-xl font-heading font-semibold tracking-tight mb-4">Storage by Client</h2>
@@ -264,6 +262,6 @@ export default function AdminLibrary() {
           )}
         </section>
       </main>
-    </div>
+    </AdminLayout>
   )
 }

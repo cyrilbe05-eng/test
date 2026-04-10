@@ -4,7 +4,23 @@ import { formatDistanceToNow } from 'date-fns'
 import { useProjects } from '@/hooks/useProjects'
 import { KanbanBoard } from '@/components/admin/KanbanBoard'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
-import { AdminNav } from '@/components/admin/AdminNav'
+import { AdminLayout } from '@/components/admin/AdminLayout'
+import { cn } from '@/lib/utils'
+
+function IconLayout() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+    </svg>
+  )
+}
+function IconList() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+    </svg>
+  )
+}
 
 type View = 'kanban' | 'list'
 
@@ -15,22 +31,24 @@ export default function AdminProjects() {
   if (isLoading) return <PageLoader />
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminNav />
-
-      <main className="max-w-screen-2xl mx-auto px-6 py-8">
+    <AdminLayout>
+      <main className="px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-heading font-semibold tracking-tight">Projects</h2>
+            <h2 className="text-2xl font-heading font-bold">Projects</h2>
             <p className="text-muted-foreground text-sm mt-0.5">{projects?.length ?? 0} total</p>
           </div>
-          <div className="flex items-center gap-1 bg-muted rounded-xl p-1 border border-border">
+          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 border border-border">
             {(['kanban', 'list'] as View[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all capitalize ${view === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-all capitalize',
+                  view === v ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground',
+                )}
               >
+                {v === 'kanban' ? <IconLayout /> : <IconList />}
                 {v}
               </button>
             ))}
@@ -67,7 +85,7 @@ export default function AdminProjects() {
           </div>
         )}
       </main>
-    </div>
+    </AdminLayout>
   )
 }
 

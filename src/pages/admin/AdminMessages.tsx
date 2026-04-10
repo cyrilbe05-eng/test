@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
-import { AdminNav } from '@/components/admin/AdminNav'
+import { AdminLayout } from '@/components/admin/AdminLayout'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { useApiFetch } from '@/lib/api'
@@ -315,10 +315,8 @@ export default function AdminMessages() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminNav />
-
-      <div className="flex h-[calc(100vh-52px)]">
+    <AdminLayout>
+      <div className="flex h-full" style={{ minHeight: 'calc(100vh - 52px)' }}>
         {/* Sidebar */}
         <aside className="w-72 border-r border-border bg-card/60 flex flex-col flex-shrink-0">
           <div className="p-4 border-b border-border flex items-center justify-between">
@@ -460,6 +458,6 @@ export default function AdminMessages() {
 
       {showNewDM && <NewDMModal users={users ?? []} onClose={() => setShowNewDM(false)} />}
       {showNewGroup && <NewGroupModal users={users ?? []} onClose={() => setShowNewGroup(false)} />}
-    </div>
+    </AdminLayout>
   )
 }

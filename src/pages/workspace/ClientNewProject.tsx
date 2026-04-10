@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { useApiFetch } from '@/lib/api'
 import { useStorageAdapter } from '@/lib/storage'
+import { ClientLayout } from '@/components/workspace/ClientLayout'
 
 const schema = z.object({
   title: z.string().min(2, 'Title required'),
@@ -72,15 +73,7 @@ export default function ClientNewProject() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-3xl mx-auto px-6 flex items-center gap-3" style={{ height: '52px' }}>
-          <Link to="/workspace" className="text-muted-foreground hover:text-foreground text-sm transition-colors">← My Workspace</Link>
-          <span className="text-border">/</span>
-          <span className="text-sm font-medium text-foreground">New Project</span>
-        </div>
-      </header>
-
+    <ClientLayout>
       <main className="max-w-3xl mx-auto px-6 py-10 animate-slide-up">
         <h1 className="text-2xl font-heading font-semibold tracking-tight mb-1.5">New Project</h1>
         <p className="text-muted-foreground mb-8 text-sm">Tell us what you need and upload your source material.</p>
@@ -136,7 +129,7 @@ export default function ClientNewProject() {
           </button>
         </form>
       </main>
-    </div>
+    </ClientLayout>
   )
 }
 

@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
+import { TeamLayout } from '@/components/workspace/TeamLayout'
 import { getSignedUrlById } from '@/lib/storage'
 import { useApiFetch } from '@/lib/api'
 import { toast } from 'sonner'
@@ -30,16 +31,17 @@ export default function TeamProjectDetail() {
   if (!project) return <Loader />
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-6 flex items-center gap-3" style={{ height: '52px' }}>
+    <TeamLayout>
+      {/* Breadcrumb */}
+      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-20" style={{ height: '52px' }}>
+        <div className="h-full px-6 flex items-center gap-3">
           <Link to="/team" className="text-muted-foreground hover:text-foreground text-sm transition-colors">← My Assignments</Link>
           <span className="text-border">/</span>
           <span className="text-sm font-medium truncate">{project.title}</span>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main */}
           <div className="lg:col-span-2 space-y-5">
@@ -125,7 +127,7 @@ export default function TeamProjectDetail() {
           </div>
         </div>
       </main>
-    </div>
+    </TeamLayout>
   )
 }
 

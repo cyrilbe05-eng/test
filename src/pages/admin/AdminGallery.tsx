@@ -3,47 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useGalleryFiles } from '@/hooks/useGallery'
-import { AdminNav } from '@/components/admin/AdminNav'
+import { AdminLayout } from '@/components/admin/AdminLayout'
 import { Gallery } from '@/components/gallery/Gallery'
-import type { Profile } from '@/types'
+import { cn } from '@/lib/utils'
+import type { Profile, Plan } from '@/types'
 
-// ─── Client sidebar row ───────────────────────────────────────────────────────
-
-function ClientRow({
-  client,
-  fileCount,
-  selected,
-  onClick,
-}: {
-  client: Profile
-  fileCount: number
-  selected: boolean
-  onClick: () => void
-}) {
-  const initial = client.full_name.charAt(0).toUpperCase()
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
-        selected ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-foreground'
-      }`}
-    >
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-        selected ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
-      }`}>
-        {initial}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{client.full_name}</p>
-        <p className={`text-xs ${selected ? 'text-primary/70' : 'text-muted-foreground'}`}>
-          {fileCount} {fileCount === 1 ? 'file' : 'files'}
-        </p>
-      </div>
-    </button>
-  )
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AdminGallery() {
   const { profile } = useAuth()
@@ -53,16 +17,24 @@ export default function AdminGallery() {
     queryKey: ['users'],
     queryFn: () => apiFetch<Profile[]>('/api/users'),
   })
+  const { data: plans = [] } = useQuery<Plan[]>({
+    queryKey: ['plans'],
+    queryFn: () => apiFetch<Plan[]>('/api/plans'),
+  })
 
   const clients = users.filter((u) => u.role === 'client')
 
+  // null = all clients, string = specific client id
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
 
-  // The active owner: selected or fall back to first client
+  // For the active specific client, load their files to show count + storage
   const activeOwnerId = selectedClientId ?? clients[0]?.id ?? null
+  const { data: activeClientFiles = [] } = useGalleryFiles(activeOwnerId ?? undefined)
 
-  // Load all files to compute per-client counts
-  const { data: allFiles = [] } = useGalleryFiles(activeOwnerId ?? undefined)
+  // Per-client storage info (storage stats come from the library endpoint)
+  function clientPlan(client: Profile) {
+    return plans.find((p) => p.id === client.plan_id) ?? null
+  }
 
   if (!profile) {
     return (
@@ -73,61 +45,106 @@ export default function AdminGallery() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminNav />
-
-      <div className="flex" style={{ minHeight: 'calc(100vh - 52px)' }}>
+    <AdminLayout>
+      <div className="flex h-full" style={{ minHeight: 'calc(100vh - 52px)' }}>
         {/* Client sidebar */}
-        <aside className="w-64 flex-shrink-0 border-r border-border bg-card/50 flex flex-col">
-          <div className="px-4 py-4 border-b border-border">
-            <h2 className="font-heading font-semibold text-sm tracking-tight">Gallery</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">{clients.length} {clients.length === 1 ? 'client' : 'clients'}</p>
+        <aside className="w-56 border-r border-border bg-background flex flex-col flex-shrink-0 overflow-y-auto">
+          <div className="px-3 pt-4 pb-2">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">Filter by client</p>
+
+            {/* All clients */}
+            <button
+              onClick={() => setSelectedClientId(null)}
+              className={cn(
+                'w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm transition-colors text-left',
+                selectedClientId === null ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground hover:bg-muted',
+              )}
+            >
+              <span className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">All</span>
+              <span className="truncate flex-1">All Clients</span>
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2">
-            {clients.length === 0 ? (
+          <div className="px-3 space-y-0.5 pb-4">
+            {clients.map((client) => {
+              const isSelected = selectedClientId === client.id
+              const plan = clientPlan(client)
+              return (
+                <button
+                  key={client.id}
+                  onClick={() => setSelectedClientId(client.id)}
+                  className={cn(
+                    'w-full flex items-start gap-2 px-2 py-2.5 rounded-lg text-sm transition-colors text-left group',
+                    isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-muted',
+                  )}
+                >
+                  <div className={cn(
+                    'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5',
+                    isSelected ? 'bg-primary text-white' : 'bg-muted text-foreground',
+                  )}>
+                    {client.full_name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate leading-tight">{client.full_name}</p>
+                    {client.client_id_label && (
+                      <p className="text-[10px] text-muted-foreground">{client.client_id_label}</p>
+                    )}
+                    {isSelected && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{activeClientFiles.length} files</p>
+                    )}
+                    {plan && <p className="text-[10px] text-muted-foreground">{plan.name}</p>}
+                  </div>
+                </button>
+              )
+            })}
+            {clients.length === 0 && (
               <p className="text-xs text-muted-foreground px-3 py-4 text-center">No clients yet</p>
-            ) : (
-              <div className="space-y-0.5">
-                {clients.map((client) => (
-                  <ClientRow
-                    key={client.id}
-                    client={client}
-                    fileCount={
-                      // Show live file count only for the active owner; use 0 for others to avoid n+1 queries
-                      (selectedClientId ?? clients[0]?.id) === client.id ? allFiles.length : 0
-                    }
-                    selected={(selectedClientId ?? clients[0]?.id) === client.id}
-                    onClick={() => setSelectedClientId(client.id)}
-                  />
-                ))}
-              </div>
             )}
           </div>
         </aside>
 
         {/* Gallery main */}
-        <main className="flex-1 flex flex-col min-w-0">
-          {activeOwnerId ? (
-            <Gallery
-              ownerId={activeOwnerId}
-              currentUserId={profile.id}
-              showOwner={false}
-              storageLimitMb={-1}
-              readOnly={false}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <svg className="w-10 h-10 text-muted-foreground mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <p className="text-muted-foreground text-sm">No clients yet. Create a client account to get started.</p>
+        <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
+          <div className="px-6 pt-5 pb-3 flex-shrink-0">
+            <h1 className="text-xl font-heading font-bold">
+              {selectedClientId
+                ? users.find((u) => u.id === selectedClientId)?.full_name ?? 'Client'
+                : 'All Clients'}
+            </h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {selectedClientId ? 'Files belonging to this client.' : 'All files across all clients and team members.'}
+            </p>
+          </div>
+          <div className="flex-1 px-6 pb-6">
+            {selectedClientId ? (
+              <Gallery
+                ownerId={selectedClientId}
+                currentUserId={profile.id}
+                showOwner={false}
+                storageLimitMb={plans.find((p) => p.id === users.find((u) => u.id === selectedClientId)?.plan_id)?.storage_limit_mb ?? -1}
+                readOnly={false}
+              />
+            ) : activeOwnerId ? (
+              <Gallery
+                ownerId={activeOwnerId}
+                currentUserId={profile.id}
+                showOwner={true}
+                storageLimitMb={-1}
+                readOnly={false}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center py-20">
+                <div className="text-center">
+                  <svg className="w-10 h-10 text-muted-foreground mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <p className="text-muted-foreground text-sm">No clients yet. Create a client account to get started.</p>
+                </div>
               </div>
-            </div>
-          )}
-        </main>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+    </AdminLayout>
   )
 }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
-import { AdminNav } from '@/components/admin/AdminNav'
+import { AdminLayout } from '@/components/admin/AdminLayout'
 import type { Plan } from '@/types'
 
 interface PlanForm {
@@ -111,10 +111,8 @@ export default function AdminPlans() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminNav />
-
-      <main className="max-w-4xl mx-auto px-6 py-8">
+    <AdminLayout>
+      <main className="px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-heading font-semibold tracking-tight">Plans</h2>
@@ -197,7 +195,7 @@ export default function AdminPlans() {
           <p><span className="text-foreground font-medium">Active Projects</span> — max simultaneous open projects a client can have. <code className="bg-muted px-1.5 py-0.5 rounded-lg text-xs">-1</code> = unlimited.</p>
         </div>
       </main>
-    </div>
+    </AdminLayout>
   )
 }
 

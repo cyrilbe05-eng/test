@@ -1,9 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { clearToken } from '@/lib/auth'
-import { useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router-dom'
-import pinguPhone from '@/assets/pingu-phone.png'
+import { TeamLayout } from '@/components/workspace/TeamLayout'
 import {
   format,
   startOfMonth,
@@ -18,8 +14,6 @@ import {
   parseISO,
 } from 'date-fns'
 import { toast } from 'sonner'
-import { NotificationBell } from '@/components/notifications/NotificationBell'
-import { ThemeToggle } from '@/lib/theme'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import {
@@ -60,13 +54,6 @@ const CONTENT_STATUS_STYLES: Record<ContentStatus, string> = {
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const teamLinks = [
-  { to: '/team', label: 'Dashboard', exact: true },
-  { to: '/team/stats', label: 'My Stats' },
-  { to: '/team/gallery', label: 'Gallery' },
-  { to: '/team/calendar', label: 'Calendar' },
-  { to: '/team/messages', label: 'Messages' },
-]
 
 function PropRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -402,9 +389,6 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function TeamCalendar() {
   const { profile } = useAuth()
-  const { pathname } = useLocation()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
   const [viewDate, setViewDate] = useState(new Date())
   const [createDay, setCreateDay] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -423,35 +407,10 @@ export default function TeamCalendar() {
 
   const days = eachDayOfInterval({ start: startOfWeek(startOfMonth(viewDate)), end: endOfWeek(endOfMonth(viewDate)) })
   const eventsForDay = (day: Date) => { const s = format(day, 'yyyy-MM-dd'); return events.filter((e) => e.date === s) }
-  const handleSignOut = () => { clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true }) }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between" style={{ height: '52px' }}>
-          <div className="flex items-center gap-2.5">
-            <img src={pinguPhone} alt="Pingu Studio" className="w-8 h-8 object-contain rounded-lg" />
-            <span className="font-heading font-semibold text-sm">Pingu Studio</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {profile && <NotificationBell userId={profile.id} />}
-            <ThemeToggle />
-            <span className="text-sm text-muted-foreground hidden sm:block">{profile?.full_name}</span>
-            <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted">Sign out</button>
-          </div>
-        </div>
-      </header>
-
-      <nav className="border-b border-border bg-background">
-        <div className="max-w-5xl mx-auto px-6 flex gap-1 h-10 items-center">
-          {teamLinks.map(({ to, label, exact }) => {
-            const isActive = exact ? pathname === to : pathname.startsWith(to)
-            return <Link key={to} to={to} className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>{label}</Link>
-          })}
-        </div>
-      </nav>
-
-      <main className="max-w-5xl mx-auto px-6 py-8">
+    <TeamLayout>
+      <main className="px-6 py-8">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-heading font-semibold tracking-tight">{format(viewDate, 'MMMM yyyy')}</h1>
           <div className="flex items-center gap-2">
@@ -527,6 +486,6 @@ export default function TeamCalendar() {
       {selectedEvent && profile && (
         <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} currentUserId={profile.id} />
       )}
-    </div>
+    </TeamLayout>
   )
 }

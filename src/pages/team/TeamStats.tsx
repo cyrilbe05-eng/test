@@ -1,14 +1,8 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { clearToken } from '@/lib/auth'
-import { useQueryClient } from '@tanstack/react-query'
-import pinguPhone from '@/assets/pingu-phone.png'
+import { Link } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
-import { NotificationBell } from '@/components/notifications/NotificationBell'
-import { useAuth } from '@/hooks/useAuth'
-import { toast } from 'sonner'
-import { ThemeToggle } from '@/lib/theme'
 import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
+import { TeamLayout } from '@/components/workspace/TeamLayout'
 import type { Project, ProjectStatus, TimelineComment } from '@/types'
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
@@ -31,25 +25,9 @@ const STATUS_COLORS: Record<ProjectStatus, string> = {
   revision_requested: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
 }
 
-const teamLinks = [
-  { to: '/team', label: 'Dashboard', exact: true },
-  { to: '/team/stats', label: 'My Stats' },
-  { to: '/team/gallery', label: 'Gallery' },
-  { to: '/team/calendar', label: 'Calendar' },
-  { to: '/team/messages', label: 'Messages' },
-]
-
 export default function TeamStats() {
   const { data: projects, isLoading } = useProjects()
-  const { profile } = useAuth()
-  const { pathname } = useLocation()
   const apiFetch = useApiFetch()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
-
-  const handleSignOut = () => {
-    clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
-  }
 
   const allProjects = (projects ?? []) as Project[]
   const active = allProjects.filter((p) => p.status !== 'client_approved')
@@ -86,40 +64,8 @@ export default function TeamStats() {
   const projectsWithRevisions = allProjects.filter((p) => p.client_revision_count > 0)
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between" style={{ height: '52px' }}>
-          <div className="flex items-center gap-2.5">
-            <img src={pinguPhone} alt="Pingu Studio" className="w-8 h-8 object-contain rounded-lg" />
-            <span className="font-heading font-semibold text-sm">Pingu Studio</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {profile && <NotificationBell userId={profile.id} />}
-            <ThemeToggle />
-            <span className="text-sm text-muted-foreground hidden sm:block">{profile?.full_name}</span>
-            <button onClick={handleSignOut} className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted">Sign out</button>
-          </div>
-        </div>
-      </header>
-
-      <nav className="border-b border-border bg-background">
-        <div className="max-w-5xl mx-auto px-6 flex gap-1 h-10 items-center">
-          {teamLinks.map(({ to, label, exact }) => {
-            const isActive = exact ? pathname === to : pathname.startsWith(to)
-            return (
-              <Link
-                key={to}
-                to={to}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-              >
-                {label}
-              </Link>
-            )
-          })}
-        </div>
-      </nav>
-
-      <main className="max-w-5xl mx-auto px-6 py-8">
+    <TeamLayout>
+      <main className="px-6 py-8">
         <h1 className="text-2xl font-heading font-semibold tracking-tight mb-6">My Stats</h1>
 
         {isLoading ? (
@@ -240,6 +186,6 @@ export default function TeamStats() {
           </>
         )}
       </main>
-    </div>
+    </TeamLayout>
   )
 }

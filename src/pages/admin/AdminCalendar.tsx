@@ -13,7 +13,7 @@ import {
   parseISO,
 } from 'date-fns'
 import { toast } from 'sonner'
-import { AdminNav } from '@/components/admin/AdminNav'
+import { AdminLayout } from '@/components/admin/AdminLayout'
 import { cn } from '@/lib/utils'
 import {
   useCalendarEvents,
@@ -513,10 +513,8 @@ export default function AdminCalendar() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminNav />
-
-      <main className="max-w-screen-xl mx-auto px-6 py-8">
+    <AdminLayout>
+      <main className="px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -638,6 +636,6 @@ export default function AdminCalendar() {
           teamMembers={teamMembers}
         />
       )}
-    </div>
+    </AdminLayout>
   )
 }
