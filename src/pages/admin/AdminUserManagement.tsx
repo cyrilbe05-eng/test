@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { useApiFetch } from '@/lib/api'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { CreateUserModal } from '@/components/admin/CreateUserModal'
+import { startImpersonation } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import type { Profile, Plan, ChatConnection, ChatGroup } from '@/types'
 
@@ -53,7 +55,7 @@ function StatBlock({ label, value, sub }: { label: string; value: string | numbe
   )
 }
 
-function UserProfileModal({ user, plans, onClose }: { user: UserRow; plans: Plan[]; onClose: () => void }) {
+function UserProfileModal({ user, plans, onClose, onViewAs }: { user: UserRow; plans: Plan[]; onClose: () => void; onViewAs: (u: UserRow) => void }) {
   const apiFetch = useApiFetch()
   const qc = useQueryClient()
   const isClient = user.role === 'client'
@@ -267,6 +269,22 @@ function UserProfileModal({ user, plans, onClose }: { user: UserRow; plans: Plan
               </div>
             </div>
           )}
+
+          {/* View as footer */}
+          {user.role !== 'admin' && (
+            <div className="pt-2 border-t border-border/60">
+              <button
+                onClick={() => onViewAs(user)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-semibold"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View as {user.full_name.split(' ')[0]}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -293,6 +311,19 @@ export default function AdminUserManagement() {
   const [groupMembers, setGroupMembers] = useState<string[]>([])
   const qc = useQueryClient()
   const apiFetch = useApiFetch()
+  const navigate = useNavigate()
+
+  const handleViewAs = async (user: UserRow) => {
+    try {
+      const { token } = await apiFetch<{ token: string }>(`/api/users/${user.id}/impersonate`, { method: 'POST' })
+      startImpersonation(token)
+      qc.clear()
+      const dest = user.role === 'client' ? '/workspace' : user.role === 'team' ? '/team' : '/admin'
+      navigate(dest)
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['all_users'],
@@ -742,6 +773,7 @@ export default function AdminUserManagement() {
           user={profileUser}
           plans={plans}
           onClose={() => setProfileUser(null)}
+          onViewAs={(u) => { setProfileUser(null); handleViewAs(u) }}
         />
       )}
       {showCreate && (

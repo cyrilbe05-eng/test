@@ -304,6 +304,25 @@ async function handleEnableUser(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+async function handleImpersonateUser(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile: callerProfile } = await requireAuth(req)
+    requireRole(callerProfile, 'admin')
+
+    const targetId = req.query.id as string
+    const [target] = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ? AND disabled = 0', [targetId])
+    if (!target) { res.status(404).json({ error: 'User not found' }); return }
+    if (target.role === 'admin') { res.status(403).json({ error: 'Cannot impersonate another admin' }); return }
+
+    // Issue a short-lived token (2 hours) for the target user
+    const token = await signJwt({ sub: target.id, role: target.role }, '2h')
+    res.json({ token, profile: target })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PROJECTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2990,6 +3009,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug.length === 3 && slug[2] === 'enable') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleEnableUser(req, res)
+    }
+    // /api/users/[id]/impersonate — POST
+    if (slug.length === 3 && slug[2] === 'impersonate') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleImpersonateUser(req, res)
     }
     res.status(404).json({ error: 'Not found' }); return
   }

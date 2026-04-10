@@ -12,12 +12,12 @@ export interface AuthContext {
   profile: Profile
 }
 
-export async function signJwt(payload: { sub: string; role: string }): Promise<string> {
+export async function signJwt(payload: { sub: string; role: string }, expiresIn = '30d'): Promise<string> {
   return new SignJWT({ role: payload.role })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(payload.sub)
     .setIssuedAt()
-    .setExpirationTime('30d')
+    .setExpirationTime(expiresIn)
     .sign(JWT_SECRET)
 }
 

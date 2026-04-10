@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useApiFetch } from '@/lib/api'
@@ -353,6 +353,7 @@ function FolderCard({
 
 export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb = -1, readOnly = false, canDownload = true }: GalleryProps) {
   const apiFetch = useApiFetch()
+  const qc = useQueryClient()
 
   // Navigation state
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
@@ -531,6 +532,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
     }
     if (successCount > 0) {
       toast.success(`${successCount} file${successCount > 1 ? 's' : ''} uploaded`)
+      qc.invalidateQueries({ queryKey: ['gallery_files', ownerId] })
     }
     setUploading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''

@@ -36,7 +36,7 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { profile } = useAuth()
+  const { profile, impersonating: isImpersonatingUser, stopImpersonating } = useAuth()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -51,6 +51,18 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* ── Impersonation banner ── */}
+      {isImpersonatingUser && (
+        <div className="bg-amber-500 text-white flex items-center justify-between px-4 py-1.5 text-sm font-medium z-50 flex-shrink-0">
+          <span>Viewing as <strong>{profile?.full_name}</strong> ({profile?.role})</span>
+          <button
+            onClick={stopImpersonating}
+            className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-xs font-semibold"
+          >
+            ← Back to Admin
+          </button>
+        </div>
+      )}
       {/* ── Top bar ── */}
       <header className="h-[52px] border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30 flex items-center px-4 gap-3 flex-shrink-0">
         <button
