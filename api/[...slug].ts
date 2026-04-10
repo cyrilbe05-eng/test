@@ -374,15 +374,21 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     const { clerkUserId, profile } = await requireAuth(req)
-    requireRole(profile, 'client')
+    if (profile.role !== 'client' && profile.role !== 'admin') {
+      res.status(403).json({ error: 'Forbidden' }); return
+    }
 
-    const { title, description, inspiration_url, video_script, instructions } = req.body
+    const { title, description, inspiration_url, video_script, instructions, client_id: bodyClientId } = req.body
     if (!title) { res.status(400).json({ error: 'title required' }); return }
+
+    // Admins can specify a client_id override; otherwise use their own id
+    const isAdmin = profile.role === 'admin'
+    const effectiveClientId: string = isAdmin && bodyClientId ? bodyClientId : clerkUserId
 
     let maxDeliverables = 1
     let maxRevisions = 2
 
-    if (profile.plan_id) {
+    if (!isAdmin && profile.plan_id) {
       const plans = await dbQuery<Plan>('SELECT * FROM plans WHERE id = ?', [profile.plan_id])
       if (plans[0]) {
         maxDeliverables = plans[0].max_deliverables
@@ -392,7 +398,7 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
           const [countRow] = await dbQuery<{ count: number }>(
             `SELECT COUNT(*) AS count FROM projects
              WHERE client_id = ? AND status NOT IN ('client_approved')`,
-            [clerkUserId]
+            [effectiveClientId]
           )
           if ((countRow?.count ?? 0) >= plans[0].max_active_projects) {
             res.status(403).json({ error: 'active_project_limit_reached' }); return
@@ -410,7 +416,7 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
           status, max_deliverables, max_client_revisions, client_revision_count, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_assignment', ?, ?, 0, ?, ?)`,
       [
-        id, clerkUserId, title,
+        id, effectiveClientId, title,
         description ?? null,
         inspiration_url ?? null,
         video_script ?? null,

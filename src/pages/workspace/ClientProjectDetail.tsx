@@ -187,7 +187,13 @@ export default function ClientProjectDetail() {
     }
   }
 
-  if (!project) return <Loader />
+  if (!project) return (
+    <ClientLayout>
+      <div className="flex-1 flex items-center justify-center py-32">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    </ClientLayout>
+  )
 
   return (
     <ClientLayout>
@@ -327,13 +333,5 @@ export default function ClientProjectDetail() {
         <div className="pb-16" />
       </main>
     </ClientLayout>
-  )
-}
-
-function Loader() {
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-    </div>
   )
 }

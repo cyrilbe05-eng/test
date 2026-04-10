@@ -136,7 +136,13 @@ export default function AdminProjectDetail() {
     }
   }
 
-  if (isLoading || !project) return <Loader />
+  if (isLoading || !project) return (
+    <AdminLayout>
+      <div className="flex-1 flex items-center justify-center py-32">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    </AdminLayout>
+  )
 
   const assignedIds = new Set((assignments ?? []).map((a) => a.team_member_id))
   const unassignedTeam = (teamMembers ?? []).filter((m) => !assignedIds.has(m.id))
@@ -420,8 +426,4 @@ export default function AdminProjectDetail() {
       </div>
     </AdminLayout>
   )
-}
-
-function Loader() {
-  return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
 }

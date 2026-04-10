@@ -28,7 +28,13 @@ export default function TeamProjectDetail() {
     toast.success('Submitted for review')
   }
 
-  if (!project) return <Loader />
+  if (!project) return (
+    <TeamLayout>
+      <div className="flex-1 flex items-center justify-center py-32">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    </TeamLayout>
+  )
 
   return (
     <TeamLayout>
@@ -146,8 +152,4 @@ function FileRow({ name, size, fileId }: { name: string; size: number | null; fi
       {size && <span className="text-muted-foreground ml-auto">{(size / 1024 / 1024).toFixed(1)} MB</span>}
     </button>
   )
-}
-
-function Loader() {
-  return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
 }
