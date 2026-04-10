@@ -505,6 +505,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
               mimeType: file.type,
               fileSize: file.size,
               folderId: currentFolderId,
+              ownerId,
             }),
           }
         )
@@ -523,6 +524,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
             fileSize: file.size,
             storageKey,
             folderId: currentFolderId,
+            ownerId,
           }),
         })
         successCount++

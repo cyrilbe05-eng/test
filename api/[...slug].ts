@@ -1470,13 +1470,16 @@ async function handleGetGallery(req: VercelRequest, res: VercelResponse) {
 async function handleRegisterGalleryFile(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
-    const { clerkUserId } = await requireAuth(req)
+    const { clerkUserId, profile } = await requireAuth(req)
 
-    const { fileName, mimeType, fileSize, storageKey, folderId } = req.body
+    const { fileName, mimeType, fileSize, storageKey, folderId, ownerId: bodyOwnerId } = req.body
 
     if (!fileName || !mimeType || !storageKey) {
       res.status(400).json({ error: 'fileName, mimeType, and storageKey are required' }); return
     }
+
+    // Admins can specify an ownerId to register files on behalf of a client
+    const ownerId = (profile.role === 'admin' && bodyOwnerId) ? bodyOwnerId : clerkUserId
 
     const id = newId()
     const now = nowIso()
@@ -1484,7 +1487,7 @@ async function handleRegisterGalleryFile(req: VercelRequest, res: VercelResponse
     await dbExecute(
       `INSERT INTO gallery_files (id, owner_id, folder_id, file_name, file_size, mime_type, storage_key, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, clerkUserId, folderId ?? null, fileName, fileSize ?? 0, mimeType, storageKey, now]
+      [id, ownerId, folderId ?? null, fileName, fileSize ?? 0, mimeType, storageKey, now]
     )
 
     const rows = await dbQuery<GalleryFile>('SELECT * FROM gallery_files WHERE id = ?', [id])
@@ -1525,7 +1528,8 @@ async function handleGetGalleryUploadUrl(req: VercelRequest, res: VercelResponse
       }
     }
 
-    const key = `gallery/${clerkUserId}/${Date.now()}-${sanitizeFileName(fileName)}`
+    const keyOwner = (profile.role === 'admin' && req.body.ownerId) ? req.body.ownerId : clerkUserId
+    const key = `gallery/${keyOwner}/${Date.now()}-${sanitizeFileName(fileName)}`
     const uploadUrl = await getPresignedUploadUrl(key, mimeType ?? 'application/octet-stream')
 
     res.json({ uploadUrl, storageKey: key })
