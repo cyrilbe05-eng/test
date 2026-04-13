@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { ProductionChatPanel } from '@/components/chat/ProductionChatPanel'
 import { ThemeToggle } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import type { Project } from '@/types'
@@ -194,6 +195,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           {children}
         </div>
       </div>
+      <ProductionChatPanel />
     </div>
   )
 }

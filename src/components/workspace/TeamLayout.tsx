@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { ProductionChatPanel } from '@/components/chat/ProductionChatPanel'
 import { ThemeToggle } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
@@ -125,6 +126,7 @@ export function TeamLayout({ children }: TeamLayoutProps) {
           {children}
         </div>
       </div>
+      <ProductionChatPanel />
     </div>
   )
 }
