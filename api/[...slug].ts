@@ -2261,6 +2261,26 @@ interface DeadlineRow extends Deadline {
   project_title: string
 }
 
+async function handleGetMyDeadlines(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { clerkUserId, profile } = await requireAuth(req)
+    if (profile.role === 'client') { res.status(403).json({ error: 'Forbidden' }); return }
+
+    const rows = await dbQuery<DeadlineRow>(
+      `SELECT d.*, pr.title AS project_title
+       FROM deadlines d
+       JOIN projects pr ON pr.id = d.project_id
+       WHERE d.team_member_id = ?
+       ORDER BY d.due_at ASC`,
+      [clerkUserId]
+    )
+    res.json(rows)
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
 async function handleGetProjectDeadlines(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
@@ -2500,7 +2520,8 @@ async function handleGetAllAssignments(req: VercelRequest, res: VercelResponse) 
     requireRole(profile, 'admin')
 
     const rows = await dbQuery<any>(
-      `SELECT pa.team_member_id, p.full_name AS profile_full_name
+      `SELECT pa.id, pa.project_id, pa.team_member_id, pa.assigned_at,
+              p.full_name AS profile_full_name
        FROM project_assignments pa
        LEFT JOIN profiles p ON pa.team_member_id = p.id`
     )
@@ -3170,6 +3191,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // ── deadlines ──────────────────────────────────────────────────────────────
   if (slug[0] === 'deadlines') {
+    if (slug[1] === 'my' && slug.length === 2) {
+      return handleGetMyDeadlines(req, res)
+    }
     if (slug.length === 2 && slug[1] !== 'project') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handlePatchDeadline(req, res)
