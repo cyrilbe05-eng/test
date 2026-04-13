@@ -25,7 +25,7 @@ const ALLOWED_TRANSITIONS: Partial<Record<ProjectStatus, ProjectStatus[]>> = {
 }
 
 interface Props {
-  projects: (Project & { profiles?: { full_name: string } })[]
+  projects: (Project & { profiles?: { full_name: string }; assigned_team_names?: string | null })[]
 }
 
 export function KanbanBoard({ projects }: Props) {
@@ -82,11 +82,21 @@ export function KanbanBoard({ projects }: Props) {
                 >
                   <Link to={`/admin/projects/${project.id}`} className="block">
                     <p className="font-medium text-sm text-foreground line-clamp-2 leading-snug">{project.title}</p>
-                    {project.profiles && (
+                    {project.profiles?.full_name && (
                       <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
                         <span className="w-1 h-1 rounded-full bg-muted-foreground/40 flex-shrink-0" />
                         {project.profiles.full_name}
                       </p>
+                    )}
+                    {project.assigned_team_names ? (
+                      <p className="text-[10px] text-primary/70 mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span className="truncate">{project.assigned_team_names}</span>
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground/40 mt-1">Unassigned</p>
                     )}
                     <p className="text-[10px] text-muted-foreground/60 mt-1.5">
                       {formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}

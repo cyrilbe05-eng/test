@@ -345,9 +345,13 @@ async function handleGetProjects(req: VercelRequest, res: VercelResponse) {
         `SELECT pr.*,
           p.full_name  AS profile_full_name,
           p.email      AS profile_email,
-          p.avatar_url AS profile_avatar_url
+          p.avatar_url AS profile_avatar_url,
+          GROUP_CONCAT(tm.full_name, ', ') AS assigned_team_names
          FROM projects pr
          LEFT JOIN profiles p ON pr.client_id = p.id
+         LEFT JOIN project_assignments pa2 ON pa2.project_id = pr.id
+         LEFT JOIN profiles tm ON tm.id = pa2.team_member_id
+         GROUP BY pr.id
          ORDER BY pr.created_at DESC`
       )
     } else if (profile.role === 'client') {
@@ -377,9 +381,10 @@ async function handleGetProjects(req: VercelRequest, res: VercelResponse) {
       )
     }
 
-    const shaped = rows.map(({ profile_full_name, profile_email, profile_avatar_url, is_assigned, ...rest }: any) => ({
+    const shaped = rows.map(({ profile_full_name, profile_email, profile_avatar_url, is_assigned, assigned_team_names, ...rest }: any) => ({
       ...rest,
       is_assigned: Boolean(is_assigned),
+      assigned_team_names: assigned_team_names ?? null,
       profiles: {
         full_name: profile_full_name,
         email: profile_email,
