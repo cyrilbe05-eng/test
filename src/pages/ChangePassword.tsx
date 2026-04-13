@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { useApiFetch } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 import { getToken } from '@/lib/auth'
+import { useAuth } from '@/hooks/useAuth'
 
 const passwordSchema = z
   .string()
@@ -30,6 +31,7 @@ export default function ChangePassword() {
   const navigate = useNavigate()
   const apiFetch = useApiFetch()
   const qc = useQueryClient()
+  const { impersonating, stopImpersonating } = useAuth()
 
   const {
     register,
@@ -56,7 +58,19 @@ export default function ChangePassword() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div className="min-h-screen bg-background flex flex-col">
+      {impersonating && (
+        <div className="bg-amber-500 text-white flex items-center justify-between px-4 py-1.5 text-sm font-medium z-50">
+          <span>Viewing as client — password not yet set</span>
+          <button
+            onClick={stopImpersonating}
+            className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-xs font-semibold"
+          >
+            ← Back to Admin
+          </button>
+        </div>
+      )}
+    <div className="flex-1 flex items-center justify-center p-6">
       <div className="w-full max-w-[380px] animate-slide-up">
         <div className="flex flex-col items-center mb-10">
           <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center mb-5 shadow-clay">
@@ -115,6 +129,7 @@ export default function ChangePassword() {
           </form>
         </div>
       </div>
+    </div>
     </div>
   )
 }
