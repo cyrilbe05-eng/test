@@ -480,13 +480,7 @@ async function handleGetProject(req: VercelRequest, res: VercelResponse) {
     if (profile.role === 'client' && row.client_id !== clerkUserId) {
       res.status(403).json({ error: 'Forbidden' }); return
     }
-    if (profile.role === 'team') {
-      const assignments = await dbQuery<{ id: string }>(
-        'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
-        [projectId, clerkUserId]
-      )
-      if (!assignments[0]) { res.status(403).json({ error: 'Forbidden' }); return }
-    }
+    // Team members can view any project (all projects are visible on their dashboard)
 
     const { profile_full_name, profile_email, profile_avatar_url, profile_plan_id, ...project } = row
     res.json({
@@ -579,12 +573,8 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
 
     if (profile.role === 'team') {
       if (!TEAM_ALLOWED_STATUSES.includes(status)) { res.status(403).json({ error: 'Forbidden' }); return }
-      const assigned = await dbQuery<{ id: string }>(
-        'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
-        [projectId, clerkUserId]
-      )
-      if (!assigned[0]) { res.status(403).json({ error: 'Forbidden' }); return }
     }
+    // Team members can update status on any project they can see
 
     const [project] = await dbQuery<{ id: string; title: string; client_id: string }>(
       'SELECT id, title, client_id FROM projects WHERE id = ?',
@@ -697,13 +687,8 @@ async function handleGetProjectFiles(req: VercelRequest, res: VercelResponse) {
         [projectId, clerkUserId]
       )
       if (!projectRows[0]) { res.status(403).json({ error: 'Forbidden' }); return }
-    } else if (profile.role === 'team') {
-      const assignRows = await dbQuery<{ id: string }>(
-        'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
-        [projectId, clerkUserId]
-      )
-      if (!assignRows[0]) { res.status(403).json({ error: 'Forbidden' }); return }
     }
+    // Team members can view files for any project
 
     const files = await dbQuery<ProjectFile & { uploader_full_name: string }>(
       `SELECT pf.*, p.full_name AS uploader_full_name
@@ -745,10 +730,8 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
     if (profile.role === 'client') {
       const [row] = await dbQuery<{ id: string }>('SELECT id FROM projects WHERE id = ? AND client_id = ?', [project_id, clerkUserId])
       if (!row) { res.status(403).json({ error: 'Forbidden' }); return }
-    } else if (profile.role === 'team') {
-      const [row] = await dbQuery<{ id: string }>('SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?', [project_id, clerkUserId])
-      if (!row) { res.status(403).json({ error: 'Forbidden' }); return }
     }
+    // Team members can upload files to any project
 
     const id = newId()
     const now = nowIso()
@@ -898,15 +881,10 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
         [file.project_id, clerkUserId]
       )
       if (!projects[0]) { res.status(403).json({ error: 'Forbidden' }); return }
-    } else if (profile.role === 'team') {
-      const assigned = await dbQuery<{ id: string }>(
-        'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
-        [file.project_id, clerkUserId]
-      )
-      if (!assigned[0]) { res.status(403).json({ error: 'Forbidden' }); return }
-    } else {
+    } else if (profile.role !== 'team') {
       res.status(403).json({ error: 'Forbidden' }); return
     }
+    // Team members can access signed URLs for any project file
 
     const signedUrl = await getPresignedDownloadUrl(file.storage_key)
     res.json({ signedUrl })
@@ -2544,15 +2522,10 @@ async function handleGetProjectAssignments(req: VercelRequest, res: VercelRespon
     const { clerkUserId, profile } = await requireAuth(req)
     const projectId = req.query.projectId as string
 
-    if (profile.role === 'team') {
-      const own = await dbQuery<{ id: string }>(
-        'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
-        [projectId, clerkUserId]
-      )
-      if (!own[0]) { res.status(403).json({ error: 'Forbidden' }); return }
-    } else if (profile.role === 'client') {
+    if (profile.role === 'client') {
       res.status(403).json({ error: 'Forbidden' }); return
     }
+    // Team members can view assignments for any project
 
     const rows = await dbQuery<any>(
       `SELECT pa.*,
@@ -2598,13 +2571,8 @@ async function handleGetTimelineComments(req: VercelRequest, res: VercelResponse
         [projectId, clerkUserId]
       )
       if (!rows[0]) { res.status(403).json({ error: 'Forbidden' }); return }
-    } else if (profile.role === 'team') {
-      const rows = await dbQuery<{ id: string }>(
-        'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
-        [projectId, clerkUserId]
-      )
-      if (!rows[0]) { res.status(403).json({ error: 'Forbidden' }); return }
     }
+    // Team members can view timeline comments for any project
 
     const comments = await dbQuery<any>(
       `SELECT tc.*,
@@ -2645,16 +2613,11 @@ async function handleCreateTimelineComment(req: VercelRequest, res: VercelRespon
         [project_id, clerkUserId]
       )
       if (!projects[0]) { res.status(403).json({ error: 'Forbidden' }); return }
-    } else if (profile.role === 'team') {
-      const assigned = await dbQuery<{ id: string }>(
-        'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
-        [project_id, clerkUserId]
-      )
-      if (!assigned[0]) { res.status(403).json({ error: 'Forbidden' }); return }
     } else {
       const [proj] = await dbQuery<{ id: string }>('SELECT id FROM projects WHERE id = ?', [project_id])
       if (!proj) { res.status(404).json({ error: 'Project not found' }); return }
     }
+    // Team members can comment on any project
 
     const author_role = profile.role
 
