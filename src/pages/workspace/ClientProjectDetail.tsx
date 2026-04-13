@@ -47,22 +47,21 @@ function StatusBanner({ color, children }: { color: string; children: React.Reac
   )
 }
 
-function StorageTab({ files, onDownload }: { files: ProjectFile[]; onDownload: (file: ProjectFile) => void }) {
-  const deliverables = files.filter((f) => f.file_type === 'deliverable' && f.approved)
+function StorageTab({ files, approvedDeliverables, onDownload }: { files: ProjectFile[]; approvedDeliverables: ProjectFile[]; onDownload: (file: ProjectFile) => void }) {
   const sources = files.filter((f) => f.file_type === 'source_video')
 
   return (
     <div className="space-y-6">
       <div>
         <h3 className="font-heading font-semibold text-sm mb-3">Your Deliverable</h3>
-        {deliverables.length === 0 ? (
+        {approvedDeliverables.length === 0 ? (
           <div className="clay-card p-8 text-center">
             <p className="text-muted-foreground text-sm">No deliverable ready yet.</p>
             <p className="text-xs text-muted-foreground mt-1">You'll be notified when your video is ready for download.</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {deliverables.map((f) => (
+            {approvedDeliverables.map((f) => (
               <div key={f.id} className="clay-card p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +117,10 @@ export default function ClientProjectDetail() {
   const { data: comments, refetch: refetchComments } = useTimelineComments(id)
   const [submitting, setSubmitting] = useState(false)
 
-  const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable' && f.approved)
+  // For review: show any deliverable when project is in a client-facing status (approved gate is handled by status)
+  // For download: only approved deliverables
+  const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable')
+  const approvedDeliverables = deliverables.filter((f) => f.approved)
   const latestDeliverable = deliverables[0]
 
   const remaining = project
@@ -257,6 +259,7 @@ export default function ClientProjectDetail() {
         {activeTab === 'storage' && (
           <StorageTab
             files={files ?? []}
+            approvedDeliverables={approvedDeliverables}
             onDownload={handleDownload}
           />
         )}
@@ -300,7 +303,7 @@ export default function ClientProjectDetail() {
                       </button>
                     </div>
                   )}
-                  {isApproved && latestDeliverable?.approved && (
+                  {isApproved && approvedDeliverables.length > 0 && (
                     <div className="animate-slide-up stagger-3">
                       <button
                         onClick={() => handleDownload()}

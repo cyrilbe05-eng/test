@@ -607,6 +607,11 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
       )
       assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: 'revision_requested', message: `Revision requested for "${project.title}"` }))
     } else if (status === 'client_reviewing') {
+      // Auto-approve all deliverable files so they're visible to the client
+      await dbExecute(
+        "UPDATE project_files SET approved = 1 WHERE project_id = ? AND file_type = 'deliverable'",
+        [projectId]
+      )
       // Notify client
       notifyMessages.push({ recipientId: project.client_id, type: 'video_ready_for_review', message: `Your video for "${project.title}" is ready for review` })
     } else if (status === 'admin_approved' || status === 'in_review') {
