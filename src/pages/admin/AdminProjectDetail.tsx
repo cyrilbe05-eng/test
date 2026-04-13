@@ -163,7 +163,7 @@ export default function AdminProjectDetail() {
 
   const handleApprove = async () => {
     if (!id) return
-    await updateStatus.mutateAsync({ id, status: 'admin_approved' })
+    await updateStatus.mutateAsync({ id, status: 'client_reviewing' })
     toast.success('Project approved — client notified')
   }
 
@@ -456,7 +456,7 @@ export default function AdminProjectDetail() {
                 )}
 
                 {/* Admin review actions */}
-                {project.status === 'in_review' && (
+                {(project.status === 'in_review' || project.status === 'admin_approved') && (
                   <div className="flex gap-3 mt-4">
                     <button
                       onClick={handleApprove}
