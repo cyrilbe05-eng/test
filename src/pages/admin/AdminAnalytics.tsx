@@ -91,6 +91,19 @@ export default function AdminAnalytics() {
   const totalDeadlines = deadlines.length
   const globalRate = totalDeadlines > 0 ? Math.round((totalMet / totalDeadlines) * 100) : 0
 
+  // Editor performance: completed projects, revisions per editor
+  const editorStats = (teamMembers ?? []).map((member) => {
+    const memberAssignments = (assignments ?? []).filter((a) => a.team_member_id === member.id)
+    const assignedProjectIds = new Set(memberAssignments.map((a) => a.project_id))
+    const assignedProjects = (projects ?? []).filter((p) => assignedProjectIds.has(p.id))
+    const completed = assignedProjects.filter((p) => p.status === 'client_approved').length
+    const active = assignedProjects.filter((p) => p.status !== 'client_approved').length
+    const totalRevisions = assignedProjects.reduce((a, p) => a + p.client_revision_count, 0)
+    const avgRev = assignedProjects.length > 0 ? (totalRevisions / assignedProjects.length).toFixed(1) : '0'
+    const revisionRequested = assignedProjects.filter((p) => p.status === 'revision_requested').length
+    return { id: member.id, name: member.full_name, completed, active, total: assignedProjects.length, totalRevisions, avgRev, revisionRequested }
+  }).filter((e) => e.total > 0)
+
   // Deadline by team member
   const deadlineByMember = (teamMembers ?? []).map((member) => {
     const memberDeadlines = deadlines.filter((d) => d.team_member_id === member.id)
@@ -224,6 +237,44 @@ export default function AdminAnalytics() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Editor performance */}
+        {editorStats.length > 0 && (
+          <div className="clay-card p-6">
+            <h3 className="font-heading font-semibold mb-1">Editor Performance</h3>
+            <p className="text-xs text-muted-foreground mb-4">Completed projects, revisions, and active load per editor</p>
+            <div className="overflow-hidden rounded-xl border border-border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/30 border-b border-border">
+                    <th className="text-left px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wide">Editor</th>
+                    <th className="text-center px-3 py-2 text-xs text-green-600 font-semibold uppercase tracking-wide">Completed</th>
+                    <th className="text-center px-3 py-2 text-xs text-blue-600 font-semibold uppercase tracking-wide">Active</th>
+                    <th className="text-center px-3 py-2 text-xs text-red-600 font-semibold uppercase tracking-wide">In Revision</th>
+                    <th className="text-center px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wide">Total</th>
+                    <th className="text-center px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wide">Avg Revisions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {editorStats.map((e) => (
+                    <tr key={e.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-3 py-2.5 font-medium text-sm">{e.name}</td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-green-600 font-semibold">{e.completed}</span></td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-blue-600 font-semibold">{e.active}</span></td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-red-600 font-semibold">{e.revisionRequested}</span></td>
+                      <td className="px-3 py-2.5 text-center text-muted-foreground">{e.total}</td>
+                      <td className="px-3 py-2.5 text-center">
+                        <span className={Number(e.avgRev) <= 1 ? 'text-green-600 font-bold' : Number(e.avgRev) <= 2 ? 'text-orange-600 font-bold' : 'text-red-600 font-bold'}>
+                          {e.avgRev}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

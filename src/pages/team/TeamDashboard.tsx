@@ -8,37 +8,37 @@ import { cn } from '@/lib/utils'
 import type { Project, ProjectStatus } from '@/types'
 
 // ── Kanban columns ────────────────────────────────────────────────────────────
-const COLUMNS: { status: ProjectStatus; label: string; color: string }[] = [
-  { status: 'pending_assignment', label: 'Pending',       color: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' },
-  { status: 'in_progress',        label: 'In Progress',   color: 'text-blue-700 bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' },
-  { status: 'in_review',          label: 'In Review',     color: 'text-violet-700 bg-violet-50 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800' },
-  { status: 'admin_approved',     label: 'Admin OK',      color: 'text-cyan-700 bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800' },
-  { status: 'client_reviewing',   label: 'Client Review', color: 'text-orange-700 bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800' },
-  { status: 'revision_requested', label: 'Revision',      color: 'text-red-700 bg-red-50 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800' },
-  { status: 'client_approved',    label: 'Approved',      color: 'text-green-700 bg-green-50 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' },
+const COLUMNS: { statuses: ProjectStatus[]; label: string; color: string }[] = [
+  { statuses: ['pending_assignment'],          label: 'Pending',       color: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' },
+  { statuses: ['in_progress'],                 label: 'In Progress',   color: 'text-blue-700 bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' },
+  { statuses: ['in_review', 'admin_approved'], label: 'Admin Approved',color: 'text-cyan-700 bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800' },
+  { statuses: ['client_reviewing'],            label: 'Client Review', color: 'text-orange-700 bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800' },
+  { statuses: ['revision_requested'],          label: 'Revision',      color: 'text-red-700 bg-red-50 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800' },
+  { statuses: ['client_approved'],             label: 'Approved',      color: 'text-green-700 bg-green-50 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' },
 ]
 
 type View = 'kanban' | 'list'
 
 // ── Kanban board ──────────────────────────────────────────────────────────────
-function TeamKanban({ projects }: { projects: Project[] }) {
+function TeamKanban({ projects }: { projects: (Project & { is_assigned?: boolean })[] }) {
   const [dragging, setDragging] = useState<string | null>(null)
-  const [dragOver, setDragOver] = useState<ProjectStatus | null>(null)
+  const [dragOver, setDragOver] = useState<string | null>(null)
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-6 animate-fade-in">
       {COLUMNS.map((col, colIdx) => {
-        const cards = projects.filter((p) => p.status === col.status)
-        const isOver = dragOver === col.status
+        const cards = projects.filter((p) => col.statuses.includes(p.status))
+        const colKey = col.statuses[0]
+        const isOver = dragOver === colKey
         return (
           <div
-            key={col.status}
+            key={colKey}
             className={cn(
               'flex-shrink-0 w-56 flex flex-col rounded-xl border transition-all duration-150 animate-slide-up',
               `stagger-${Math.min(colIdx + 1, 7)}`,
               isOver ? 'border-primary/50 bg-primary/5' : 'border-border bg-card/30',
             )}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(col.status) }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(colKey) }}
             onDragLeave={() => setDragOver(null)}
             onDrop={() => { setDragging(null); setDragOver(null) }}
           >
@@ -65,9 +65,14 @@ function TeamKanban({ projects }: { projects: Project[] }) {
                   )}
                 >
                   <Link to={`/team/projects/${p.id}`} className="block">
-                    <p className="font-medium text-sm text-foreground line-clamp-2 leading-snug">{p.title}</p>
+                    <div className="flex items-start justify-between gap-1 mb-0.5">
+                      <p className="font-medium text-sm text-foreground line-clamp-2 leading-snug flex-1">{p.title}</p>
+                      {(p as any).is_assigned && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary flex-shrink-0 mt-0.5">Mine</span>
+                      )}
+                    </div>
                     {(p as any).profiles?.full_name && (
-                      <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0" />
                         {(p as any).profiles.full_name}
                       </p>
@@ -99,7 +104,8 @@ export default function TeamDashboard() {
   const { data: projects, isLoading } = useProjects()
   const [view, setView] = useState<View>('kanban')
 
-  const allProjects = (projects ?? []) as Project[]
+  const allProjects = (projects ?? []) as (Project & { is_assigned?: boolean })[]
+  const assignedCount = allProjects.filter((p) => p.is_assigned).length
 
   return (
     <TeamLayout>
@@ -107,9 +113,9 @@ export default function TeamDashboard() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-heading font-semibold tracking-tight">My Assignments</h1>
+            <h1 className="text-2xl font-heading font-semibold tracking-tight">All Projects</h1>
             <p className="text-muted-foreground text-sm mt-0.5">
-              {allProjects.length} project{allProjects.length !== 1 ? 's' : ''} assigned to you
+              {allProjects.length} total · {assignedCount} assigned to you
             </p>
           </div>
 
@@ -148,7 +154,7 @@ export default function TeamDashboard() {
           </div>
         ) : allProjects.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-border rounded-2xl">
-            <p className="text-muted-foreground text-sm">No projects assigned yet. Check back soon!</p>
+            <p className="text-muted-foreground text-sm">No projects yet. Check back soon!</p>
           </div>
         ) : view === 'kanban' ? (
           <TeamKanban projects={allProjects} />
@@ -157,7 +163,7 @@ export default function TeamDashboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left bg-muted/20">
-                  {['Client', 'Title', 'Status', 'Updated'].map((h) => (
+                  {['Client', 'Title', 'Status', 'Updated', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -175,6 +181,11 @@ export default function TeamDashboard() {
                     <td className="px-4 py-3"><ProjectStatusBadge status={p.status} /></td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
                       {formatDistanceToNow(new Date(p.updated_at), { addSuffix: true })}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(p as any).is_assigned && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">Mine</span>
+                      )}
                     </td>
                   </tr>
                 ))}

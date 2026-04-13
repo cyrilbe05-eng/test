@@ -54,7 +54,9 @@ async function handleGetClients(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     const { profile } = await requireAuth(req)
-    requireRole(profile, 'admin')
+    if (profile.role !== 'admin' && profile.role !== 'team') {
+      res.status(403).json({ error: 'Forbidden' }); return
+    }
 
     const clients = await dbQuery<Profile>(
       'SELECT * FROM profiles WHERE role = ? AND disabled = 0 ORDER BY full_name ASC',
@@ -365,17 +367,19 @@ async function handleGetProjects(req: VercelRequest, res: VercelResponse) {
         `SELECT pr.*,
           p.full_name  AS profile_full_name,
           p.email      AS profile_email,
-          p.avatar_url AS profile_avatar_url
+          p.avatar_url AS profile_avatar_url,
+          CASE WHEN pa.project_id IS NOT NULL THEN 1 ELSE 0 END AS is_assigned
          FROM projects pr
          LEFT JOIN profiles p ON pr.client_id = p.id
-         INNER JOIN project_assignments pa ON pa.project_id = pr.id AND pa.team_member_id = ?
+         LEFT JOIN project_assignments pa ON pa.project_id = pr.id AND pa.team_member_id = ?
          ORDER BY pr.created_at DESC`,
         [clerkUserId]
       )
     }
 
-    const shaped = rows.map(({ profile_full_name, profile_email, profile_avatar_url, ...rest }: any) => ({
+    const shaped = rows.map(({ profile_full_name, profile_email, profile_avatar_url, is_assigned, ...rest }: any) => ({
       ...rest,
+      is_assigned: Boolean(is_assigned),
       profiles: {
         full_name: profile_full_name,
         email: profile_email,
@@ -582,16 +586,54 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
       if (!assigned[0]) { res.status(403).json({ error: 'Forbidden' }); return }
     }
 
-    const [project] = await dbQuery<{ id: string }>(
-      'SELECT id FROM projects WHERE id = ?',
+    const [project] = await dbQuery<{ id: string; title: string; client_id: string }>(
+      'SELECT id, title, client_id FROM projects WHERE id = ?',
       [projectId]
     )
     if (!project) { res.status(404).json({ error: 'Project not found' }); return }
 
+    const now = nowIso()
     await dbExecute(
       'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',
-      [status, nowIso(), projectId]
+      [status, now, projectId]
     )
+
+    // Send notifications on key transitions
+    const notifyMessages: { recipientId: string; type: string; message: string }[] = []
+    if (status === 'revision_requested') {
+      // Notify assigned team members
+      const assigned = await dbQuery<{ team_member_id: string }>(
+        'SELECT team_member_id FROM project_assignments WHERE project_id = ?',
+        [projectId]
+      )
+      assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: 'revision_requested', message: `Revision requested for "${project.title}"` }))
+    } else if (status === 'client_reviewing') {
+      // Notify client
+      notifyMessages.push({ recipientId: project.client_id, type: 'video_ready_for_review', message: `Your video for "${project.title}" is ready for review` })
+    } else if (status === 'admin_approved' || status === 'in_review') {
+      // Notify assigned team members
+      const assigned = await dbQuery<{ team_member_id: string }>(
+        'SELECT team_member_id FROM project_assignments WHERE project_id = ?',
+        [projectId]
+      )
+      const msg = status === 'admin_approved' ? `Project "${project.title}" has been approved by admin` : `Project "${project.title}" is ready for admin review`
+      assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: status, message: msg }))
+    } else if (status === 'in_progress') {
+      // Notify assigned team members
+      const assigned = await dbQuery<{ team_member_id: string }>(
+        'SELECT team_member_id FROM project_assignments WHERE project_id = ?',
+        [projectId]
+      )
+      assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: 'project_assigned', message: `Project "${project.title}" is now in progress` }))
+    }
+    for (const n of notifyMessages) {
+      if (n.recipientId !== clerkUserId) {
+        await dbExecute(
+          'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
+          [newId(), n.recipientId, projectId, n.type, n.message, now]
+        )
+      }
+    }
 
     res.json({ ok: true })
   } catch (e: any) {
@@ -810,7 +852,7 @@ async function handleApproveProjectFile(req: VercelRequest, res: VercelResponse)
         'SELECT status, client_id, title FROM projects WHERE id = ?',
         [file.project_id]
       )
-      if (project?.status === 'admin_approved') {
+      if (project?.status === 'admin_approved' || project?.status === 'in_review') {
         const now = nowIso()
         await dbExecute(
           'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',

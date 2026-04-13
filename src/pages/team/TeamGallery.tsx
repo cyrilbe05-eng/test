@@ -49,12 +49,10 @@ export default function TeamGallery() {
   const { profile } = useAuth()
   const apiFetch = useApiFetch()
 
-  const { data: users = [] } = useQuery<Profile[]>({
-    queryKey: ['users'],
-    queryFn: () => apiFetch<Profile[]>('/api/users'),
+  const { data: clients = [] } = useQuery<Profile[]>({
+    queryKey: ['users', 'clients'],
+    queryFn: () => apiFetch<Profile[]>('/api/users/clients'),
   })
-
-  const clients = users.filter((u) => u.role === 'client')
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   const activeOwnerId = selectedClientId ?? clients[0]?.id ?? null
 

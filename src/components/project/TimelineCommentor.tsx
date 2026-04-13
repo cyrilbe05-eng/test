@@ -34,7 +34,9 @@ interface Props {
 export function TimelineCommentor({ fileId, projectId, comments, currentUserRole, canComment, revisionRound, onCommentAdded, theater = false, onTheaterToggle }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<Plyr | null>(null)
+  const playerContainerRef = useRef<HTMLDivElement>(null)
   const [currentTs, setCurrentTs] = useState(0)
+  const [duration, setDuration] = useState(0)
   const [showAddComment, setShowAddComment] = useState(false)
   const [signedUrl, setSignedUrl] = useState<string | null>(null)
   const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(new Set())
@@ -51,9 +53,33 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
     const player = playerRef.current
     player.on('pause', () => { setCurrentTs(player.currentTime); setShowAddComment(canComment) })
     player.on('play', () => setShowAddComment(false))
+    player.on('ready', () => { if (player.duration) setDuration(player.duration) })
+    player.on('loadedmetadata', () => { if (player.duration) setDuration(player.duration) })
     player.on('error', () => { getSignedUrlById(apiFetch, fileId).then(setSignedUrl) })
     return () => { player.destroy(); playerRef.current = null }
   }, [signedUrl, fileId, canComment])
+
+  // Inject comment marker dots into the Plyr progress bar
+  useEffect(() => {
+    if (!duration || !playerContainerRef.current) return
+    const bar = playerContainerRef.current.querySelector('.plyr__progress')
+    if (!bar) return
+    // Remove old markers
+    bar.querySelectorAll('.comment-marker').forEach((el) => el.remove())
+    // Add new markers
+    const seen = new Set<number>()
+    comments.filter((c) => c.timestamp_sec != null).forEach((c) => {
+      const pct = Math.min(100, Math.max(0, ((c.timestamp_sec ?? 0) / duration) * 100))
+      const key = Math.round(pct * 10)
+      if (seen.has(key)) return
+      seen.add(key)
+      const dot = document.createElement('span')
+      dot.className = 'comment-marker'
+      dot.style.cssText = `position:absolute;top:50%;left:${pct}%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:hsl(var(--primary));border:2px solid white;cursor:pointer;z-index:10;pointer-events:none;`
+      ;(bar as HTMLElement).style.position = 'relative'
+      bar.appendChild(dot)
+    })
+  }, [comments, duration])
 
   const seekTo = (sec: number) => { if (playerRef.current) playerRef.current.currentTime = sec }
 
@@ -72,7 +98,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
   return (
     <div className="space-y-4">
       {/* Video */}
-      <div className="rounded-xl overflow-hidden bg-zinc-950 border border-border">
+      <div ref={playerContainerRef} className="rounded-xl overflow-hidden bg-zinc-950 border border-border">
         {signedUrl
           ? <video ref={videoRef} src={signedUrl} className="w-full" />
           : <div className="aspect-video flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>

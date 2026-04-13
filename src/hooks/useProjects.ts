@@ -18,6 +18,7 @@ export function useProject(id: string | undefined) {
   return useQuery({
     queryKey: ['project', id],
     enabled: !!id,
+    refetchInterval: 30_000,
     queryFn: () =>
       apiFetch<Project & { profiles: { full_name: string; email: string; avatar_url: string | null; plan_id: string | null } }>(
         `/api/projects/${id}`
@@ -30,6 +31,7 @@ export function useProjectFiles(projectId: string | undefined) {
   return useQuery({
     queryKey: ['project_files', projectId],
     enabled: !!projectId,
+    refetchInterval: 30_000,
     queryFn: () =>
       apiFetch<(ProjectFile & { profiles: { full_name: string } })[]>(
         `/api/project-files/project/${projectId}`

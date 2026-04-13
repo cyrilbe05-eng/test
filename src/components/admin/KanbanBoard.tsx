@@ -5,20 +5,19 @@ import { formatDistanceToNow } from 'date-fns'
 import type { Project, ProjectStatus } from '@/types'
 import { Link } from 'react-router-dom'
 
-const COLUMNS: { status: ProjectStatus; label: string }[] = [
-  { status: 'pending_assignment', label: 'Pending Assignment' },
-  { status: 'in_progress',        label: 'In Progress' },
-  { status: 'in_review',          label: 'In Review' },
-  { status: 'admin_approved',     label: 'Admin Approved' },
-  { status: 'client_reviewing',   label: 'Client Reviewing' },
-  { status: 'revision_requested', label: 'Revision Requested' },
-  { status: 'client_approved',    label: 'Client Approved' },
+const COLUMNS: { statuses: ProjectStatus[]; dropTarget: ProjectStatus; label: string }[] = [
+  { statuses: ['pending_assignment'], dropTarget: 'pending_assignment', label: 'Pending Assignment' },
+  { statuses: ['in_progress'],        dropTarget: 'in_progress',        label: 'In Progress' },
+  { statuses: ['in_review', 'admin_approved'], dropTarget: 'admin_approved', label: 'Admin Approved' },
+  { statuses: ['client_reviewing'],   dropTarget: 'client_reviewing',   label: 'Client Reviewing' },
+  { statuses: ['revision_requested'], dropTarget: 'revision_requested', label: 'Revision Requested' },
+  { statuses: ['client_approved'],    dropTarget: 'client_approved',    label: 'Client Approved' },
 ]
 
 // Allowed drag transitions
 const ALLOWED_TRANSITIONS: Partial<Record<ProjectStatus, ProjectStatus[]>> = {
   pending_assignment: ['in_progress'],
-  in_progress: ['in_review'],
+  in_progress: ['in_review', 'admin_approved'],
   in_review: ['admin_approved', 'revision_requested'],
   admin_approved: ['client_reviewing'],
   client_reviewing: ['client_approved', 'revision_requested'],
@@ -60,13 +59,13 @@ export function KanbanBoard({ projects }: Props) {
   return (
     <div className="flex gap-3 overflow-x-auto pb-4">
       {COLUMNS.map((col) => {
-        const cards = projects.filter((p) => p.status === col.status)
+        const cards = projects.filter((p) => col.statuses.includes(p.status))
         return (
           <div
-            key={col.status}
+            key={col.dropTarget}
             className="flex-shrink-0 w-60 flex flex-col"
             onDragOver={(e) => e.preventDefault()}
-            onDrop={() => handleDrop(col.status)}
+            onDrop={() => handleDrop(col.dropTarget)}
           >
             <div className="flex items-center justify-between mb-2.5 px-1">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{col.label}</h3>
