@@ -531,7 +531,11 @@ async function handleAssignProject(req: VercelRequest, res: VercelResponse) {
     )
 
     if (result.changes > 0) {
-      const due = new Date(new Date(now).getTime() + 48 * 60 * 60 * 1000).toISOString()
+      // Due at end of next calendar day (tomorrow 23:59 UTC)
+      const tomorrow = new Date(now)
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+      tomorrow.setUTCHours(23, 59, 0, 0)
+      const due = tomorrow.toISOString()
       await dbExecute(
         `INSERT OR IGNORE INTO deadlines (id, project_id, team_member_id, assignment_id, due_at, status, created_at)
          VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
