@@ -8,7 +8,7 @@ interface Props {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: Props) {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, impersonating } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -23,8 +23,8 @@ export function ProtectedRoute({ children, allowedRoles }: Props) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // Force password change on first login
-  if (!profile.password_changed && location.pathname !== '/change-password') {
+  // Force password change on first login — skip when admin is impersonating
+  if (!profile.password_changed && !impersonating && location.pathname !== '/change-password') {
     return <Navigate to="/change-password" replace />
   }
 
