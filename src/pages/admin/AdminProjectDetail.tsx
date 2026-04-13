@@ -41,19 +41,74 @@ function Section({ title, children, className }: { title: string; children: Reac
   )
 }
 
-function FileRow({ name, size, fileId }: { name: string; size: number | null; fileId: string }) {
+function TextBlock({ label, value }: { label: string; value: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const isLong = value.length > 300
+  return (
+    <div className="clay-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+        <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">{label}</h3>
+        {isLong && (
+          <button onClick={() => setExpanded((e) => !e)} className="text-xs text-primary hover:underline flex-shrink-0">
+            {expanded ? 'Show less' : 'Show more'}
+          </button>
+        )}
+      </div>
+      <div
+        className={cn('px-4 py-3 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap overflow-hidden transition-all', !expanded && isLong ? 'max-h-32' : 'max-h-none')}
+        style={!expanded && isLong ? { WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)' } : {}}
+      >
+        {value}
+      </div>
+      {!expanded && isLong && (
+        <button onClick={() => setExpanded(true)} className="w-full px-4 pb-3 text-xs text-primary hover:underline text-left">
+          Read full text ↓
+        </button>
+      )}
+    </div>
+  )
+}
+
+function FileRow({ name, size, fileId, iconOnly }: { name: string; size: number | null; fileId: string; iconOnly?: boolean }) {
   const apiFetch = useApiFetch()
+  const [loading, setLoading] = useState(false)
   const handleDownload = async () => {
-    const url = await getSignedUrlById(apiFetch, fileId)
-    window.open(url, '_blank')
+    setLoading(true)
+    try {
+      const url = await getSignedUrlById(apiFetch, fileId)
+      window.open(url, '_blank')
+    } catch {
+      toast.error('Failed to get download link')
+    } finally {
+      setLoading(false)
+    }
+  }
+  if (iconOnly) {
+    return (
+      <button onClick={handleDownload} disabled={loading} title="Download" className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 flex-shrink-0">
+        {loading
+          ? <div className="w-4 h-4 rounded-full border border-primary border-t-transparent animate-spin" />
+          : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+        }
+      </button>
+    )
   }
   return (
-    <button onClick={handleDownload} className="flex items-center gap-2 w-full text-left hover:text-primary transition-colors text-sm group py-1">
-      <svg className="w-4 h-4 text-muted-foreground group-hover:text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-      </svg>
-      <span className="truncate">{name}</span>
-      {size && <span className="text-muted-foreground ml-auto flex-shrink-0 text-xs">{formatBytes(size)}</span>}
+    <button
+      onClick={handleDownload}
+      disabled={loading}
+      className="flex items-center gap-3 w-full text-left hover:bg-muted/60 transition-colors rounded-lg px-2 py-2 group disabled:opacity-60"
+    >
+      <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
+        <svg className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+        </svg>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium truncate text-foreground group-hover:text-primary transition-colors">{name}</p>
+        {size != null && <p className="text-[10px] text-muted-foreground">{formatBytes(size)}</p>}
+      </div>
+      {loading && <div className="w-3 h-3 rounded-full border border-primary border-t-transparent animate-spin flex-shrink-0" />}
     </button>
   )
 }
@@ -280,24 +335,13 @@ export default function AdminProjectDetail() {
                 href={project.inspiration_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline break-all leading-relaxed"
+                className="flex items-center gap-1.5 text-xs text-primary hover:underline"
               >
-                {project.inspiration_url}
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Open link
               </a>
-            </Section>
-          )}
-
-          {/* Video script */}
-          {project.video_script && (
-            <Section title="Video Script">
-              <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{project.video_script}</p>
-            </Section>
-          )}
-
-          {/* Instructions */}
-          {project.instructions && (
-            <Section title="Instructions">
-              <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{project.instructions}</p>
             </Section>
           )}
         </aside>
@@ -308,6 +352,15 @@ export default function AdminProjectDetail() {
             <div className="mb-4">
               <h1 className="text-xl font-heading font-semibold tracking-tight">{project.title}</h1>
             </div>
+
+            {/* Description / script / instructions */}
+            {(project.description || project.video_script || project.instructions) && (
+              <div className="space-y-3 mb-5">
+                {project.description && <TextBlock label="Description" value={project.description} />}
+                {project.instructions && <TextBlock label="Client Instructions" value={project.instructions} />}
+                {project.video_script && <TextBlock label="Video Script" value={project.video_script} />}
+              </div>
+            )}
 
             {/* Tabs */}
             <div className="flex gap-1 mb-5 border-b border-border">
@@ -336,19 +389,20 @@ export default function AdminProjectDetail() {
                   {deliverables.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No deliverables yet</p>
                   ) : (
-                    <div className="clay-card divide-y divide-border/50">
+                    <div className="clay-card divide-y divide-border/50 overflow-hidden">
                       {deliverables.map((f) => (
                         <div key={f.id} className="flex items-center gap-3 px-4 py-3">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{f.file_name}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {f.file_size ? formatBytes(f.file_size) : '—'} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
+                              {(f as any).profiles?.full_name && ` · ${(f as any).profiles.full_name}`}
                             </p>
                           </div>
-                          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full border', f.approved ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200')}>
+                          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full border flex-shrink-0', f.approved ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800')}>
                             {f.approved ? 'Approved' : 'Pending'}
                           </span>
-                          <FileRow name="" size={null} fileId={f.id} />
+                          <FileRow name="" size={null} fileId={f.id} iconOnly />
                         </div>
                       ))}
                     </div>
@@ -361,7 +415,7 @@ export default function AdminProjectDetail() {
                   {sourceFiles.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No source files</p>
                   ) : (
-                    <div className="clay-card divide-y divide-border/50">
+                    <div className="clay-card divide-y divide-border/50 overflow-hidden">
                       {sourceFiles.map((f) => (
                         <div key={f.id} className="flex items-center gap-3 px-4 py-3">
                           <div className="flex-1 min-w-0">
@@ -370,7 +424,10 @@ export default function AdminProjectDetail() {
                               {f.file_size ? formatBytes(f.file_size) : '—'} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
                             </p>
                           </div>
-                          <FileRow name="" size={null} fileId={f.id} />
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">
+                            {f.file_type === 'source_video' ? 'Main video' : f.file_type === 'attachment' ? 'Attachment' : f.file_type}
+                          </span>
+                          <FileRow name="" size={null} fileId={f.id} iconOnly />
                         </div>
                       ))}
                     </div>
