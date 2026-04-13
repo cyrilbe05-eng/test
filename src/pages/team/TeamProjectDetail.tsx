@@ -184,21 +184,6 @@ export default function TeamProjectDetail() {
               </div>
             </div>
 
-            {/* Description */}
-            {project.description && (
-              <TextBlock label="Description" value={project.description} />
-            )}
-
-            {/* Instructions */}
-            {project.instructions && (
-              <TextBlock label="Client Instructions" value={project.instructions} />
-            )}
-
-            {/* Video script */}
-            {project.video_script && (
-              <TextBlock label="Video Script" value={project.video_script} />
-            )}
-
             {/* Source files */}
             <div className="clay-card overflow-hidden">
               <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
@@ -254,6 +239,11 @@ export default function TeamProjectDetail() {
                 </div>
               </div>
             )}
+
+            {/* Description / instructions / script — below source files & comments */}
+            {project.description && <TextBlock label="Description" value={project.description} />}
+            {project.instructions && <TextBlock label="Client Instructions" value={project.instructions} />}
+            {project.video_script && <TextBlock label="Video Script" value={project.video_script} />}
           </div>
 
           {/* ── Right: sidebar ── */}
@@ -261,9 +251,9 @@ export default function TeamProjectDetail() {
 
             {/* Deliverable upload */}
             <div className="clay-card overflow-hidden">
-              <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
-                <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Your Deliverable</h3>
-                <DeliverableCounter used={deliverables.length} max={project.max_deliverables} />
+              <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between gap-2 overflow-hidden">
+                <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground truncate">Your Deliverable</h3>
+                <div className="flex-shrink-0"><DeliverableCounter used={deliverables.length} max={project.max_deliverables} /></div>
               </div>
               <div className="p-3 space-y-1">
                 {deliverables.map((f) => (

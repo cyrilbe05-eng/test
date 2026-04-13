@@ -247,12 +247,17 @@ export default function AdminProjectDetail() {
           </Section>
 
           {/* Deliverables */}
-          <Section title="Deliverables">
-            <DeliverableCounter used={deliverables.length} max={project.max_deliverables} />
-            <div className="mt-2 space-y-0.5">
-              {deliverables.map((f) => <FileRow key={f.id} name={f.file_name} size={f.file_size} fileId={f.id} />)}
+          <div className="clay-card p-4">
+            <div className="flex items-center justify-between gap-2 mb-3 overflow-hidden">
+              <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground truncate">Deliverables</h3>
+              <div className="flex-shrink-0"><DeliverableCounter used={deliverables.length} max={project.max_deliverables} /></div>
             </div>
-          </Section>
+            <div className="space-y-0.5">
+              {deliverables.length === 0
+                ? <p className="text-xs text-muted-foreground">None uploaded</p>
+                : deliverables.map((f) => <FileRow key={f.id} name={f.file_name} size={f.file_size} fileId={f.id} />)}
+            </div>
+          </div>
 
           {/* Team assignment */}
           <Section title="Assigned Team">
@@ -352,15 +357,6 @@ export default function AdminProjectDetail() {
             <div className="mb-4">
               <h1 className="text-xl font-heading font-semibold tracking-tight">{project.title}</h1>
             </div>
-
-            {/* Description / script / instructions */}
-            {(project.description || project.video_script || project.instructions) && (
-              <div className="space-y-3 mb-5">
-                {project.description && <TextBlock label="Description" value={project.description} />}
-                {project.instructions && <TextBlock label="Client Instructions" value={project.instructions} />}
-                {project.video_script && <TextBlock label="Video Script" value={project.video_script} />}
-              </div>
-            )}
 
             {/* Tabs */}
             <div className="flex gap-1 mb-5 border-b border-border">
@@ -474,6 +470,15 @@ export default function AdminProjectDetail() {
                     >
                       Request Revision
                     </button>
+                  </div>
+                )}
+
+                {/* Description / script / instructions — below the video */}
+                {(project.description || project.video_script || project.instructions) && (
+                  <div className="space-y-3 mt-5">
+                    {project.description && <TextBlock label="Description" value={project.description} />}
+                    {project.instructions && <TextBlock label="Client Instructions" value={project.instructions} />}
+                    {project.video_script && <TextBlock label="Video Script" value={project.video_script} />}
                   </div>
                 )}
               </div>
