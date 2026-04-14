@@ -104,10 +104,10 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
   return (
     <div className="space-y-4">
       {/* Video */}
-      <div ref={playerContainerRef} className="rounded-xl overflow-hidden bg-zinc-950 border border-border aspect-video">
+      <div ref={playerContainerRef} className="rounded-xl overflow-hidden bg-zinc-950 border border-border">
         {signedUrl
-          ? <video ref={videoRef} src={signedUrl} className="w-full h-full" />
-          : <div className="w-full h-full flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+          ? <video ref={videoRef} src={signedUrl} className="w-full max-h-[80vh] object-contain" />
+          : <div className="aspect-video flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
         }
       </div>
 
