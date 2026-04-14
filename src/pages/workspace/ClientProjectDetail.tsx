@@ -178,12 +178,18 @@ export default function ClientProjectDetail() {
     setSubmitting(false)
   }
 
-  const handleDownload = async (file?: { id: string }) => {
+  const handleDownload = async (file?: { id: string; file_name?: string }) => {
     const fileId = file?.id ?? latestDeliverable?.id
+    const fileName = file?.file_name ?? latestDeliverable?.file_name ?? 'video'
     if (!fileId || !id) return
     try {
       const data = await apiFetch<{ signedUrl: string }>('/api/downloads/' + id + '/' + fileId)
-      window.open(data.signedUrl, '_blank')
+      const a = document.createElement('a')
+      a.href = data.signedUrl
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
     } catch (err) {
       toast.error((err as Error).message)
     }
