@@ -414,7 +414,7 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
     const effectiveClientId: string = isAdmin && bodyClientId ? bodyClientId : clerkUserId
 
     let maxDeliverables = 1
-    let maxRevisions = 2
+    let maxRevisions = -1 // unlimited by default
 
     if (!isAdmin && profile.plan_id) {
       const plans = await dbQuery<Plan>('SELECT * FROM plans WHERE id = ?', [profile.plan_id])
@@ -802,6 +802,26 @@ async function handleGetProjectFileUploadUrl(req: VercelRequest, res: VercelResp
     const uploadUrl = await getPresignedUploadUrl(key, mimeType ?? 'application/octet-stream')
 
     res.json({ uploadUrl, key })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+async function handleDeleteProject(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'DELETE') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    requireRole(profile, 'admin')
+    const projectId = req.query.id as string
+    if (!projectId) { res.status(400).json({ error: 'Project ID required' }); return }
+    // Cascade delete: files, assignments, deadlines, comments, notifications
+    await dbExecute('DELETE FROM timeline_comments WHERE project_id = ?', [projectId])
+    await dbExecute('DELETE FROM deadlines WHERE project_id = ?', [projectId])
+    await dbExecute('DELETE FROM project_assignments WHERE project_id = ?', [projectId])
+    await dbExecute('DELETE FROM project_files WHERE project_id = ?', [projectId])
+    await dbExecute('DELETE FROM notifications WHERE project_id = ?', [projectId])
+    await dbExecute('DELETE FROM projects WHERE id = ?', [projectId])
+    res.json({ ok: true })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
@@ -3085,6 +3105,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug.length === 3 && slug[2] === 'approve-client') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleApproveClient(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'delete') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleDeleteProject(req, res)
     }
     res.status(404).json({ error: 'Not found' }); return
   }

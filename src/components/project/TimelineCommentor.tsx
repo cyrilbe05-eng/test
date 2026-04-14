@@ -66,9 +66,10 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
     if (!bar) return
     // Remove old markers
     bar.querySelectorAll('.comment-marker').forEach((el) => el.remove())
-    // Add new markers
+    // Add new markers (filter admin comments for clients)
+    const markerComments = currentUserRole === 'client' ? comments.filter((c) => c.author_role !== 'admin') : comments
     const seen = new Set<number>()
-    comments.filter((c) => c.timestamp_sec != null).forEach((c) => {
+    markerComments.filter((c) => c.timestamp_sec != null).forEach((c) => {
       const pct = Math.min(100, Math.max(0, ((c.timestamp_sec ?? 0) / duration) * 100))
       const key = Math.round(pct * 10)
       if (seen.has(key)) return
@@ -79,7 +80,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
       ;(bar as HTMLElement).style.position = 'relative'
       bar.appendChild(dot)
     })
-  }, [comments, duration])
+  }, [comments, currentUserRole, duration])
 
   const seekTo = (sec: number) => { if (playerRef.current) playerRef.current.currentTime = sec }
 
@@ -93,15 +94,20 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
     } catch (e: any) { toast.error(e.message) }
   }
 
-  const rounds = Array.from(new Set(comments.map((c) => c.revision_round))).sort((a, b) => b - a)
+  // Clients only see their own comments and team comments (not internal admin notes)
+  const visibleComments = currentUserRole === 'client'
+    ? comments.filter((c) => c.author_role !== 'admin')
+    : comments
+
+  const rounds = Array.from(new Set(visibleComments.map((c) => c.revision_round))).sort((a, b) => b - a)
 
   return (
     <div className="space-y-4">
       {/* Video */}
-      <div ref={playerContainerRef} className="rounded-xl overflow-hidden bg-zinc-950 border border-border">
+      <div ref={playerContainerRef} className="rounded-xl overflow-hidden bg-zinc-950 border border-border aspect-video">
         {signedUrl
-          ? <video ref={videoRef} src={signedUrl} className="w-full" />
-          : <div className="aspect-video flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+          ? <video ref={videoRef} src={signedUrl} className="w-full h-full" />
+          : <div className="w-full h-full flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
         }
       </div>
 
@@ -153,14 +159,14 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
         <div className="px-4 py-3 border-b border-border flex items-center gap-2">
           <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
           <h3 className="font-heading font-semibold text-sm">Comments</h3>
-          <span className="ml-auto text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{comments.length}</span>
+          <span className="ml-auto text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{visibleComments.length}</span>
         </div>
 
         <div className={cn('overflow-y-auto', theater ? 'max-h-80' : 'max-h-64')}>
           {rounds.length === 0 ? (
             <p className="text-center text-muted-foreground text-sm py-8">No comments yet. Pause the video to add one.</p>
           ) : rounds.map((round) => {
-            const roundComments = comments.filter((c) => c.revision_round === round)
+            const roundComments = visibleComments.filter((c) => c.revision_round === round)
             const isCurrentRound = round === revisionRound
             const isCollapsed = collapsedRounds.has(round)
             return (

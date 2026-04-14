@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getSignedUrlById } from '@/lib/storage'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -116,6 +116,7 @@ function FileRow({ name, size, fileId, iconOnly }: { name: string; size: number 
 export default function AdminProjectDetail() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: project, isLoading } = useProject(id)
   const { data: files } = useProjectFiles(id)
@@ -176,6 +177,18 @@ export default function AdminProjectDetail() {
     toast.success('Revision requested')
   }
 
+  const handleDeleteProject = async () => {
+    if (!id || !confirm(`Delete "${project?.title}"? This cannot be undone.`)) return
+    try {
+      await apiFetch(`/api/projects/${id}/delete`, { method: 'DELETE' })
+      toast.success('Project deleted')
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      navigate('/admin')
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
+  }
+
   const saveDeadlineEdit = async (deadlineId: string) => {
     if (!editDeadlineValue) return
     try {
@@ -217,7 +230,19 @@ export default function AdminProjectDetail() {
           </Link>
           <span className="text-border/60">/</span>
           <span className="text-sm font-medium truncate max-w-xs">{project.title}</span>
-          <div className="ml-auto"><ProjectStatusBadge status={project.status} /></div>
+          <div className="ml-auto flex items-center gap-2">
+            <ProjectStatusBadge status={project.status} />
+            <button
+              onClick={handleDeleteProject}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800/40 transition-colors"
+              title="Delete project"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </button>
+          </div>
         </div>
       </header>
 
