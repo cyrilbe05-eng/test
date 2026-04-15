@@ -6,6 +6,7 @@ export function useProjects() {
   const apiFetch = useApiFetch()
   return useQuery({
     queryKey: ['projects'],
+    refetchInterval: 30_000,
     queryFn: () =>
       apiFetch<(Project & { profiles: { full_name: string; email: string; avatar_url: string | null } })[]>(
         '/api/projects'

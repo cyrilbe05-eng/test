@@ -10,6 +10,7 @@ import {
   useDeleteFolder,
   useMoveFile,
   useDeleteGalleryFile,
+  useRenameGalleryFile,
 } from '@/hooks/useGallery'
 import type { GalleryFile, GalleryFolder } from '@/types'
 
@@ -119,6 +120,38 @@ function MoveModal({
   )
 }
 
+// ─── Fullscreen Preview Modal ─────────────────────────────────────────────────
+
+function PreviewModal({ file, signedUrl, onClose }: { file: GalleryFile; signedUrl: string; onClose: () => void }) {
+  const isImage = file.mime_type.startsWith('image/')
+  const isVideo = file.mime_type.startsWith('video/')
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition-colors"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <div className="max-w-5xl max-h-[90vh] w-full flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+        {isImage ? (
+          <img src={signedUrl} alt={file.file_name} className="max-h-[80vh] max-w-full object-contain rounded-xl" />
+        ) : isVideo ? (
+          <video src={signedUrl} controls autoPlay className="max-h-[80vh] max-w-full rounded-xl" />
+        ) : (
+          <div className="text-white text-sm">Preview not available for this file type.</div>
+        )}
+        <p className="text-white/70 text-sm truncate max-w-full">{file.file_name}</p>
+      </div>
+    </div>
+  )
+}
+
 // ─── File Card ────────────────────────────────────────────────────────────────
 
 function FileCard({
@@ -129,6 +162,7 @@ function FileCard({
   onDragStart,
   onDragEnd,
   onDownload,
+  onPreview,
 }: {
   file: GalleryFile
   viewMode: 'grid' | 'list'
@@ -137,6 +171,7 @@ function FileCard({
   onDragStart: (fileId: string) => void
   onDragEnd: () => void
   onDownload: (fileId: string, fileName: string) => void
+  onPreview: (file: GalleryFile, url: string) => void
 }) {
   const isImage = file.mime_type.startsWith('image/')
   const isVideo = file.mime_type.startsWith('video/')
@@ -221,9 +256,19 @@ function FileCard({
       onContextMenu={(e) => onContextMenu(e, file.id)}
       className="clay-card overflow-hidden cursor-grab active:cursor-grabbing select-none group"
     >
-      <div className="aspect-video bg-muted/50 flex items-center justify-center overflow-hidden relative">
+      <div className="aspect-video bg-muted/50 flex items-center justify-center overflow-hidden relative group/media">
         {isImage && signedUrl?.url ? (
-          <img src={signedUrl.url} alt={file.file_name} className="w-full h-full object-cover" />
+          <>
+            <img src={signedUrl.url} alt={file.file_name} className="w-full h-full object-cover" />
+            <button
+              onClick={(e) => { e.stopPropagation(); onPreview(file, signedUrl.url) }}
+              className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/media:bg-black/30 transition-colors"
+            >
+              <svg className="w-7 h-7 text-white opacity-0 group-hover/media:opacity-100 transition-opacity drop-shadow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+            </button>
+          </>
         ) : isVideo && signedUrl?.url ? (
           <>
             <video
@@ -250,6 +295,16 @@ function FileCard({
                   </svg>
                 )}
               </div>
+            </button>
+            {/* Fullscreen button */}
+            <button
+              onClick={(e) => { e.stopPropagation(); onPreview(file, signedUrl.url) }}
+              className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/50 text-white flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/70"
+              title="Fullscreen"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
             </button>
             {/* Video badge */}
             {!playing && (
@@ -384,6 +439,12 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   const deleteFolder = useDeleteFolder()
   const moveFile = useMoveFile()
   const deleteFile = useDeleteGalleryFile()
+  const renameFile = useRenameGalleryFile()
+
+  // Preview / rename state
+  const [previewFile, setPreviewFile] = useState<{ file: GalleryFile; url: string } | null>(null)
+  const [renameFileId, setRenameFileId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   const isLoading = filesLoading || foldersLoading
 
@@ -471,6 +532,24 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
     } catch {
       toast.error('Failed to delete folder')
     }
+  }
+
+  // ── Rename ──
+  const startRename = (file: GalleryFile) => {
+    setRenameFileId(file.id)
+    setRenameValue(file.file_name)
+    setContextMenu(null)
+  }
+
+  const commitRename = async () => {
+    if (!renameFileId || !renameValue.trim()) { setRenameFileId(null); return }
+    try {
+      await renameFile.mutateAsync({ id: renameFileId, fileName: renameValue.trim(), ownerId })
+      toast.success('File renamed')
+    } catch {
+      toast.error('Failed to rename')
+    }
+    setRenameFileId(null)
   }
 
   // ── Download ──
@@ -718,6 +797,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 onDragStart={setDraggingFileId}
                 onDragEnd={() => setDraggingFileId(null)}
                 onDownload={handleDownload}
+                onPreview={(f, url) => setPreviewFile({ file: f, url })}
               />
             ))}
           </div>
@@ -758,6 +838,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 onDragStart={setDraggingFileId}
                 onDragEnd={() => setDraggingFileId(null)}
                 onDownload={handleDownload}
+                onPreview={(f, url) => setPreviewFile({ file: f, url })}
               />
             ))}
           </div>
@@ -784,6 +865,21 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
+          {!readOnly && (() => {
+            const file = currentFiles.find((f) => f.id === contextMenu.fileId)
+            if (!file) return null
+            return (
+              <button
+                onClick={() => startRename(file)}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2"
+              >
+                <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Rename
+              </button>
+            )
+          })()}
           <button
             onClick={() => { setMoveModalFileId(contextMenu.fileId); setContextMenu(null) }}
             className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2"
@@ -829,6 +925,35 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
           ownerId={ownerId}
           folders={allFolders}
           onClose={() => setMoveModalFileId(null)}
+        />
+      )}
+
+      {/* Rename modal */}
+      {renameFileId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setRenameFileId(null)}>
+          <div className="bg-card border border-border rounded-2xl shadow-xl w-80 p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading font-semibold text-sm">Rename file</h3>
+            <input
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenameFileId(null) }}
+              className="w-full px-3 py-2 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <div className="flex gap-2">
+              <button onClick={commitRename} className="flex-1 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:brightness-110 transition-all">Save</button>
+              <button onClick={() => setRenameFileId(null)} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen preview */}
+      {previewFile && (
+        <PreviewModal
+          file={previewFile.file}
+          signedUrl={previewFile.url}
+          onClose={() => setPreviewFile(null)}
         />
       )}
     </div>

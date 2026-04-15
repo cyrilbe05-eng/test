@@ -297,7 +297,20 @@ export default function AdminProjectDetail() {
                     <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                       {a.profiles.full_name.charAt(0)}
                     </div>
-                    <span className="text-xs font-medium">{a.profiles.full_name}</span>
+                    <span className="text-xs font-medium flex-1">{a.profiles.full_name}</span>
+                    <button
+                      onClick={async () => {
+                        if (!id || !confirm(`Unassign ${a.profiles.full_name}?`)) return
+                        try {
+                          await apiFetch(`/api/projects/${id}/unassign`, { method: 'DELETE', body: JSON.stringify({ team_member_id: a.team_member_id }) })
+                          qc.invalidateQueries({ queryKey: ['project_assignments', id] })
+                          qc.invalidateQueries({ queryKey: ['project_deadlines', id] })
+                          toast.success('Unassigned')
+                        } catch (err) { toast.error((err as Error).message) }
+                      }}
+                      className="text-[10px] text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                      title="Unassign"
+                    >✕</button>
                   </div>
                   {dl && (
                     <div className="ml-8">

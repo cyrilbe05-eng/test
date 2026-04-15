@@ -103,15 +103,6 @@ export default function ClientAnalytics() {
     }).length,
   }))
 
-  const revisionsPerMonth = months.map((m) => ({
-    label: format(m, 'MMM'),
-    value: allComments.filter((c) => {
-      if (c.author_role === 'team') return false
-      const d = parseISO(c.created_at)
-      return d.getFullYear() === m.getFullYear() && d.getMonth() === m.getMonth()
-    }).length,
-  }))
-
   // Status breakdown
   const statusCounts = allProjects.reduce<Record<string, number>>((acc, p) => {
     acc[p.status] = (acc[p.status] || 0) + 1
@@ -180,10 +171,9 @@ export default function ClientAnalytics() {
               <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-3">
                 {timeframe === 'week' ? 'This week' : timeframe === 'month' ? 'This month' : `${customFrom} – ${customTo}`}
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Projects Started', value: rangeProjects.length, color: 'text-primary' },
-                  { label: 'Revision Comments', value: rangeComments.filter((c) => c.author_role !== 'team').length, color: rangeComments.filter((c) => c.author_role !== 'team').length > 0 ? 'text-red-500' : 'text-green-600' },
                   { label: 'Team Comments', value: rangeComments.filter((c) => c.author_role === 'team').length, color: 'text-foreground' },
                 ].map((kpi, i) => (
                   <div key={kpi.label} className={`clay-card p-4 text-center animate-slide-up stagger-${i + 1}`}>
@@ -213,15 +203,9 @@ export default function ClientAnalytics() {
             </div>
 
             {/* Charts row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div className="clay-card p-5">
-                <h3 className="font-heading font-semibold text-sm mb-4">Projects started (last 6 months)</h3>
-                <MiniBarChart data={projectsPerMonth} color="bg-primary" />
-              </div>
-              <div className="clay-card p-5">
-                <h3 className="font-heading font-semibold text-sm mb-4">Revision comments (last 6 months)</h3>
-                <MiniBarChart data={revisionsPerMonth} color="bg-red-400" />
-              </div>
+            <div className="clay-card p-5">
+              <h3 className="font-heading font-semibold text-sm mb-4">Projects started (last 6 months)</h3>
+              <MiniBarChart data={projectsPerMonth} color="bg-primary" />
             </div>
 
             {/* Status breakdown */}

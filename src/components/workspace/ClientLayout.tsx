@@ -80,7 +80,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       {/* ── Top bar ── */}
       <header className="h-[52px] border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30 flex items-center px-4 gap-4">
         <div className="flex items-center gap-2 mr-2">
-          <img src={pinguWave} alt="Pingu Studio" className="w-8 h-8 object-contain rounded-lg flex-shrink-0" />
+          <img src={pinguWave} alt="Pingu Studio" className="w-8 h-8 object-contain flex-shrink-0" />
           <span className="font-heading font-semibold text-sm hidden sm:block">Pingu Studio</span>
         </div>
         <div className="flex-1" />

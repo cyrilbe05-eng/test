@@ -564,6 +564,28 @@ async function handleAssignProject(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+async function handleUnassignProject(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'DELETE') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    requireRole(profile, 'admin')
+    const projectId = req.query.id as string
+    const { team_member_id } = req.body
+    if (!team_member_id) { res.status(400).json({ error: 'team_member_id required' }); return }
+    await dbExecute(
+      'DELETE FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
+      [projectId, team_member_id]
+    )
+    await dbExecute(
+      'DELETE FROM deadlines WHERE project_id = ? AND team_member_id = ?',
+      [projectId, team_member_id]
+    )
+    res.json({ ok: true })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
 async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'PATCH') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
@@ -1611,8 +1633,15 @@ async function handleGalleryFile(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'PATCH') {
-      const { folderId } = req.body as { folderId: string | null }
-      await dbExecute('UPDATE gallery_files SET folder_id = ? WHERE id = ?', [folderId ?? null, fileId])
+      const { folderId, fileName } = req.body as { folderId?: string | null; fileName?: string }
+      if (fileName !== undefined) {
+        const trimmed = fileName.trim()
+        if (!trimmed) { res.status(400).json({ error: 'fileName cannot be empty' }); return }
+        await dbExecute('UPDATE gallery_files SET file_name = ? WHERE id = ?', [trimmed, fileId])
+      }
+      if (folderId !== undefined) {
+        await dbExecute('UPDATE gallery_files SET folder_id = ? WHERE id = ?', [folderId ?? null, fileId])
+      }
       const updated = await dbQuery<GalleryFile>('SELECT * FROM gallery_files WHERE id = ?', [fileId])
       res.json(updated[0]); return
     }
@@ -3109,6 +3138,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug.length === 3 && slug[2] === 'delete') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleDeleteProject(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'unassign') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleUnassignProject(req, res)
     }
     res.status(404).json({ error: 'Not found' }); return
   }

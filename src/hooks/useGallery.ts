@@ -82,6 +82,21 @@ export function useMoveFile() {
   })
 }
 
+export function useRenameGalleryFile() {
+  const qc = useQueryClient()
+  const apiFetch = useApiFetch()
+  return useMutation({
+    mutationFn: ({ id, fileName }: { id: string; fileName: string; ownerId: string }) =>
+      apiFetch<GalleryFile>(`/api/gallery/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ fileName }),
+      }),
+    onSuccess: (_data, variables) => {
+      qc.refetchQueries({ queryKey: ['gallery_files', variables.ownerId] })
+    },
+  })
+}
+
 export function useDeleteGalleryFile() {
   const qc = useQueryClient()
   const apiFetch = useApiFetch()

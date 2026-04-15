@@ -75,7 +75,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </button>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          <img src={pinguSuit} alt="Pingu Studio" className="w-8 h-8 object-contain rounded-lg" />
+          <img src={pinguSuit} alt="Pingu Studio" className="w-8 h-8 object-contain" />
           <span className="font-heading font-semibold text-sm hidden sm:block">Pingu Studio</span>
         </div>
 
