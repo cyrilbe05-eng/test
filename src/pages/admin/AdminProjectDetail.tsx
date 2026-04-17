@@ -246,9 +246,9 @@ export default function AdminProjectDetail() {
         </div>
       </header>
 
-      <div className="flex" style={{ minHeight: 'calc(100vh - 52px)' }}>
+      <div className="flex flex-col md:flex-row" style={{ minHeight: 'calc(100vh - 52px)' }}>
         {/* ── Left metadata sidebar ── */}
-        <aside className="w-56 border-r border-border bg-card/20 flex flex-col overflow-y-auto p-3 space-y-3 flex-shrink-0">
+        <aside className="w-full md:w-56 border-b md:border-b-0 md:border-r border-border bg-card/20 flex flex-col overflow-y-auto p-3 space-y-3 md:flex-shrink-0">
           {/* Client */}
           {client && (
             <Section title="Client">

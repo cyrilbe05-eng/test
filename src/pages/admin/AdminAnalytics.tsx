@@ -139,7 +139,7 @@ export default function AdminAnalytics() {
 
         {/* Deadline summary KPIs */}
         {totalDeadlines > 0 && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="clay-card p-5 border-l-4 border-l-green-500">
               <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Deadlines Met</p>
               <p className="text-3xl font-heading font-bold mt-2 text-green-600">{totalMet}</p>
