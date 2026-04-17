@@ -4,6 +4,7 @@ import { dbQuery, dbExecute, newId, nowIso } from './_helpers/db.js'
 import { getPresignedUploadUrl, getPresignedDownloadUrl, deleteObject } from './_helpers/r2.js'
 import { ok, err, handleError } from './_helpers/respond.js'
 import { sanitizeFileName } from '../src/lib/utils.js'
+import { sendEmailNotifications, sendEmailNotification, projectUrl } from './_helpers/email.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -552,10 +553,16 @@ async function handleAssignProject(req: VercelRequest, res: VercelResponse) {
     }
 
     if (result.changes > 0 && projects[0]) {
+      const msg = `You have been assigned to "${projects[0].title}"`
       await dbExecute(
         'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
-        [newId(), team_member_id, projectId, 'team_assigned', `You have been assigned to "${projects[0].title}"`, now]
+        [newId(), team_member_id, projectId, 'team_assigned', msg, now]
       )
+      await sendEmailNotification({
+        recipientId: team_member_id,
+        subject: `New project assigned: ${projects[0].title}`,
+        text: `${msg}\n\nView it here: ${projectUrl(projectId, 'team')}`,
+      })
     }
 
     res.json({ ok: true })
@@ -652,14 +659,22 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
       )
       assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: 'project_assigned', message: `Project "${project.title}" is now in progress` }))
     }
+    const emailQueue: { recipientId: string; subject: string; text: string }[] = []
     for (const n of notifyMessages) {
       if (n.recipientId !== clerkUserId) {
         await dbExecute(
           'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
           [newId(), n.recipientId, projectId, n.type, n.message, now]
         )
+        const role = n.type === 'video_ready_for_review' ? 'client' : 'team'
+        emailQueue.push({
+          recipientId: n.recipientId,
+          subject: n.message,
+          text: `${n.message}\n\nView project: ${projectUrl(projectId, role as 'client' | 'team')}`,
+        })
       }
     }
+    await sendEmailNotifications(emailQueue)
 
     res.json({ ok: true })
   } catch (e: any) {
@@ -2865,12 +2880,20 @@ async function handleSubmitRevision(req: VercelRequest, res: VercelResponse) {
       ...assignments.map((a) => a.team_member_id),
     ]
 
+    const revisionMsg = `Client requested a revision on project "${project.title}"`
     for (const recipient_id of recipients) {
       await dbExecute(
         'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
-        [newId(), recipient_id, project_id, 'revision_requested', `Client requested a revision on project "${project.title}"`, now]
+        [newId(), recipient_id, project_id, 'revision_requested', revisionMsg, now]
       )
     }
+    await sendEmailNotifications(
+      recipients.map((recipient_id) => ({
+        recipientId: recipient_id,
+        subject: revisionMsg,
+        text: `${revisionMsg}\n\nView project: ${projectUrl(project_id, admins.some((a) => a.id === recipient_id) ? 'admin' : 'team')}`,
+      }))
+    )
 
     res.json({ ok: true })
   } catch (e: any) {
