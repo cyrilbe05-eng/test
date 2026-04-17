@@ -303,7 +303,7 @@ export default function TeamProjectDetail() {
                   />
                 ))}
               </div>
-              {canUpload && deliverables.length < project.max_deliverables && (
+              {canUpload && (deliverables.length < project.max_deliverables || project.max_deliverables === -1) && (
                 <div className="px-3 pb-3">
                   <FileUploader
                     projectId={project.id}
@@ -312,6 +312,11 @@ export default function TeamProjectDetail() {
                     onUploaded={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
                   />
                 </div>
+              )}
+              {canUpload && deliverables.length >= project.max_deliverables && project.max_deliverables !== -1 && (
+                <p className="px-4 pb-3 text-xs text-muted-foreground">
+                  Deliverable limit reached — delete the existing file to replace it.
+                </p>
               )}
               {!canUpload && (
                 <p className="px-4 pb-3 text-xs text-muted-foreground">
