@@ -136,7 +136,11 @@ export default function TeamMessages() {
     <TeamLayout>
       <div className="flex h-full" style={{ minHeight: 'calc(100vh - 52px)' }}>
         {/* Sidebar */}
-        <aside className="w-72 border-r border-border bg-card/60 flex flex-col flex-shrink-0">
+        <aside className={cn(
+          'border-r border-border bg-card/60 flex flex-col flex-shrink-0',
+          'w-full md:w-72',
+          activeConvId ? 'hidden md:flex' : 'flex',
+        )}>
           <div className="p-4 border-b border-border">
             <h2 className="font-heading font-semibold text-sm">Conversations</h2>
           </div>
@@ -205,9 +209,22 @@ export default function TeamMessages() {
         </aside>
 
         {/* Thread panel */}
-        <main className="flex-1 flex flex-col bg-background">
+        <main className={cn('flex-1 flex flex-col bg-background', !activeConvId && 'hidden md:flex')}>
           {activeConvId ? (
-            <Thread conversationId={activeConvId} currentUserId={profile?.id ?? ''} />
+            <>
+              <div className="md:hidden flex items-center gap-2 px-3 py-2 border-b border-border bg-card/60">
+                <button
+                  onClick={() => setActiveConvId(null)}
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Back
+                </button>
+              </div>
+              <Thread conversationId={activeConvId} currentUserId={profile?.id ?? ''} />
+            </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">

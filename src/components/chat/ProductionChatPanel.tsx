@@ -155,7 +155,7 @@ export function ProductionChatPanel() {
     <div className="fixed bottom-20 md:bottom-5 right-4 md:right-5 z-50 flex flex-col items-end gap-3 pointer-events-none">
       {/* Panel */}
       {panel !== 'closed' && (
-        <div className="pointer-events-auto w-80 h-96 bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+        <div className="pointer-events-auto w-[calc(100vw-2rem)] sm:w-80 h-[min(384px,calc(100dvh-10rem))] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-muted/40 flex-shrink-0">
             {panel === 'thread' ? (
