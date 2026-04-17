@@ -852,15 +852,29 @@ async function handleDeleteProject(req: VercelRequest, res: VercelResponse) {
 async function handleDeleteProjectFile(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'DELETE') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
-    const { profile } = await requireAuth(req)
-    requireRole(profile, 'admin')
+    const { clerkUserId, profile } = await requireAuth(req)
 
     const fileId = req.query.id as string
-    const rows = await dbQuery<ProjectFile>('SELECT * FROM project_files WHERE id = ?', [fileId])
+    const rows = await dbQuery<ProjectFile & { project_status: string }>(
+      `SELECT pf.*, p.status AS project_status FROM project_files pf
+       JOIN projects p ON p.id = pf.project_id
+       WHERE pf.id = ?`,
+      [fileId]
+    )
     if (!rows[0]) { res.status(404).json({ error: 'File not found' }); return }
+    const file = rows[0]
+
+    if (profile.role !== 'admin') {
+      // Team members can only delete their own deliverables when project allows edits
+      if (profile.role !== 'team') { res.status(403).json({ error: 'Forbidden' }); return }
+      if (file.uploader_id !== clerkUserId) { res.status(403).json({ error: 'You can only delete your own files' }); return }
+      if (!['in_progress', 'revision_requested'].includes(file.project_status)) {
+        res.status(403).json({ error: 'Cannot delete files once project is under review' }); return
+      }
+    }
 
     await dbExecute('DELETE FROM project_files WHERE id = ?', [fileId])
-    await deleteObject(rows[0].storage_key)
+    await deleteObject(file.storage_key)
     res.json({ ok: true })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })

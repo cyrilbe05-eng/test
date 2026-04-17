@@ -57,26 +57,34 @@ export function useStorageAdapter(): StorageAdapter {
             onProgress?.(100)
             resolve()
           } else {
-            reject(new Error(`R2 upload failed with status ${xhr.status}`))
+            // Try to extract R2's XML error message for better diagnostics
+            const msg = xhr.responseText?.match(/<Message>(.*?)<\/Message>/)?.[1]
+            reject(new Error(msg ?? `Upload failed (${xhr.status})`))
           }
         }
 
-        xhr.onerror = () => reject(new Error('R2 upload network error'))
+        xhr.onerror = () => reject(new Error('Network error — check your connection and try again'))
+        xhr.onabort = () => reject(new Error('Upload was cancelled'))
+        xhr.ontimeout = () => reject(new Error('Upload timed out — file may be too large or connection too slow'))
         xhr.send(file)
       })
 
       // 3. Register the file row in D1
-      await apiFetch('/api/project-files/register', {
-        method: 'POST',
-        body: JSON.stringify({
-          project_id: projectId,
-          file_type: fileType,
-          storage_key: key,
-          file_name: file.name,
-          file_size: file.size,
-          mime_type: file.type,
-        }),
-      })
+      try {
+        await apiFetch('/api/project-files/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            project_id: projectId,
+            file_type: fileType,
+            storage_key: key,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          }),
+        })
+      } catch (e: any) {
+        throw new Error(`File uploaded but failed to register: ${e.message ?? 'unknown error'}. Contact support.`)
+      }
 
       return { key }
     },

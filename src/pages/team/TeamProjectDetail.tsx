@@ -63,9 +63,14 @@ function TextBlock({ label, value }: { label: string; value: string }) {
 }
 
 // ── File row ──────────────────────────────────────────────────────────────────
-function FileRow({ name, size, fileId, badge }: { name: string; size: number | null; fileId: string; badge?: string }) {
+function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
+  name: string; size: number | null; fileId: string; badge?: string
+  canDelete?: boolean; onDelete?: () => void
+}) {
   const apiFetch = useApiFetch()
   const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   const handleDownload = async () => {
     setLoading(true)
     try {
@@ -77,26 +82,57 @@ function FileRow({ name, size, fileId, badge }: { name: string; size: number | n
       setLoading(false)
     }
   }
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+    setDeleting(true)
+    try {
+      await apiFetch(`/api/project-files/${fileId}`, { method: 'DELETE' })
+      toast.success('File deleted')
+      onDelete?.()
+    } catch (err) {
+      toast.error((err as Error).message ?? 'Failed to delete file')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
-    <button
-      onClick={handleDownload}
-      disabled={loading}
-      className="flex items-center gap-3 w-full text-left hover:bg-muted/60 transition-colors rounded-lg px-3 py-2.5 group disabled:opacity-60"
-    >
-      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-        <svg className="w-4 h-4 text-muted-foreground group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-        </svg>
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate text-foreground group-hover:text-primary transition-colors">{name}</p>
-        <p className="text-xs text-muted-foreground">{formatBytes(size)}</p>
-      </div>
-      {badge && (
-        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">{badge}</span>
+    <div className="flex items-center gap-2 rounded-lg px-3 py-2.5 hover:bg-muted/60 transition-colors group">
+      <button
+        onClick={handleDownload}
+        disabled={loading}
+        className="flex items-center gap-3 flex-1 text-left disabled:opacity-60 min-w-0"
+      >
+        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
+          <svg className="w-4 h-4 text-muted-foreground group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate text-foreground group-hover:text-primary transition-colors">{name}</p>
+          <p className="text-xs text-muted-foreground">{formatBytes(size)}</p>
+        </div>
+        {badge && (
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">{badge}</span>
+        )}
+        {loading && <div className="w-3.5 h-3.5 rounded-full border border-primary border-t-transparent animate-spin flex-shrink-0" />}
+      </button>
+      {canDelete && (
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+          title="Delete file"
+        >
+          {deleting
+            ? <div className="w-3 h-3 rounded-full border border-destructive border-t-transparent animate-spin" />
+            : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          }
+        </button>
       )}
-      {loading && <div className="w-3.5 h-3.5 rounded-full border border-primary border-t-transparent animate-spin flex-shrink-0" />}
-    </button>
+    </div>
   )
 }
 
@@ -257,7 +293,14 @@ export default function TeamProjectDetail() {
               </div>
               <div className="p-3 space-y-1">
                 {deliverables.map((f) => (
-                  <FileRow key={f.id} name={f.file_name} size={f.file_size} fileId={f.id} />
+                  <FileRow
+                    key={f.id}
+                    name={f.file_name}
+                    size={f.file_size}
+                    fileId={f.id}
+                    canDelete={canUpload}
+                    onDelete={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
+                  />
                 ))}
               </div>
               {canUpload && deliverables.length < project.max_deliverables && (
