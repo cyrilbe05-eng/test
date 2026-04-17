@@ -15,11 +15,15 @@ const s3 = new S3Client({
 })
 
 /** Generate a pre-signed URL for a browser to PUT a file directly to R2 (upload) */
-export async function getPresignedUploadUrl(key: string, mimeType: string, expiresIn = 3600): Promise<string> {
+export async function getPresignedUploadUrl(key: string, _mimeType: string, expiresIn = 3600): Promise<string> {
+  // ContentType is intentionally omitted from the command so it is NOT included
+  // in X-Amz-SignedHeaders. Including it requires R2's CORS policy to explicitly
+  // allow the Content-Type header in AllowedHeaders, and causes browser preflight
+  // failures on buckets without that CORS rule. The browser still sends
+  // Content-Type freely; R2 stores whatever the client sends.
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
-    ContentType: mimeType,
   })
   return getSignedUrl(s3, command, { expiresIn })
 }
