@@ -379,34 +379,60 @@ function EventModal({
             )}
             <PropRow label="Clients">
               <div className="flex flex-wrap gap-1 pt-0.5">
-                {clients.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => isManual && setAssignedClientIds(toggleId(assignedClientIds, c.id))}
-                    disabled={!isManual}
-                    className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all', assignedClientIds.includes(c.id) ? 'bg-teal-500 text-white border-teal-500' : 'bg-muted text-muted-foreground border-border', isManual && !assignedClientIds.includes(c.id) && 'hover:border-teal-400 hover:text-teal-600')}
-                  >
-                    {assignedClientIds.includes(c.id) && <span className="text-[9px]">✓</span>}
-                    {c.full_name}
-                  </button>
-                ))}
-                {clients.length === 0 && <span className="text-xs text-muted-foreground">No clients</span>}
+                {isManual ? (
+                  <>
+                    {clients.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setAssignedClientIds(toggleId(assignedClientIds, c.id))}
+                        className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all', assignedClientIds.includes(c.id) ? 'bg-teal-500 text-white border-teal-500' : 'bg-muted text-muted-foreground border-border hover:border-teal-400 hover:text-teal-600')}
+                      >
+                        {assignedClientIds.includes(c.id) && <span className="text-[9px]">✓</span>}
+                        {c.full_name}
+                      </button>
+                    ))}
+                    {clients.length === 0 && <span className="text-xs text-muted-foreground">No clients</span>}
+                  </>
+                ) : (
+                  <>
+                    {assignedClientIds.length > 0
+                      ? assignedClientIds.map((id) => {
+                          const c = clients.find((x) => x.id === id)
+                          return c ? <span key={id} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-300/40">{c.full_name}</span> : null
+                        })
+                      : <span className="text-xs text-muted-foreground">—</span>
+                    }
+                  </>
+                )}
               </div>
             </PropRow>
             <PropRow label="Team">
               <div className="flex flex-wrap gap-1 pt-0.5">
-                {teamMembers.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => isManual && setAssignedTeamIds(toggleId(assignedTeamIds, m.id))}
-                    disabled={!isManual}
-                    className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all', assignedTeamIds.includes(m.id) ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-muted text-muted-foreground border-border', isManual && !assignedTeamIds.includes(m.id) && 'hover:border-indigo-400 hover:text-indigo-600')}
-                  >
-                    {assignedTeamIds.includes(m.id) && <span className="text-[9px]">✓</span>}
-                    {m.full_name}
-                  </button>
-                ))}
-                {teamMembers.length === 0 && <span className="text-xs text-muted-foreground">No team members</span>}
+                {isManual ? (
+                  <>
+                    {teamMembers.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => setAssignedTeamIds(toggleId(assignedTeamIds, m.id))}
+                        className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all', assignedTeamIds.includes(m.id) ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-muted text-muted-foreground border-border hover:border-indigo-400 hover:text-indigo-600')}
+                      >
+                        {assignedTeamIds.includes(m.id) && <span className="text-[9px]">✓</span>}
+                        {m.full_name}
+                      </button>
+                    ))}
+                    {teamMembers.length === 0 && <span className="text-xs text-muted-foreground">No team members</span>}
+                  </>
+                ) : (
+                  <>
+                    {assignedTeamIds.length > 0
+                      ? assignedTeamIds.map((id) => {
+                          const m = teamMembers.find((x) => x.id === id)
+                          return m ? <span key={id} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40">{m.full_name}</span> : null
+                        })
+                      : <span className="text-xs text-muted-foreground">—</span>
+                    }
+                  </>
+                )}
               </div>
             </PropRow>
           </div>
