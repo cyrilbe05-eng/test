@@ -152,7 +152,7 @@ export function ProductionChatPanel() {
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3 pointer-events-none">
+    <div className="fixed bottom-20 md:bottom-5 right-4 md:right-5 z-50 flex flex-col items-end gap-3 pointer-events-none">
       {/* Panel */}
       {panel !== 'closed' && (
         <div className="pointer-events-auto w-80 h-96 bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
