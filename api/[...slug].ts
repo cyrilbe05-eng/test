@@ -545,12 +545,6 @@ async function handleAssignProject(req: VercelRequest, res: VercelResponse) {
     }
 
     const projects = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [projectId])
-    if (projects[0]?.status === 'pending_assignment') {
-      await dbExecute(
-        'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',
-        ['in_progress', now, projectId]
-      )
-    }
 
     if (result.changes > 0 && projects[0]) {
       const msg = `You have been assigned to "${projects[0].title}"`
@@ -972,6 +966,18 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
     // Team members can access signed URLs for any project file
 
     const signedUrl = await getPresignedDownloadUrl(file.storage_key)
+
+    // Trigger: team member downloading a source file moves project pending_assignment → in_progress
+    if (profile.role === 'team' && file.file_type === 'source') {
+      const projectRows = await dbQuery<{ status: string }>('SELECT status FROM projects WHERE id = ?', [file.project_id])
+      if (projectRows[0]?.status === 'pending_assignment') {
+        await dbExecute(
+          'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',
+          ['in_progress', nowIso(), file.project_id]
+        )
+      }
+    }
+
     res.json({ signedUrl })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })

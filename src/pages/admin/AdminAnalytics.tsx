@@ -91,17 +91,33 @@ export default function AdminAnalytics() {
   const totalDeadlines = deadlines.length
   const globalRate = totalDeadlines > 0 ? Math.round((totalMet / totalDeadlines) * 100) : 0
 
-  // Editor performance: completed projects, revisions per editor
+  // Editor performance: work-time stats
   const editorStats = (teamMembers ?? []).map((member) => {
     const memberAssignments = (assignments ?? []).filter((a) => a.team_member_id === member.id)
     const assignedProjectIds = new Set(memberAssignments.map((a) => a.project_id))
     const assignedProjects = (projects ?? []).filter((p) => assignedProjectIds.has(p.id))
+
+    // Turnaround: days from assigned_at to client_approved updated_at
+    const turnarounds: number[] = []
+    for (const p of assignedProjects) {
+      if (p.status !== 'client_approved') continue
+      const assignment = memberAssignments.find((a) => a.project_id === p.id)
+      if (!assignment?.assigned_at) continue
+      const days = (new Date(p.updated_at).getTime() - new Date(assignment.assigned_at).getTime()) / 86_400_000
+      if (days >= 0) turnarounds.push(days)
+    }
+    const avgDays = turnarounds.length > 0 ? (turnarounds.reduce((a, b) => a + b, 0) / turnarounds.length).toFixed(1) : null
+    const fastestDays = turnarounds.length > 0 ? Math.min(...turnarounds).toFixed(1) : null
+    const slowestDays = turnarounds.length > 0 ? Math.max(...turnarounds).toFixed(1) : null
+
+    // Past due: active projects where deadline has passed
+    const memberDeadlineEvents = deadlines.filter((d) => d.team_member_id === member.id)
+    const pastDue = memberDeadlineEvents.filter((d) => d.color === 'bg-red-500').length
+
     const completed = assignedProjects.filter((p) => p.status === 'client_approved').length
     const active = assignedProjects.filter((p) => p.status !== 'client_approved').length
-    const totalRevisions = assignedProjects.reduce((a, p) => a + p.client_revision_count, 0)
-    const avgRev = assignedProjects.length > 0 ? (totalRevisions / assignedProjects.length).toFixed(1) : '0'
-    const revisionRequested = assignedProjects.filter((p) => p.status === 'revision_requested').length
-    return { id: member.id, name: member.full_name, completed, active, total: assignedProjects.length, totalRevisions, avgRev, revisionRequested }
+
+    return { id: member.id, name: member.full_name, completed, active, total: assignedProjects.length, avgDays, fastestDays, slowestDays, pastDue }
   }).filter((e) => e.total > 0)
 
   // Deadline by team member
@@ -245,31 +261,43 @@ export default function AdminAnalytics() {
         {editorStats.length > 0 && (
           <div className="clay-card p-6">
             <h3 className="font-heading font-semibold mb-1">Editor Performance</h3>
-            <p className="text-xs text-muted-foreground mb-4">Completed projects, revisions, and active load per editor</p>
-            <div className="overflow-hidden rounded-xl border border-border">
+            <p className="text-xs text-muted-foreground mb-4">Work time from assignment to completion, active load, and late projects</p>
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-muted/30 border-b border-border">
+                  <tr className="bg-muted/30 border-b border-border rounded-xl">
                     <th className="text-left px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wide">Editor</th>
-                    <th className="text-center px-3 py-2 text-xs text-green-600 font-semibold uppercase tracking-wide">Completed</th>
                     <th className="text-center px-3 py-2 text-xs text-blue-600 font-semibold uppercase tracking-wide">Active</th>
-                    <th className="text-center px-3 py-2 text-xs text-red-600 font-semibold uppercase tracking-wide">In Revision</th>
-                    <th className="text-center px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wide">Total</th>
-                    <th className="text-center px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wide">Avg Revisions</th>
+                    <th className="text-center px-3 py-2 text-xs text-green-600 font-semibold uppercase tracking-wide">Done</th>
+                    <th className="text-center px-3 py-2 text-xs text-red-600 font-semibold uppercase tracking-wide">Past Due</th>
+                    <th className="text-center px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wide">Avg Days</th>
+                    <th className="text-center px-3 py-2 text-xs text-green-600 font-semibold uppercase tracking-wide">Fastest</th>
+                    <th className="text-center px-3 py-2 text-xs text-orange-600 font-semibold uppercase tracking-wide">Slowest</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
                   {editorStats.map((e) => (
                     <tr key={e.id} className="hover:bg-muted/20 transition-colors">
                       <td className="px-3 py-2.5 font-medium text-sm">{e.name}</td>
-                      <td className="px-3 py-2.5 text-center"><span className="text-green-600 font-semibold">{e.completed}</span></td>
                       <td className="px-3 py-2.5 text-center"><span className="text-blue-600 font-semibold">{e.active}</span></td>
-                      <td className="px-3 py-2.5 text-center"><span className="text-red-600 font-semibold">{e.revisionRequested}</span></td>
-                      <td className="px-3 py-2.5 text-center text-muted-foreground">{e.total}</td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-green-600 font-semibold">{e.completed}</span></td>
                       <td className="px-3 py-2.5 text-center">
-                        <span className={Number(e.avgRev) <= 1 ? 'text-green-600 font-bold' : Number(e.avgRev) <= 2 ? 'text-orange-600 font-bold' : 'text-red-600 font-bold'}>
-                          {e.avgRev}
-                        </span>
+                        {e.pastDue > 0
+                          ? <span className="text-red-600 font-bold">{e.pastDue}</span>
+                          : <span className="text-muted-foreground">0</span>
+                        }
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        {e.avgDays !== null
+                          ? <span className={Number(e.avgDays) <= 3 ? 'text-green-600 font-bold' : Number(e.avgDays) <= 7 ? 'text-orange-600 font-bold' : 'text-red-600 font-bold'}>{e.avgDays}d</span>
+                          : <span className="text-muted-foreground">—</span>
+                        }
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        {e.fastestDays !== null ? <span className="text-green-600 font-semibold">{e.fastestDays}d</span> : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        {e.slowestDays !== null ? <span className="text-orange-600 font-semibold">{e.slowestDays}d</span> : <span className="text-muted-foreground">—</span>}
                       </td>
                     </tr>
                   ))}
