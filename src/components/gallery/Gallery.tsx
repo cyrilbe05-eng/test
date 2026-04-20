@@ -158,6 +158,9 @@ function FileCard({
   file,
   viewMode,
   canDownload,
+  dlProgress,
+  selected,
+  onSelect,
   onContextMenu,
   onDragStart,
   onDragEnd,
@@ -167,6 +170,9 @@ function FileCard({
   file: GalleryFile
   viewMode: 'grid' | 'list'
   canDownload: boolean
+  dlProgress?: number
+  selected?: boolean
+  onSelect?: (id: string) => void
   onContextMenu: (e: React.MouseEvent, fileId: string) => void
   onDragStart: (fileId: string) => void
   onDragEnd: () => void
@@ -207,8 +213,13 @@ function FileCard({
         onDragStart={() => onDragStart(file.id)}
         onDragEnd={onDragEnd}
         onContextMenu={(e) => onContextMenu(e, file.id)}
-        className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors cursor-grab active:cursor-grabbing rounded-lg select-none"
+        className={cn('flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors cursor-grab active:cursor-grabbing rounded-lg select-none', selected && 'bg-primary/5')}
       >
+        {onSelect && (
+          <input type="checkbox" checked={!!selected} onChange={() => onSelect(file.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 accent-primary flex-shrink-0" />
+        )}
         <div className="w-8 h-8 flex-shrink-0 rounded-lg overflow-hidden bg-muted flex items-center justify-center relative">
           {isImage && signedUrl?.url ? (
             <img src={signedUrl.url} alt={file.file_name} className="w-full h-full object-cover" />
@@ -217,9 +228,7 @@ function FileCard({
               <video ref={videoRef} src={signedUrl.url} className="w-full h-full object-cover" muted preload="metadata" onEnded={() => setPlaying(false)} />
               <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                 <div className="w-4 h-4 rounded-full bg-white/90 flex items-center justify-center">
-                  <svg className="w-2 h-2 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
+                  <svg className="w-2 h-2 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                 </div>
               </div>
             </>
@@ -231,17 +240,21 @@ function FileCard({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{file.file_name}</p>
-          <p className="text-xs text-muted-foreground">{formatBytes(file.file_size)}</p>
+          <p className="text-xs text-muted-foreground">
+            {dlProgress !== undefined ? `${dlProgress}%` : formatBytes(file.file_size)}
+          </p>
         </div>
         {canDownload && (
           <button
             onClick={(e) => { e.stopPropagation(); onDownload(file.id, file.file_name) }}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
+            disabled={dlProgress !== undefined}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 disabled:opacity-40"
             title="Download"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+            {dlProgress !== undefined
+              ? <div className="w-3.5 h-3.5 rounded-full border border-primary border-t-transparent animate-spin" />
+              : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            }
           </button>
         )}
       </div>
@@ -254,8 +267,15 @@ function FileCard({
       onDragStart={() => onDragStart(file.id)}
       onDragEnd={onDragEnd}
       onContextMenu={(e) => onContextMenu(e, file.id)}
-      className="clay-card overflow-hidden cursor-grab active:cursor-grabbing select-none group"
+      className={cn('clay-card overflow-hidden cursor-grab active:cursor-grabbing select-none group relative', selected && 'ring-2 ring-primary')}
     >
+      {onSelect && (
+        <div className="absolute top-1.5 left-1.5 z-10">
+          <input type="checkbox" checked={!!selected} onChange={() => onSelect(file.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 accent-primary" />
+        </div>
+      )}
       <div className="aspect-video bg-muted/50 flex items-center justify-center overflow-hidden relative group/media">
         {isImage && signedUrl?.url ? (
           <>
@@ -319,23 +339,32 @@ function FileCard({
           </span>
         )}
       </div>
-      <div className="p-3 flex items-start justify-between gap-1">
+      <div className="p-2.5 flex items-start justify-between gap-1">
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate">{file.file_name}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{formatBytes(file.file_size)}</p>
+          <p className="text-xs font-medium truncate">{file.file_name}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {dlProgress !== undefined ? `↓ ${dlProgress}%` : formatBytes(file.file_size)}
+          </p>
         </div>
         {canDownload && (
           <button
             onClick={(e) => { e.stopPropagation(); onDownload(file.id, file.file_name) }}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+            disabled={dlProgress !== undefined}
+            className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 disabled:opacity-40"
             title="Download"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+            {dlProgress !== undefined
+              ? <div className="w-3 h-3 rounded-full border border-primary border-t-transparent animate-spin" />
+              : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            }
           </button>
         )}
       </div>
+      {dlProgress !== undefined && dlProgress > 0 && (
+        <div className="h-0.5 bg-muted mx-2.5 mb-2 rounded-full overflow-hidden">
+          <div className="h-full bg-primary transition-all" style={{ width: `${dlProgress}%` }} />
+        </div>
+      )}
     </div>
   )
 }
@@ -428,8 +457,9 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   const [moveModalFileId, setMoveModalFileId] = useState<string | null>(null)
 
   // Upload state
-  const [uploading, setUploading] = useState(false)
+  const [uploadItems, setUploadItems] = useState<Record<string, { progress: number; retrying: boolean; error: string | null }>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploading = Object.values(uploadItems).some((u) => u.error === null && u.progress < 100)
 
   // Data
   const { data: allFiles = [], isLoading: filesLoading } = useGalleryFiles(ownerId)
@@ -445,6 +475,27 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   const [previewFile, setPreviewFile] = useState<{ file: GalleryFile; url: string } | null>(null)
   const [renameFileId, setRenameFileId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+
+  // Multi-select
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchDownloading, setBatchDownloading] = useState(false)
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const selectAll = () => setSelectedIds(new Set(currentFiles.map((f) => f.id)))
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const handleBatchDownload = async () => {
+    if (selectedIds.size === 0) return
+    setBatchDownloading(true)
+    const files = currentFiles.filter((f) => selectedIds.has(f.id))
+    for (const f of files) {
+      await handleDownload(f.id, f.file_name)
+    }
+    setBatchDownloading(false)
+    clearSelection()
+  }
 
   const isLoading = filesLoading || foldersLoading
 
@@ -553,72 +604,97 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   }
 
   // ── Download ──
+  const [dlProgress, setDlProgress] = useState<Record<string, number>>({})
+
   const handleDownload = async (fileId: string, fileName: string) => {
+    setDlProgress((p) => ({ ...p, [fileId]: 0 }))
     try {
       const { url } = await apiFetch<{ url: string }>(`/api/gallery/${fileId}/signed-url`)
+      const resp = await fetch(url)
+      const total = Number(resp.headers.get('content-length') ?? 0)
+      const reader = resp.body?.getReader()
+      if (!reader || total === 0) {
+        const a = document.createElement('a')
+        a.href = url; a.download = fileName
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        return
+      }
+      const chunks: BlobPart[] = []
+      let received = 0
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks.push(value); received += value.length
+        setDlProgress((p) => ({ ...p, [fileId]: Math.round((received / total) * 100) }))
+      }
+      const blob = new Blob(chunks)
       const a = document.createElement('a')
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
+      a.href = URL.createObjectURL(blob); a.download = fileName
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(a.href)
     } catch {
       toast.error('Failed to download file')
+    } finally {
+      setDlProgress((p) => { const n = { ...p }; delete n[fileId]; return n })
     }
   }
 
   // ── Upload ──
+  const uploadSingleFile = async (file: File) => {
+    const mimeType = file.type || 'application/octet-stream'
+    const setItem = (patch: Partial<{ progress: number; retrying: boolean; error: string | null }>) =>
+      setUploadItems((prev) => ({ ...prev, [file.name]: { ...{ progress: 0, retrying: false, error: null }, ...prev[file.name], ...patch } }))
+    const removeItem = () => setUploadItems((prev) => { const n = { ...prev }; delete n[file.name]; return n })
+
+    setItem({ progress: 0 })
+    const MAX_RETRIES = 3
+    try {
+      const { uploadUrl, storageKey } = await apiFetch<{ uploadUrl: string; storageKey: string }>(
+        '/api/gallery/upload-url',
+        { method: 'POST', body: JSON.stringify({ fileName: file.name, mimeType, fileSize: file.size, folderId: currentFolderId, ownerId }) }
+      )
+
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            xhr.open('PUT', uploadUrl)
+            xhr.setRequestHeader('Content-Type', mimeType)
+            xhr.timeout = 120_000
+            xhr.upload.onprogress = (e) => { if (e.lengthComputable) setItem({ progress: Math.round((e.loaded / e.total) * 100) }) }
+            xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? (setItem({ progress: 100 }), resolve()) : reject(new Error(xhr.responseText?.match(/<Message>(.*?)<\/Message>/)?.[1] ?? `Upload failed (${xhr.status})`))
+            xhr.onerror = () => reject(new Error('network'))
+            xhr.ontimeout = () => reject(new Error('network'))
+            xhr.onabort = () => reject(new Error('Upload was cancelled'))
+            xhr.send(file)
+          })
+          break
+        } catch (err: any) {
+          if (err.message !== 'network' || attempt === MAX_RETRIES) throw err.message === 'network' ? new Error(`Upload failed after ${MAX_RETRIES} attempts — check your connection`) : err
+          setItem({ progress: 0, retrying: true })
+          await new Promise((r) => setTimeout(r, attempt * 1500))
+          setItem({ retrying: false })
+        }
+      }
+
+      await apiFetch('/api/gallery/register', {
+        method: 'POST',
+        body: JSON.stringify({ fileName: file.name, mimeType, fileSize: file.size, storageKey, folderId: currentFolderId, ownerId }),
+      })
+      toast.success(`${file.name} uploaded`)
+      setTimeout(removeItem, 1200)
+      return true
+    } catch (err) {
+      setItem({ error: (err as Error).message ?? 'Upload failed', progress: 0 })
+      toast.error(`Failed to upload ${file.name}`)
+      return false
+    }
+  }
+
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
-    setUploading(true)
-    let successCount = 0
-    for (const file of Array.from(files)) {
-      const mimeType = file.type || 'application/octet-stream'
-      try {
-        // 1. Get presigned upload URL
-        const { uploadUrl, storageKey } = await apiFetch<{ uploadUrl: string; storageKey: string }>(
-          '/api/gallery/upload-url',
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              fileName: file.name,
-              mimeType,
-              fileSize: file.size,
-              folderId: currentFolderId,
-              ownerId,
-            }),
-          }
-        )
-        // 2. PUT file directly to R2
-        const r2Res = await fetch(uploadUrl, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': mimeType },
-        })
-        if (!r2Res.ok) throw new Error(`R2 upload failed (${r2Res.status})`)
-        // 3. Register in DB
-        await apiFetch('/api/gallery/register', {
-          method: 'POST',
-          body: JSON.stringify({
-            fileName: file.name,
-            mimeType,
-            fileSize: file.size,
-            storageKey,
-            folderId: currentFolderId,
-            ownerId,
-          }),
-        })
-        successCount++
-      } catch (err) {
-        toast.error(`Failed to upload ${file.name}: ${(err as Error).message}`)
-      }
-    }
-    // Always refresh the file list after upload attempts
+    await Promise.all(Array.from(files).map(uploadSingleFile))
     qc.refetchQueries({ queryKey: ['gallery_files', ownerId] })
-    if (successCount > 0) {
-      toast.success(`${successCount} file${successCount > 1 ? 's' : ''} uploaded`)
-    }
-    setUploading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -655,6 +731,36 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
             </span>
           ))}
         </nav>
+
+        {/* Selection toolbar */}
+        {canDownload && currentFiles.length > 0 && (
+          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+            {selectedIds.size > 0 ? (
+              <>
+                <span className="text-xs text-muted-foreground">{selectedIds.size} selected</span>
+                <button
+                  onClick={handleBatchDownload}
+                  disabled={batchDownloading}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary text-white hover:brightness-110 disabled:opacity-50 transition-all"
+                >
+                  {batchDownloading
+                    ? <div className="w-3 h-3 rounded-full border border-white border-t-transparent animate-spin" />
+                    : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  }
+                  Download
+                </button>
+                <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground transition-colors">✕</button>
+              </>
+            ) : (
+              <button
+                onClick={selectAll}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Select all
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 flex-shrink-0 ml-4">
@@ -723,6 +829,26 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
         </div>
       </div>
 
+      {/* Upload progress toasts */}
+      {Object.keys(uploadItems).length > 0 && (
+        <div className="px-3 sm:px-6 py-2 border-b border-border bg-card/30 space-y-1.5">
+          {Object.entries(uploadItems).map(([name, item]) => (
+            <div key={name} className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">{name}</p>
+              <span className="text-xs flex-shrink-0">
+                {item.error ? <span className="text-destructive">✗ Failed</span> : item.retrying ? <span className="text-amber-500">Retrying…</span> : item.progress === 100 ? <span className="text-green-600">✓</span> : `${item.progress}%`}
+              </span>
+              <div className="w-20 h-1 bg-muted rounded-full overflow-hidden flex-shrink-0">
+                <div
+                  className={cn('h-full rounded-full transition-all', item.error ? 'bg-destructive' : item.retrying ? 'bg-amber-400 animate-pulse' : item.progress === 100 ? 'bg-green-500' : 'bg-primary')}
+                  style={{ width: `${item.progress}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* New folder inline input */}
       {creatingFolder && (
         <div className="px-6 py-2 border-b border-border bg-muted/30 flex items-center gap-2">
@@ -762,7 +888,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
             </p>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))' }}>
             {currentFolders.map((folder) => (
               <div key={folder.id} className="group relative">
                 <FolderCard
@@ -794,6 +920,9 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 file={file}
                 viewMode="grid"
                 canDownload={canDownload}
+                dlProgress={dlProgress[file.id]}
+                selected={selectedIds.has(file.id)}
+                onSelect={canDownload ? toggleSelect : undefined}
                 onContextMenu={handleContextMenu}
                 onDragStart={setDraggingFileId}
                 onDragEnd={() => setDraggingFileId(null)}
@@ -835,6 +964,9 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 file={file}
                 viewMode="list"
                 canDownload={canDownload}
+                dlProgress={dlProgress[file.id]}
+                selected={selectedIds.has(file.id)}
+                onSelect={canDownload ? toggleSelect : undefined}
                 onContextMenu={handleContextMenu}
                 onDragStart={setDraggingFileId}
                 onDragEnd={() => setDraggingFileId(null)}

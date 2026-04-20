@@ -68,18 +68,42 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
   canDelete?: boolean; onDelete?: () => void
 }) {
   const apiFetch = useApiFetch()
-  const [loading, setLoading] = useState(false)
+  const [dlProgress, setDlProgress] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   const handleDownload = async () => {
-    setLoading(true)
+    setDlProgress(0)
     try {
       const url = await getSignedUrlById(apiFetch, fileId)
-      window.open(url, '_blank')
+      // Stream download with progress
+      const resp = await fetch(url)
+      const total = Number(resp.headers.get('content-length') ?? 0)
+      const reader = resp.body?.getReader()
+      if (!reader || total === 0) {
+        // fallback: just open URL
+        window.open(url, '_blank')
+        setDlProgress(null)
+        return
+      }
+      const chunks: BlobPart[] = []
+      let received = 0
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks.push(value)
+        received += value.length
+        setDlProgress(Math.round((received / total) * 100))
+      }
+      const blob = new Blob(chunks)
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = name
+      a.click()
+      URL.revokeObjectURL(a.href)
     } catch {
       toast.error('Failed to get download link')
     } finally {
-      setLoading(false)
+      setDlProgress(null)
     }
   }
 
@@ -99,10 +123,11 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg px-3 py-2.5 hover:bg-muted/60 transition-colors group">
+    <div className="rounded-lg border border-border/50 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-muted/60 transition-colors group">
       <button
         onClick={handleDownload}
-        disabled={loading}
+        disabled={dlProgress !== null}
         className="flex items-center gap-3 flex-1 text-left disabled:opacity-60 min-w-0"
       >
         <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
@@ -112,18 +137,20 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate text-foreground group-hover:text-primary transition-colors">{name}</p>
-          <p className="text-xs text-muted-foreground">{formatBytes(size)}</p>
+          <p className="text-xs text-muted-foreground">
+            {dlProgress !== null ? `Downloading… ${dlProgress}%` : formatBytes(size)}
+          </p>
         </div>
         {badge && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">{badge}</span>
         )}
-        {loading && <div className="w-3.5 h-3.5 rounded-full border border-primary border-t-transparent animate-spin flex-shrink-0" />}
+        {dlProgress !== null && <div className="w-3.5 h-3.5 rounded-full border border-primary border-t-transparent animate-spin flex-shrink-0" />}
       </button>
       {canDelete && (
         <button
           onClick={handleDelete}
           disabled={deleting}
-          className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+          className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
           title="Delete file"
         >
           {deleting
@@ -131,6 +158,13 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
             : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           }
         </button>
+      )}
+      </div>
+      {/* Download progress bar */}
+      {dlProgress !== null && dlProgress > 0 && (
+        <div className="h-0.5 bg-muted">
+          <div className="h-full bg-primary transition-all" style={{ width: `${dlProgress}%` }} />
+        </div>
       )}
     </div>
   )
@@ -148,7 +182,7 @@ export default function TeamProjectDetail() {
   const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable')
   const sourceFiles = (files ?? []).filter((f) => f.file_type !== 'deliverable')
 
-  const canUpload = project?.status === 'in_progress' || project?.status === 'revision_requested'
+  const canUpload = project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment'
   const canSubmitReview = canUpload && deliverables.length > 0
 
   const handleSubmitForReview = async () => {

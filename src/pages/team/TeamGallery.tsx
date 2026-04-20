@@ -58,48 +58,65 @@ export default function TeamGallery() {
 
   return (
     <TeamLayout>
-      <div className="flex h-full" style={{ minHeight: 'calc(100vh - 52px)' }}>
-        {/* Client sidebar */}
-        <aside className="w-60 flex-shrink-0 border-r border-border bg-card/50 flex flex-col">
-          <div className="px-4 py-4 border-b border-border">
-            <h2 className="font-heading font-semibold text-sm tracking-tight">Client Galleries</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Read-only view</p>
+      <div className="flex flex-col h-full" style={{ minHeight: 'calc(100dvh - 52px)' }}>
+        {/* Mobile: client picker dropdown */}
+        {clients.length > 0 && (
+          <div className="md:hidden px-4 py-2 border-b border-border bg-card/50 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground flex-shrink-0">Client:</span>
+            <select
+              value={activeOwnerId ?? ''}
+              onChange={(e) => setSelectedClientId(e.target.value || null)}
+              className="flex-1 bg-muted rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>{c.full_name}</option>
+              ))}
+            </select>
           </div>
+        )}
 
-          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-            {clients.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-3 py-4 text-center">No clients yet</p>
-            ) : (
-              clients.map((client) => (
-                <SidebarButton
-                  key={client.id}
-                  label={client.full_name}
-                  sub={activeOwnerId === client.id ? '— loading…' : ''}
-                  selected={(selectedClientId ?? clients[0]?.id) === client.id}
-                  onClick={() => setSelectedClientId(client.id)}
-                  initial={client.full_name.charAt(0).toUpperCase()}
-                />
-              ))
-            )}
-          </div>
-        </aside>
-
-        {/* Gallery main */}
-        <main className="flex-1 flex flex-col min-w-0">
-          {activeOwnerId ? (
-            <Gallery
-              ownerId={activeOwnerId}
-              currentUserId={profile?.id ?? ''}
-              showOwner={false}
-              storageLimitMb={-1}
-              readOnly={true}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-muted-foreground text-sm">No clients yet.</p>
+        <div className="flex flex-1 min-h-0">
+          {/* Desktop sidebar */}
+          <aside className="hidden md:flex w-60 flex-shrink-0 border-r border-border bg-card/50 flex-col">
+            <div className="px-4 py-4 border-b border-border">
+              <h2 className="font-heading font-semibold text-sm tracking-tight">Client Galleries</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Read-only view</p>
             </div>
-          )}
-        </main>
+            <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+              {clients.length === 0 ? (
+                <p className="text-xs text-muted-foreground px-3 py-4 text-center">No clients yet</p>
+              ) : (
+                clients.map((client) => (
+                  <SidebarButton
+                    key={client.id}
+                    label={client.full_name}
+                    sub={activeOwnerId === client.id ? '— loading…' : ''}
+                    selected={(selectedClientId ?? clients[0]?.id) === client.id}
+                    onClick={() => setSelectedClientId(client.id)}
+                    initial={client.full_name.charAt(0).toUpperCase()}
+                  />
+                ))
+              )}
+            </div>
+          </aside>
+
+          {/* Gallery main */}
+          <main className="flex-1 flex flex-col min-w-0">
+            {activeOwnerId ? (
+              <Gallery
+                ownerId={activeOwnerId}
+                currentUserId={profile?.id ?? ''}
+                showOwner={false}
+                storageLimitMb={-1}
+                readOnly={true}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <p className="text-muted-foreground text-sm">No clients yet.</p>
+              </div>
+            )}
+          </main>
+        </div>
       </div>
     </TeamLayout>
   )

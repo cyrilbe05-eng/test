@@ -41,54 +41,70 @@ export default function ClientGallery() {
 
   return (
     <ClientLayout>
-      <div className="flex h-full min-h-0 overflow-hidden" style={{ minHeight: 'calc(100vh - 52px)' }}>
-        {/* Storage sidebar */}
-        {plan && (
-          <aside className="w-56 border-r border-border bg-background flex flex-col flex-shrink-0 p-4 space-y-3">
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Storage</p>
-              <div className="bg-muted/50 rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Used</span>
-                  <span className="font-medium">{formatBytes(usedBytes)}</span>
-                </div>
-                {limitBytes && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Limit</span>
-                    <span className="font-medium">{formatBytes(limitBytes)}</span>
-                  </div>
-                )}
-                {usagePct !== null && (
-                  <>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={cn('h-full rounded-full transition-all duration-500', usagePct >= 90 ? 'bg-red-500' : usagePct >= 70 ? 'bg-amber-400' : 'bg-primary')}
-                        style={{ width: `${usagePct}%` }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">{usagePct.toFixed(0)}% of {plan.name} plan used</p>
-                  </>
-                )}
-              </div>
+      <div className="flex flex-col h-full" style={{ minHeight: 'calc(100dvh - 52px)' }}>
+        {/* Storage bar — horizontal on mobile, sidebar on desktop */}
+        {plan && usagePct !== null && (
+          <div className="md:hidden px-4 py-2 border-b border-border bg-card/50 flex items-center gap-3">
+            <span className="text-xs text-muted-foreground flex-shrink-0">Storage</span>
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className={cn('h-full rounded-full', usagePct >= 90 ? 'bg-red-500' : usagePct >= 70 ? 'bg-amber-400' : 'bg-primary')}
+                style={{ width: `${usagePct}%` }}
+              />
             </div>
-          </aside>
+            <span className="text-xs text-muted-foreground flex-shrink-0">{formatBytes(usedBytes)}{limitBytes ? ` / ${formatBytes(limitBytes)}` : ''}</span>
+          </div>
         )}
 
-        {/* Gallery main */}
-        <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
-          <div className="px-6 pt-5 pb-3 flex-shrink-0">
-            <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
-              <IconFolder /> My Gallery
-            </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Your personal file storage — organize into folders, upload assets.</p>
-          </div>
-          <div className="flex-1 px-6 pb-6">
-            <Gallery
-              ownerId={profile.id}
-              currentUserId={profile.id}
-              storageLimitMb={limitMb}
-              readOnly={false}
-            />
+        <div className="flex flex-1 min-h-0">
+          {/* Storage sidebar — desktop only */}
+          {plan && (
+            <aside className="hidden md:flex w-56 border-r border-border bg-background flex-col flex-shrink-0 p-4 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Storage</p>
+                <div className="bg-muted/50 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Used</span>
+                    <span className="font-medium">{formatBytes(usedBytes)}</span>
+                  </div>
+                  {limitBytes && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Limit</span>
+                      <span className="font-medium">{formatBytes(limitBytes)}</span>
+                    </div>
+                  )}
+                  {usagePct !== null && (
+                    <>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={cn('h-full rounded-full transition-all duration-500', usagePct >= 90 ? 'bg-red-500' : usagePct >= 70 ? 'bg-amber-400' : 'bg-primary')}
+                          style={{ width: `${usagePct}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{usagePct.toFixed(0)}% of {plan.name} plan used</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </aside>
+          )}
+
+          {/* Gallery main */}
+          <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
+            <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-2 sm:pb-3 flex-shrink-0">
+              <h1 className="text-xl sm:text-2xl font-heading font-bold flex items-center gap-2">
+                <IconFolder /> My Gallery
+              </h1>
+              <p className="text-muted-foreground text-sm mt-0.5 hidden sm:block">Your personal file storage — organize into folders, upload assets.</p>
+            </div>
+            <div className="flex-1">
+              <Gallery
+                ownerId={profile.id}
+                currentUserId={profile.id}
+                storageLimitMb={limitMb}
+                readOnly={false}
+              />
+            </div>
           </div>
         </div>
       </div>

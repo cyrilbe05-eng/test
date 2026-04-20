@@ -40,34 +40,49 @@ export function useStorageAdapter(): StorageAdapter {
         }
       )
 
-      // 2. PUT directly to R2 using XMLHttpRequest (enables real progress events)
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open('PUT', uploadUrl)
-        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+      // 2. PUT directly to R2 with retries (handles unstable connections)
+      const MAX_RETRIES = 3
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            xhr.open('PUT', uploadUrl)
+            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            onProgress?.(Math.round((e.loaded / e.total) * 100))
-          }
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                onProgress?.(Math.round((e.loaded / e.total) * 100))
+              }
+            }
+
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                onProgress?.(100)
+                resolve()
+              } else {
+                const msg = xhr.responseText?.match(/<Message>(.*?)<\/Message>/)?.[1]
+                reject(new Error(msg ?? `Upload failed (${xhr.status})`))
+              }
+            }
+
+            xhr.onerror = () => reject(new Error('network'))
+            xhr.onabort = () => reject(new Error('Upload was cancelled'))
+            xhr.ontimeout = () => reject(new Error('network'))
+            xhr.timeout = 120_000
+            xhr.send(file)
+          })
+          // success — break retry loop
+          break
+        } catch (err: any) {
+          const isRetryable = err.message === 'network'
+          if (!isRetryable || attempt === MAX_RETRIES) throw isRetryable
+            ? new Error(`Upload failed after ${MAX_RETRIES} attempts — check your connection`)
+            : err
+          // reset progress and wait before retry
+          onProgress?.(0)
+          await new Promise((r) => setTimeout(r, attempt * 1500))
         }
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            onProgress?.(100)
-            resolve()
-          } else {
-            // Try to extract R2's XML error message for better diagnostics
-            const msg = xhr.responseText?.match(/<Message>(.*?)<\/Message>/)?.[1]
-            reject(new Error(msg ?? `Upload failed (${xhr.status})`))
-          }
-        }
-
-        xhr.onerror = () => reject(new Error('Network error — check your connection and try again'))
-        xhr.onabort = () => reject(new Error('Upload was cancelled'))
-        xhr.ontimeout = () => reject(new Error('Upload timed out — file may be too large or connection too slow'))
-        xhr.send(file)
-      })
+      }
 
       // 3. Register the file row in D1
       try {
