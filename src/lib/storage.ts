@@ -84,21 +84,30 @@ export function useStorageAdapter(): StorageAdapter {
         }
       }
 
-      // 3. Register the file row in D1
-      try {
-        await apiFetch('/api/project-files/register', {
-          method: 'POST',
-          body: JSON.stringify({
-            project_id: projectId,
-            file_type: fileType,
-            storage_key: key,
-            file_name: file.name,
-            file_size: file.size,
-            mime_type: file.type,
-          }),
-        })
-      } catch (e: any) {
-        throw new Error(`File uploaded but failed to register: ${e.message ?? 'unknown error'}. Contact support.`)
+      // 3. Register the file row in D1 — retry up to 3 times on transient failures
+      let registerErr: Error | null = null
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await apiFetch('/api/project-files/register', {
+            method: 'POST',
+            body: JSON.stringify({
+              project_id: projectId,
+              file_type: fileType,
+              storage_key: key,
+              file_name: file.name,
+              file_size: file.size,
+              mime_type: file.type,
+            }),
+          })
+          registerErr = null
+          break
+        } catch (e: any) {
+          registerErr = e
+          if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 1000))
+        }
+      }
+      if (registerErr) {
+        throw new Error(`File uploaded but failed to register: ${registerErr.message ?? 'unknown error'}. Contact support.`)
       }
 
       return { key }
