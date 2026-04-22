@@ -6,6 +6,7 @@ import { useProject, useProjectFiles, useTimelineComments } from '@/hooks/usePro
 import { TimelineCommentor } from '@/components/project/TimelineCommentor'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { RevisionCounter } from '@/components/project/RevisionCounter'
+import { FileUploader } from '@/components/project/FileUploader'
 import { useAuth } from '@/hooks/useAuth'
 import { useApiFetch } from '@/lib/api'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
@@ -47,8 +48,8 @@ function StatusBanner({ color, children }: { color: string; children: React.Reac
   )
 }
 
-function StorageTab({ files, approvedDeliverables, onDownload }: { files: ProjectFile[]; approvedDeliverables: ProjectFile[]; onDownload: (file: ProjectFile) => void }) {
-  const sources = files.filter((f) => f.file_type === 'source_video')
+function StorageTab({ files, approvedDeliverables, projectId, onDownload, onUploaded }: { files: ProjectFile[]; approvedDeliverables: ProjectFile[]; projectId: string; onDownload: (file: ProjectFile) => void; onUploaded: () => void }) {
+  const sources = files.filter((f) => f.file_type === 'source_video' || f.file_type === 'attachment')
 
   return (
     <div className="space-y-6">
@@ -85,10 +86,10 @@ function StorageTab({ files, approvedDeliverables, onDownload }: { files: Projec
         )}
       </div>
 
-      {sources.length > 0 && (
-        <div>
-          <h3 className="font-heading font-semibold text-sm mb-3">Source Files</h3>
-          <div className="space-y-1">
+      <div>
+        <h3 className="font-heading font-semibold text-sm mb-3">Your Source Files</h3>
+        {sources.length > 0 && (
+          <div className="space-y-1 mb-4">
             {sources.map((f) => (
               <div key={f.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 transition-colors">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-sm">
@@ -100,8 +101,14 @@ function StorageTab({ files, approvedDeliverables, onDownload }: { files: Projec
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+        <FileUploader
+          projectId={projectId}
+          fileType="source_video"
+          accept="video/*,image/*,.pdf,.zip,.doc,.docx"
+          onUploaded={onUploaded}
+        />
+      </div>
     </div>
   )
 }
@@ -113,7 +120,7 @@ export default function ClientProjectDetail() {
   const [theater, setTheater] = useState(false)
   const [activeTab, setActiveTab] = useState<'review' | 'storage'>('review')
   const { data: project, refetch: refetchProject } = useProject(id)
-  const { data: files } = useProjectFiles(id)
+  const { data: files, refetch: refetchFiles } = useProjectFiles(id)
   const { data: comments, refetch: refetchComments } = useTimelineComments(id)
   const [submitting, setSubmitting] = useState(false)
 
@@ -266,7 +273,9 @@ export default function ClientProjectDetail() {
           <StorageTab
             files={files ?? []}
             approvedDeliverables={approvedDeliverables}
+            projectId={id!}
             onDownload={handleDownload}
+            onUploaded={refetchFiles}
           />
         )}
 
