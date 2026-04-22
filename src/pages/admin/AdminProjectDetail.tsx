@@ -519,6 +519,31 @@ export default function AdminProjectDetail() {
                     {project.video_script && <TextBlock label="Video Script" value={project.video_script} />}
                   </div>
                 )}
+
+                {/* Source files from client */}
+                {sourceFiles.length > 0 && (
+                  <div className="mt-5">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Source Files from Client
+                    </h3>
+                    <div className="clay-card divide-y divide-border/50 overflow-hidden">
+                      {sourceFiles.map((f) => (
+                        <div key={f.id} className="flex items-center gap-3 px-4 py-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{f.file_name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {f.file_size ? formatBytes(f.file_size) : '—'} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">
+                            {f.file_type === 'source_video' ? 'Main video' : 'Attachment'}
+                          </span>
+                          <FileRow name="" size={null} fileId={f.id} iconOnly />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
