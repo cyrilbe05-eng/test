@@ -637,14 +637,19 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
       )
       // Notify client
       notifyMessages.push({ recipientId: project.client_id, type: 'video_ready_for_review', message: `Your video for "${project.title}" is ready for review` })
-    } else if (status === 'admin_approved' || status === 'in_review') {
-      // Notify assigned team members
+    } else if (status === 'admin_approved') {
+      // Notify assigned team members that admin approved
       const assigned = await dbQuery<{ team_member_id: string }>(
         'SELECT team_member_id FROM project_assignments WHERE project_id = ?',
         [projectId]
       )
-      const msg = status === 'admin_approved' ? `Project "${project.title}" has been approved by admin` : `Project "${project.title}" is ready for admin review`
+      const msg = `Project "${project.title}" has been approved by admin`
       assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: status, message: msg }))
+    } else if (status === 'in_review') {
+      // Notify admins that a project is ready for review
+      const admins = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
+      const msg = `Project "${project.title}" is ready for admin review`
+      admins.forEach((a) => notifyMessages.push({ recipientId: a.id, type: status, message: msg }))
     } else if (status === 'in_progress') {
       // Notify assigned team members
       const assigned = await dbQuery<{ team_member_id: string }>(
@@ -660,11 +665,11 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
           'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
           [newId(), n.recipientId, projectId, n.type, n.message, now]
         )
-        const role = n.type === 'video_ready_for_review' ? 'client' : 'team'
+        const role = n.type === 'video_ready_for_review' ? 'client' : n.type === 'in_review' ? 'admin' : 'team'
         emailQueue.push({
           recipientId: n.recipientId,
           subject: n.message,
-          text: `${n.message}\n\nView project: ${projectUrl(projectId, role as 'client' | 'team')}`,
+          text: `${n.message}\n\nView project: ${projectUrl(projectId, role as 'client' | 'team' | 'admin')}`,
         })
       }
     }

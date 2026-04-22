@@ -44,8 +44,8 @@ export async function sendEmailNotification({
       text,
       html: html ?? `<p>${text.replace(/\n/g, '<br>')}</p>`,
     })
-  } catch {
-    // Email failures must never break the main request
+  } catch (err) {
+    console.error('[email] send failed for recipient', recipientId, err)
   }
 }
 
