@@ -973,7 +973,7 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
     const signedUrl = await getPresignedDownloadUrl(file.storage_key)
 
     // Trigger: team member downloading a source file moves project pending_assignment → in_progress
-    if (profile.role === 'team' && file.file_type === 'source') {
+    if (profile.role === 'team' && file.file_type === 'source_video') {
       const projectRows = await dbQuery<{ status: string }>('SELECT status FROM projects WHERE id = ?', [file.project_id])
       if (projectRows[0]?.status === 'pending_assignment') {
         await dbExecute(
@@ -2643,7 +2643,7 @@ async function handleGetAllAssignments(req: VercelRequest, res: VercelResponse) 
 async function handleGetProjectAssignments(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
-    const { clerkUserId, profile } = await requireAuth(req)
+    const { profile } = await requireAuth(req)
     const projectId = req.query.projectId as string
 
     if (profile.role === 'client') {
