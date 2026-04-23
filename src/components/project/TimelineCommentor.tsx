@@ -39,12 +39,17 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
   const [duration, setDuration] = useState(0)
   const [showAddComment, setShowAddComment] = useState(false)
   const [signedUrl, setSignedUrl] = useState<string | null>(null)
+  const [urlError, setUrlError] = useState<string | null>(null)
   const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(new Set())
   const apiFetch = useApiFetch()
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CommentForm>({ resolver: zodResolver(commentSchema) })
 
   useEffect(() => {
-    getSignedUrlById(apiFetch, fileId).then(setSignedUrl).catch(() => toast.error('Failed to load video'))
+    setSignedUrl(null)
+    setUrlError(null)
+    getSignedUrlById(apiFetch, fileId)
+      .then(setSignedUrl)
+      .catch((e: any) => { setUrlError(e?.message ?? 'Failed to load video'); toast.error('Failed to load video') })
   }, [fileId])
 
   useEffect(() => {
@@ -55,7 +60,8 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
     player.on('play', () => setShowAddComment(false))
     player.on('ready', () => { if (player.duration) setDuration(player.duration) })
     player.on('loadedmetadata', () => { if (player.duration) setDuration(player.duration) })
-    player.on('error', () => { getSignedUrlById(apiFetch, fileId).then(setSignedUrl) })
+    let errorRefreshed = false
+    player.on('error', () => { if (!errorRefreshed) { errorRefreshed = true; getSignedUrlById(apiFetch, fileId).then(setSignedUrl).catch(() => {}) } })
     return () => { player.destroy(); playerRef.current = null }
   }, [signedUrl, fileId, canComment])
 
@@ -107,7 +113,13 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
       <div ref={playerContainerRef} className="rounded-xl overflow-hidden bg-zinc-950 border border-border">
         {signedUrl
           ? <video ref={videoRef} src={signedUrl} className="w-full max-h-[80vh] object-contain" />
-          : <div className="aspect-video flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+          : urlError
+            ? <div className="aspect-video flex flex-col items-center justify-center gap-2 text-red-400 text-sm px-4 text-center">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                <p>Could not load video</p>
+                <p className="text-xs text-red-300/70">{urlError}</p>
+              </div>
+            : <div className="aspect-video flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
         }
       </div>
 
