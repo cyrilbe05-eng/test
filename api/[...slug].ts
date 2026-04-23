@@ -820,6 +820,12 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
     }
     // Team members can upload files to any project
 
+    // Idempotency: if this storage_key is already registered (retry after partial failure), return the existing row
+    const existing = await dbQuery<ProjectFile>('SELECT * FROM project_files WHERE storage_key = ?', [storage_key])
+    if (existing[0]) {
+      res.status(201).json({ ...existing[0], approved: Boolean(existing[0].approved) }); return
+    }
+
     const id = newId()
     const now = nowIso()
 
