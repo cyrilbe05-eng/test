@@ -456,6 +456,22 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
     )
 
     const rows = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [id])
+
+    // Notify all admins about the new project
+    const admins = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
+    const newProjectMsg = `New project submitted: "${title}"`
+    await Promise.all(admins.map(async (admin) => {
+      await dbExecute(
+        'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
+        [newId(), admin.id, id, 'new_project', newProjectMsg, now]
+      )
+    }))
+    await sendEmailNotifications(admins.map((admin) => ({
+      recipientId: admin.id,
+      subject: newProjectMsg,
+      text: `${newProjectMsg}\n\nView it here: ${projectUrl(id, 'admin')}`,
+    })))
+
     res.status(201).json(rows[0])
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -715,6 +731,27 @@ async function handleApproveClient(req: VercelRequest, res: VercelResponse) {
       ['client_approved', now, projectId, clerkUserId]
     )
 
+    // Notify assigned team members + admins that client approved
+    const [approvedProject] = await dbQuery<{ title: string }>('SELECT title FROM projects WHERE id = ?', [projectId])
+    const approvalMsg = `Client approved "${approvedProject?.title ?? projectId}"`
+    const assigned = await dbQuery<{ team_member_id: string }>('SELECT team_member_id FROM project_assignments WHERE project_id = ?', [projectId])
+    const adminsForApproval = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
+    const approvalRecipients = [
+      ...assigned.map((a) => ({ id: a.team_member_id, role: 'team' as const })),
+      ...adminsForApproval.map((a) => ({ id: a.id, role: 'admin' as const })),
+    ]
+    await Promise.all(approvalRecipients.map(async (r) => {
+      await dbExecute(
+        'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
+        [newId(), r.id, projectId, 'client_approved', approvalMsg, now]
+      )
+    }))
+    await sendEmailNotifications(approvalRecipients.map((r) => ({
+      recipientId: r.id,
+      subject: approvalMsg,
+      text: `${approvalMsg}\n\nView it here: ${projectUrl(projectId, r.role)}`,
+    })))
+
     res.json({ ok: true })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -793,6 +830,33 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
     )
 
     const rows = await dbQuery<ProjectFile>('SELECT * FROM project_files WHERE id = ?', [id])
+
+    // Trigger in_progress when team member uploads any file to a pending_assignment project
+    if (profile.role === 'team') {
+      const [proj] = await dbQuery<{ status: string; title: string }>('SELECT status, title FROM projects WHERE id = ?', [project_id])
+      if (proj?.status === 'pending_assignment') {
+        await dbExecute('UPDATE projects SET status = ?, updated_at = ? WHERE id = ?', ['in_progress', now, project_id])
+      }
+
+      // Notify admins when team uploads a deliverable
+      if (file_type === 'deliverable') {
+        const [projInfo] = await dbQuery<{ title: string }>('SELECT title FROM projects WHERE id = ?', [project_id])
+        const deliverableMsg = `New deliverable uploaded for "${projInfo?.title ?? project_id}"`
+        const adminsForDeliverable = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
+        await Promise.all(adminsForDeliverable.map(async (a) => {
+          await dbExecute(
+            'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
+            [newId(), a.id, project_id, 'deliverable_uploaded', deliverableMsg, now]
+          )
+        }))
+        await sendEmailNotifications(adminsForDeliverable.map((a) => ({
+          recipientId: a.id,
+          subject: deliverableMsg,
+          text: `${deliverableMsg}\n\nView it here: ${projectUrl(project_id, 'admin')}`,
+        })))
+      }
+    }
+
     res.status(201).json({ ...rows[0], approved: false })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
