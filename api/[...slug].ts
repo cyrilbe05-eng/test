@@ -463,7 +463,7 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
     await Promise.all(admins.map(async (admin) => {
       await dbExecute(
         'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
-        [newId(), admin.id, id, 'new_project', newProjectMsg, now]
+        [newId(), admin.id, id, 'project_created', newProjectMsg, now]
       )
     }))
     await sendEmailNotifications(admins.map((admin) => ({
@@ -660,19 +660,19 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
         [projectId]
       )
       const msg = `Project "${project.title}" has been approved by admin`
-      assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: status, message: msg }))
+      assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: 'project_approved', message: msg }))
     } else if (status === 'in_review') {
       // Notify admins that a project is ready for review
       const admins = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
       const msg = `Project "${project.title}" is ready for admin review`
-      admins.forEach((a) => notifyMessages.push({ recipientId: a.id, type: status, message: msg }))
+      admins.forEach((a) => notifyMessages.push({ recipientId: a.id, type: 'status_changed', message: msg }))
     } else if (status === 'in_progress') {
       // Notify assigned team members
       const assigned = await dbQuery<{ team_member_id: string }>(
         'SELECT team_member_id FROM project_assignments WHERE project_id = ?',
         [projectId]
       )
-      assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: 'project_assigned', message: `Project "${project.title}" is now in progress` }))
+      assigned.forEach((a) => notifyMessages.push({ recipientId: a.team_member_id, type: 'team_assigned', message: `Project "${project.title}" is now in progress` }))
     }
     const emailQueue: { recipientId: string; subject: string; text: string }[] = []
     for (const n of notifyMessages) {
@@ -743,7 +743,7 @@ async function handleApproveClient(req: VercelRequest, res: VercelResponse) {
     await Promise.all(approvalRecipients.map(async (r) => {
       await dbExecute(
         'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
-        [newId(), r.id, projectId, 'client_approved', approvalMsg, now]
+        [newId(), r.id, projectId, 'project_approved', approvalMsg, now]
       )
     }))
     await sendEmailNotifications(approvalRecipients.map((r) => ({
@@ -846,7 +846,7 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
         await Promise.all(adminsForDeliverable.map(async (a) => {
           await dbExecute(
             'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
-            [newId(), a.id, project_id, 'deliverable_uploaded', deliverableMsg, now]
+            [newId(), a.id, project_id, 'status_changed', deliverableMsg, now]
           )
         }))
         await sendEmailNotifications(adminsForDeliverable.map((a) => ({
