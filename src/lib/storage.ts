@@ -68,7 +68,8 @@ export function useStorageAdapter(): StorageAdapter {
             xhr.onerror = () => reject(new Error('network'))
             xhr.onabort = () => reject(new Error('Upload was cancelled'))
             xhr.ontimeout = () => reject(new Error('network'))
-            xhr.timeout = 120_000
+            // Allow at least 5 min, or 1 min per 10 MB — handles slow connections on large files
+            xhr.timeout = Math.max(300_000, Math.ceil(file.size / (10 * 1024 * 1024)) * 60_000)
             xhr.send(file)
           })
           // success — break retry loop
