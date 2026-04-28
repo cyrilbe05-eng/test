@@ -185,6 +185,12 @@ export default function TeamProjectDetail() {
   const canUpload = project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment'
   const canSubmitReview = canUpload && deliverables.length > 0
 
+  const handleMarkInProgress = async () => {
+    if (!id) return
+    await updateStatus.mutateAsync({ id, status: 'in_progress' })
+    toast.success('Project marked as in progress')
+  }
+
   const handleSubmitForReview = async () => {
     if (!id || !confirm('Submit for admin review?')) return
     await updateStatus.mutateAsync({ id, status: 'in_review' })
@@ -364,6 +370,17 @@ export default function TeamProjectDetail() {
                 </p>
               )}
             </div>
+
+            {/* Mark in progress */}
+            {project.status === 'pending_assignment' && (
+              <button
+                onClick={handleMarkInProgress}
+                disabled={updateStatus.isPending}
+                className="w-full py-2.5 bg-blue-600 rounded-xl text-white font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                {updateStatus.isPending ? 'Updating…' : 'Start Processing'}
+              </button>
+            )}
 
             {/* Submit for review */}
             {canSubmitReview && (

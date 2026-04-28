@@ -28,7 +28,7 @@ interface FileItem {
 let _id = 0
 function nextId() { return ++_id }
 
-export function FileUploader({ projectId, fileType, accept, maxSizeMb = 2000, onUploaded, disabled }: Props) {
+export function FileUploader({ projectId, fileType, accept, maxSizeMb = 5000, onUploaded, disabled }: Props) {
   const storageAdapter = useStorageAdapter()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)

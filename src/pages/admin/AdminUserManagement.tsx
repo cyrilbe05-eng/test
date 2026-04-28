@@ -55,7 +55,7 @@ function StatBlock({ label, value, sub }: { label: string; value: string | numbe
   )
 }
 
-function UserProfileModal({ user, plans, onClose, onViewAs }: { user: UserRow; plans: Plan[]; onClose: () => void; onViewAs: (u: UserRow) => void }) {
+function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: { user: UserRow; plans: Plan[]; onClose: () => void; onViewAs: (u: UserRow) => void; onResetPassword: (u: UserRow) => void }) {
   const apiFetch = useApiFetch()
   const qc = useQueryClient()
   const isClient = user.role === 'client'
@@ -270,9 +270,9 @@ function UserProfileModal({ user, plans, onClose, onViewAs }: { user: UserRow; p
             </div>
           )}
 
-          {/* View as footer */}
+          {/* Footer actions */}
           {user.role !== 'admin' && (
-            <div className="pt-2 border-t border-border/60">
+            <div className="pt-2 border-t border-border/60 space-y-2">
               <button
                 onClick={() => onViewAs(user)}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-semibold"
@@ -282,6 +282,15 @@ function UserProfileModal({ user, plans, onClose, onViewAs }: { user: UserRow; p
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
                 View as {user.full_name.split(' ')[0]}
+              </button>
+              <button
+                onClick={() => onResetPassword(user)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors text-sm font-semibold dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+                Reset Password
               </button>
             </div>
           )}
@@ -341,6 +350,15 @@ export default function AdminUserManagement() {
     queryKey: ['groups'],
     queryFn: () => apiFetch<ChatGroup[]>('/api/messages/groups'),
   })
+
+  const handleResetPassword = async (user: UserRow) => {
+    if (!confirm(`Reset password for ${user.full_name}? A new temporary password will be generated.`)) return
+    try {
+      const { temporary_password } = await apiFetch<{ temporary_password: string }>(`/api/users/${user.id}/reset-password`, { method: 'POST' })
+      await navigator.clipboard.writeText(temporary_password).catch(() => {})
+      toast.success(`New password: ${temporary_password}`, { duration: 30000, description: 'Copied to clipboard. Share this with the user.' })
+    } catch (err) { toast.error((err as Error).message) }
+  }
 
   const disableUser = async (userId: string, name: string) => {
     if (!confirm('Disable account for ' + name + '?')) return
@@ -774,6 +792,7 @@ export default function AdminUserManagement() {
           plans={plans}
           onClose={() => setProfileUser(null)}
           onViewAs={(u) => { setProfileUser(null); handleViewAs(u) }}
+          onResetPassword={(u) => { setProfileUser(null); handleResetPassword(u) }}
         />
       )}
       {showCreate && (
