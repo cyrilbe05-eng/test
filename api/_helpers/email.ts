@@ -42,7 +42,7 @@ export async function sendEmailNotification({
       to: recipient.email,
       subject,
       text,
-      html: html ?? `<p>${text.replace(/\n/g, '<br>')}</p>`,
+      html: html ?? autoLinkifyHtml(text),
     })
   } catch (err) {
     console.error('[email] send failed for recipient', recipientId, err)
@@ -57,10 +57,32 @@ export async function sendEmailNotifications(
   await Promise.allSettled(notifications.map(sendEmailNotification))
 }
 
-const APP = process.env.APP_ORIGIN ?? ''
+// Fallback to the production dashboard domain so notification emails always
+// contain a clickable absolute URL even if APP_ORIGIN isn't configured in the
+// deploy environment. Strip any trailing slash so we don't produce //paths.
+const APP = (process.env.APP_ORIGIN || 'https://dashboard.projectpingu.com').replace(/\/$/, '')
 
 export function projectUrl(projectId: string, role: 'admin' | 'team' | 'client'): string {
   if (role === 'admin') return `${APP}/admin/projects/${projectId}`
   if (role === 'team') return `${APP}/team/projects/${projectId}`
   return `${APP}/workspace/projects/${projectId}`
+}
+
+/**
+ * Render plain text as HTML with bare URLs converted to <a> tags. Mail clients
+ * (notably Gmail desktop) don't always auto-link URLs in HTML bodies — wrapping
+ * them ourselves guarantees a clickable link in the rendered email.
+ */
+function autoLinkifyHtml(text: string): string {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+  // Match http(s) URLs up to the next whitespace character.
+  const linked = escaped.replace(
+    /https?:\/\/[^\s<]+/g,
+    (url) => `<a href="${url}" style="color:#2563eb;text-decoration:underline">${url}</a>`,
+  )
+  return `<p style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111827">${linked.replace(/\n/g, '<br>')}</p>`
 }
