@@ -9,10 +9,12 @@
   ],
   "functions": {
     "api/[...slug].ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "api/_helpers/pingu-excited.png"
     },
     "api/cron/budget-nudge.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "api/_helpers/pingu-excited.png"
     }
   },
   "crons": [
