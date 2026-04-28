@@ -1,7 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAuth, requireRole, signJwt, hashPassword, comparePassword } from './_helpers/auth.js'
 import { dbQuery, dbExecute, newId, nowIso } from './_helpers/db.js'
-import { getPresignedUploadUrl, getPresignedDownloadUrl, deleteObject } from './_helpers/r2.js'
+import {
+  getPresignedUploadUrl,
+  getPresignedDownloadUrl,
+  deleteObject,
+  createMultipartUpload,
+  getPresignedPartUrl,
+  completeMultipartUpload,
+  abortMultipartUpload,
+} from './_helpers/r2.js'
 import { ok, err, handleError } from './_helpers/respond.js'
 import { sanitizeFileName } from '../src/lib/utils.js'
 import { sendEmailNotifications, sendEmailNotification, projectUrl } from './_helpers/email.js'
@@ -932,6 +940,155 @@ async function handleGetProjectFileUploadUrl(req: VercelRequest, res: VercelResp
     const uploadUrl = await getPresignedUploadUrl(key, mimeType ?? 'application/octet-stream')
 
     res.json({ uploadUrl, key })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+// ── Multipart upload handlers ─────────────────────────────────────────────
+// Four endpoints mirror the S3 multipart protocol: create → upload parts
+// (browser → R2 directly via presigned URLs) → complete. Abort/sign are
+// cleanup and URL-refresh paths.
+
+/**
+ * Authorize that the caller may operate on a multipart upload for `key`.
+ * The key shape is fixed by handleMultipartCreate: `projects/{projectId}/...`
+ * Without this check, any authenticated user could complete or abort
+ * someone else's in-flight upload (denial of service or hijacking) by
+ * supplying a key + uploadId they observed elsewhere.
+ */
+async function authorizeKeyForUpload(profile: any, key: string): Promise<void> {
+  const m = /^projects\/([^/]+)\//.exec(key)
+  if (!m) { const e: any = new Error('invalid key'); e.status = 400; throw e }
+  const projectId = m[1]
+  const [project] = await dbQuery<{ client_id: string }>(
+    'SELECT client_id FROM projects WHERE id = ?',
+    [projectId],
+  )
+  if (!project) { const e: any = new Error('project not found'); e.status = 404; throw e }
+  if (profile.role === 'admin') return
+  if (profile.role === 'client' && project.client_id === profile.id) return
+  if (profile.role === 'team') {
+    const [assignment] = await dbQuery<{ id: string }>(
+      'SELECT id FROM project_assignments WHERE project_id = ? AND user_id = ?',
+      [projectId, profile.id],
+    )
+    if (assignment) return
+  }
+  const e: any = new Error('forbidden'); e.status = 403; throw e
+}
+
+async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    const { projectId, fileType, fileName, fileSize, partCount } = req.body
+    if (!projectId || !fileType || !fileName || !partCount) {
+      res.status(400).json({ error: 'projectId, fileType, fileName, partCount required' }); return
+    }
+    if (typeof partCount !== 'number' || partCount < 1 || partCount > 10000) {
+      res.status(400).json({ error: 'partCount must be 1..10000' }); return
+    }
+
+    // Same plan-storage gate as single-PUT path
+    if (profile.role === 'client' && profile.plan_id) {
+      const [planRow] = await dbQuery<PlanRow>(
+        'SELECT storage_limit_mb FROM plans WHERE id = ?',
+        [profile.plan_id]
+      )
+      if (planRow && planRow.storage_limit_mb !== -1) {
+        const [usageRow] = await dbQuery<StorageRow>(
+          `SELECT COALESCE(SUM(pf.file_size), 0) / 1048576.0 AS used_mb
+           FROM project_files pf
+           JOIN projects p ON p.id = pf.project_id
+           WHERE p.client_id = ?`,
+          [profile.id]
+        )
+        const usedMb = usageRow?.used_mb ?? 0
+        const incomingMb = fileSize ? fileSize / 1048576.0 : 0
+        if (usedMb + incomingMb > planRow.storage_limit_mb) {
+          res.status(403).json({ error: 'storage_limit_reached' }); return
+        }
+      }
+    }
+
+    const key = `projects/${projectId}/${fileType}/${Date.now()}-${sanitizeFileName(fileName)}`
+    const uploadId = await createMultipartUpload(key)
+    // Presign every part URL up front (1 hour). For very long uploads the
+    // client can call /multipart/sign again to refresh expired URLs.
+    const partUrls = await Promise.all(
+      Array.from({ length: partCount }, (_, i) =>
+        getPresignedPartUrl(key, uploadId, i + 1).then((url) => ({ partNumber: i + 1, url })),
+      ),
+    )
+    res.json({ key, uploadId, partUrls })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+async function handleMultipartSign(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    const { key, uploadId, partNumbers } = req.body
+    if (!key || !uploadId || !Array.isArray(partNumbers) || partNumbers.length === 0) {
+      res.status(400).json({ error: 'key, uploadId, partNumbers[] required' }); return
+    }
+    if (partNumbers.length > 100) {
+      res.status(400).json({ error: 'too many partNumbers in one request (max 100)' }); return
+    }
+    for (const n of partNumbers) {
+      if (typeof n !== 'number' || n < 1 || n > 10000) {
+        res.status(400).json({ error: 'partNumbers must be integers 1..10000' }); return
+      }
+    }
+    await authorizeKeyForUpload(profile, key)
+    const partUrls = await Promise.all(
+      partNumbers.map((n: number) =>
+        getPresignedPartUrl(key, uploadId, n).then((url) => ({ partNumber: n, url })),
+      ),
+    )
+    res.json({ partUrls })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+async function handleMultipartComplete(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    const { key, uploadId, parts } = req.body
+    if (!key || !uploadId || !Array.isArray(parts) || parts.length === 0) {
+      res.status(400).json({ error: 'key, uploadId, parts[] required' }); return
+    }
+    // Validate part shape: every entry must have partNumber and etag.
+    // If any ETag is missing or malformed R2 will reject CompleteMultipartUpload
+    // and the assembled object is never created — protecting against silent
+    // corruption of the final file.
+    for (const p of parts) {
+      if (typeof p?.partNumber !== 'number' || typeof p?.etag !== 'string' || !p.etag) {
+        res.status(400).json({ error: 'each part needs partNumber and etag' }); return
+      }
+    }
+    await authorizeKeyForUpload(profile, key)
+    await completeMultipartUpload(key, uploadId, parts)
+    res.json({ ok: true, key })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+async function handleMultipartAbort(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    const { key, uploadId } = req.body
+    if (!key || !uploadId) { res.status(400).json({ error: 'key, uploadId required' }); return }
+    await authorizeKeyForUpload(profile, key)
+    await abortMultipartUpload(key, uploadId)
+    res.json({ ok: true })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
@@ -3304,6 +3461,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (slug[1] === 'upload-url' && slug.length === 2) {
       return handleGetProjectFileUploadUrl(req, res)
+    }
+    if (slug[1] === 'multipart' && slug.length === 3) {
+      if (slug[2] === 'create') return handleMultipartCreate(req, res)
+      if (slug[2] === 'sign') return handleMultipartSign(req, res)
+      if (slug[2] === 'complete') return handleMultipartComplete(req, res)
+      if (slug[2] === 'abort') return handleMultipartAbort(req, res)
+      res.status(404).json({ error: 'Not found' }); return
     }
     if (slug.length === 2 && req.method === 'DELETE') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
