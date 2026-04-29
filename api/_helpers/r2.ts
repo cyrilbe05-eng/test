@@ -64,12 +64,14 @@ export async function createMultipartUpload(key: string): Promise<string> {
   return out.UploadId
 }
 
-/** Presign a single UploadPart URL. Each part gets its own signed PUT URL. */
+/** Presign a single UploadPart URL. Each part gets its own signed PUT URL.
+ *  TTL defaults to 24h: a slow 100 GB upload over a 5 MB/s link takes ~6h,
+ *  so 1h URLs expired mid-upload and caused intermittent 7 GB crashes. */
 export async function getPresignedPartUrl(
   key: string,
   uploadId: string,
   partNumber: number,
-  expiresIn = 3600,
+  expiresIn = 86400,
 ): Promise<string> {
   const command = new UploadPartCommand({
     Bucket: BUCKET,

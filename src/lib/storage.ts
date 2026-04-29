@@ -23,9 +23,16 @@ export interface StorageAdapter {
 // PART_CONCURRENCY parallel connections. We pick 4.5 GB as the threshold to
 // give a safety margin under R2's 5 GB cap.
 const MULTIPART_THRESHOLD = 4.5 * 1024 * 1024 * 1024 // 4.5 GB
-const PART_SIZE = 100 * 1024 * 1024 // 100 MB per part — fewer round-trips, retry cost still small
-const PART_CONCURRENCY = 4
+const PART_SIZE = 250 * 1024 * 1024 // 250 MB per part — fewer round-trips, retry cost still modest
+const PART_CONCURRENCY = 6
 const PART_MAX_RETRIES = 5
+// Idle-progress timeout: abort a part PUT only if no bytes move for this long.
+// Replaces the old total-time timeout, which would kill long-running parts
+// even when they were uploading fine — just slowly.
+const PART_IDLE_TIMEOUT_MS = 90_000 // 90s with zero progress = stalled
+// Refresh a presigned URL that's been sitting around longer than this before
+// using it. Below the 24h server TTL with comfortable margin.
+const URL_PROACTIVE_REFRESH_MS = 18 * 60 * 60 * 1000 // 18 hours
 
 /**
  * Creates a storage adapter bound to an apiFetch instance.
@@ -160,8 +167,14 @@ async function uploadMultipart(args: {
     }),
   })
 
-  // Map partNumber → presigned URL for re-signing on expiry
-  const urlByPart = new Map(partUrls.map((p) => [p.partNumber, p.url]))
+  // Map partNumber → { url, signedAt } so we can pre-refresh URLs that are
+  // close to their server-side TTL before sending. Without this, parts started
+  // late in a multi-hour upload would hit 403 on first attempt and waste a
+  // full retry round-trip.
+  const startedAt = Date.now()
+  const urlByPart = new Map<number, { url: string; signedAt: number }>(
+    partUrls.map((p) => [p.partNumber, { url: p.url, signedAt: startedAt }]),
+  )
 
   // Track per-part bytes uploaded so combined progress stays smooth even when
   // parts upload concurrently and finish out of order.
@@ -186,8 +199,17 @@ async function uploadMultipart(args: {
     })
     const url = refreshed[0]?.url
     if (!url) throw new Error('failed to refresh part URL')
-    urlByPart.set(partNumber, url)
+    urlByPart.set(partNumber, { url, signedAt: Date.now() })
     return url
+  }
+
+  // Return a usable URL for a part, refreshing proactively if the cached one
+  // is older than URL_PROACTIVE_REFRESH_MS. This keeps multi-hour uploads
+  // from hitting an avoidable 403 on the first attempt of late parts.
+  const getFreshUrl = async (partNumber: number): Promise<string> => {
+    const cached = urlByPart.get(partNumber)!
+    if (Date.now() - cached.signedAt < URL_PROACTIVE_REFRESH_MS) return cached.url
+    return refreshUrl(partNumber)
   }
 
   const uploadOnePart = async (partNumber: number): Promise<{ partNumber: number; etag: string }> => {
@@ -197,11 +219,12 @@ async function uploadMultipart(args: {
     const partSize = end - start
 
     let lastErr: any
-    for (let attempt = 1; attempt <= PART_MAX_RETRIES; attempt++) {
+    let attempt = 0
+    while (attempt < PART_MAX_RETRIES) {
       if (abortController.signal.aborted) throw new Error('aborted')
-      // Re-sign on attempts after the first, in case the original presigned
-      // URL has expired (default 1 hr). Also re-sign on 403 from a stale URL.
-      const url = attempt === 1 ? urlByPart.get(partNumber)! : await refreshUrl(partNumber)
+      // Pre-refresh the URL if it's near server-side expiry. Cheap on the
+      // happy path (one Map lookup + Date.now()).
+      const url = await getFreshUrl(partNumber)
       try {
         const etag = await putPart(url, blob, partSize, abortController.signal, (loaded) => {
           bytesByPart[partNumber - 1] = loaded
@@ -212,10 +235,18 @@ async function uploadMultipart(args: {
         return { partNumber, etag }
       } catch (err: any) {
         if (abortController.signal.aborted) throw err
+        if (err?.fatal) throw err
         lastErr = err
         bytesByPart[partNumber - 1] = 0
         reportProgress()
-        if (err?.fatal) throw err
+        // 403 = stale presigned URL: free retry, no backoff, no budget cost.
+        // The URL was definitely the problem — refresh and immediately retry.
+        if (err?.expired) {
+          await refreshUrl(partNumber)
+          continue
+        }
+        attempt++
+        if (attempt >= PART_MAX_RETRIES) break
         // exponential-ish backoff with jitter
         const delay = Math.min(15_000, 1000 * 2 ** (attempt - 1)) + Math.random() * 500
         await new Promise((r) => setTimeout(r, delay))
@@ -275,18 +306,44 @@ function putPart(
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', url)
 
+    // Idle-progress watchdog: fires only when the upload has stopped moving
+    // bytes for PART_IDLE_TIMEOUT_MS. Replaces xhr.timeout (which counts
+    // total wallclock time and can kill long-but-progressing uploads).
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+    const armIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => {
+        try { xhr.abort() } catch {}
+        // Distinct error message so the caller doesn't confuse it with a
+        // user-initiated abort.
+        finishReject(new Error('part upload stalled — no progress'))
+      }, PART_IDLE_TIMEOUT_MS)
+    }
+    const disarmIdle = () => { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null } }
+
     const onAbort = () => {
       try { xhr.abort() } catch {}
     }
     signal.addEventListener('abort', onAbort, { once: true })
-    const cleanup = () => signal.removeEventListener('abort', onAbort)
+    let settled = false
+    const cleanup = () => {
+      if (settled) return
+      settled = true
+      disarmIdle()
+      signal.removeEventListener('abort', onAbort)
+    }
+    const finishResolve = (v: string) => { if (!settled) { cleanup(); resolve(v) } }
+    const finishReject = (e: any) => { if (!settled) { cleanup(); reject(e) } }
 
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && !signal.aborted) onLoaded(e.loaded)
+      if (e.lengthComputable && !signal.aborted) {
+        onLoaded(e.loaded)
+        armIdle()
+      }
     }
+    xhr.upload.onloadstart = () => armIdle()
 
     xhr.onload = () => {
-      cleanup()
       if (xhr.status >= 200 && xhr.status < 300) {
         // R2/S3 returns the part hash in the ETag header. CORS must expose it
         // (ExposeHeaders: ["ETag"]) — without that, getResponseHeader returns
@@ -295,25 +352,28 @@ function putPart(
         if (!etag) {
           const err: any = new Error('R2 did not expose ETag header — check bucket CORS (ExposeHeaders must include ETag)')
           err.fatal = true
-          reject(err); return
+          finishReject(err); return
         }
         onLoaded(size)
         // Strip surrounding quotes only — keep any embedded chars intact.
-        resolve(etag.replace(/^"|"$/g, ''))
+        finishResolve(etag.replace(/^"|"$/g, ''))
       } else if (xhr.status === 403) {
-        // Likely a stale presigned URL — let the caller refresh and retry.
-        reject(new Error(`part rejected (403) — URL may have expired`))
+        // Stale presigned URL — caller treats this as a free retry with re-sign.
+        const err: any = new Error('part rejected (403) — URL expired')
+        err.expired = true
+        finishReject(err)
       } else {
         const msg = xhr.responseText?.match(/<Message>(.*?)<\/Message>/)?.[1]
-        reject(new Error(msg ?? `part upload failed (${xhr.status})`))
+        finishReject(new Error(msg ?? `part upload failed (${xhr.status})`))
       }
     }
 
-    xhr.onerror = () => { cleanup(); reject(new Error('network')) }
-    xhr.onabort = () => { cleanup(); reject(new Error('aborted')) }
-    xhr.ontimeout = () => { cleanup(); reject(new Error('network')) }
-    // 1 minute per 10 MB, min 5 minutes — same scaling logic as single-PUT.
-    xhr.timeout = Math.max(300_000, Math.ceil(size / (10 * 1024 * 1024)) * 60_000)
+    xhr.onerror = () => finishReject(new Error('network'))
+    xhr.onabort = () => finishReject(new Error('aborted'))
+    // We deliberately don't set xhr.timeout — the idle-progress watchdog
+    // above is the single source of timeout truth, so a slow-but-moving
+    // upload of a 100 MB part on a 1 MB/s link can run for ~100s without
+    // being killed.
     xhr.send(blob)
   })
 }
