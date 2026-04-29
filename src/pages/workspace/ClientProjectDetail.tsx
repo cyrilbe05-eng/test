@@ -190,10 +190,15 @@ export default function ClientProjectDetail() {
     const fileName = file?.file_name ?? latestDeliverable?.file_name ?? 'video'
     if (!fileId || !id) return
     try {
-      const data = await apiFetch<{ signedUrl: string }>('/api/downloads/' + id + '/' + fileId)
+      // ?download=1 → server signs Content-Disposition: attachment + correct
+      // mime-type into the URL, so the browser saves the file natively with
+      // the right name and extension instead of sniffing the bytes (which
+      // misclassifies them on Android Chrome and saves as text/plain).
+      const data = await apiFetch<{ signedUrl: string }>(`/api/downloads/${id}/${fileId}?download=1`)
       const a = document.createElement('a')
       a.href = data.signedUrl
       a.download = fileName
+      a.rel = 'noopener'
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

@@ -158,7 +158,7 @@ function FileCard({
   file,
   viewMode,
   canDownload,
-  dlProgress,
+  downloading,
   selected,
   onSelect,
   onContextMenu,
@@ -170,7 +170,7 @@ function FileCard({
   file: GalleryFile
   viewMode: 'grid' | 'list'
   canDownload: boolean
-  dlProgress?: number
+  downloading?: boolean
   selected?: boolean
   onSelect?: (id: string) => void
   onContextMenu: (e: React.MouseEvent, fileId: string) => void
@@ -240,18 +240,16 @@ function FileCard({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{file.file_name}</p>
-          <p className="text-xs text-muted-foreground">
-            {dlProgress !== undefined ? `${dlProgress}%` : formatBytes(file.file_size)}
-          </p>
+          <p className="text-xs text-muted-foreground">{formatBytes(file.file_size)}</p>
         </div>
         {canDownload && (
           <button
             onClick={(e) => { e.stopPropagation(); onDownload(file.id, file.file_name) }}
-            disabled={dlProgress !== undefined}
+            disabled={downloading}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 disabled:opacity-40"
             title="Download"
           >
-            {dlProgress !== undefined
+            {downloading
               ? <div className="w-3.5 h-3.5 rounded-full border border-primary border-t-transparent animate-spin" />
               : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             }
@@ -342,29 +340,22 @@ function FileCard({
       <div className="p-2.5 flex items-start justify-between gap-1">
         <div className="min-w-0">
           <p className="text-xs font-medium truncate">{file.file_name}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
-            {dlProgress !== undefined ? `↓ ${dlProgress}%` : formatBytes(file.file_size)}
-          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{formatBytes(file.file_size)}</p>
         </div>
         {canDownload && (
           <button
             onClick={(e) => { e.stopPropagation(); onDownload(file.id, file.file_name) }}
-            disabled={dlProgress !== undefined}
+            disabled={downloading}
             className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 disabled:opacity-40"
             title="Download"
           >
-            {dlProgress !== undefined
+            {downloading
               ? <div className="w-3 h-3 rounded-full border border-primary border-t-transparent animate-spin" />
               : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             }
           </button>
         )}
       </div>
-      {dlProgress !== undefined && dlProgress > 0 && (
-        <div className="h-0.5 bg-muted mx-2.5 mb-2 rounded-full overflow-hidden">
-          <div className="h-full bg-primary transition-all" style={{ width: `${dlProgress}%` }} />
-        </div>
-      )}
     </div>
   )
 }
@@ -604,38 +595,29 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   }
 
   // ── Download ──
-  const [dlProgress, setDlProgress] = useState<Record<string, number>>({})
+  // Tracks which fileIds currently have an in-flight signed-URL request, so
+  // we can disable the button briefly without showing a fake progress bar.
+  const [downloading, setDownloading] = useState<Record<string, boolean>>({})
 
   const handleDownload = async (fileId: string, fileName: string) => {
-    setDlProgress((p) => ({ ...p, [fileId]: 0 }))
+    setDownloading((p) => ({ ...p, [fileId]: true }))
     try {
-      const { url } = await apiFetch<{ url: string }>(`/api/gallery/${fileId}/signed-url`)
-      const resp = await fetch(url)
-      const total = Number(resp.headers.get('content-length') ?? 0)
-      const reader = resp.body?.getReader()
-      if (!reader || total === 0) {
-        const a = document.createElement('a')
-        a.href = url; a.download = fileName
-        document.body.appendChild(a); a.click(); document.body.removeChild(a)
-        return
-      }
-      const chunks: BlobPart[] = []
-      let received = 0
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        chunks.push(value); received += value.length
-        setDlProgress((p) => ({ ...p, [fileId]: Math.round((received / total) * 100) }))
-      }
-      const blob = new Blob(chunks)
+      // Request a download-mode URL: R2 returns Content-Disposition:
+      // attachment + correct filename + correct content-type. The browser
+      // then handles the actual download natively, with the right name and
+      // extension. The previous in-app fetch→blob→click flow corrupted the
+      // file type on Android Chrome (saved as text/plain) and showed a
+      // misleading 0→100% bar that finished before the real download began.
+      const { url } = await apiFetch<{ url: string }>(`/api/gallery/${fileId}/signed-url?download=1`)
       const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob); a.download = fileName
+      a.href = url
+      a.download = fileName
+      a.rel = 'noopener'
       document.body.appendChild(a); a.click(); document.body.removeChild(a)
-      URL.revokeObjectURL(a.href)
     } catch {
       toast.error('Failed to download file')
     } finally {
-      setDlProgress((p) => { const n = { ...p }; delete n[fileId]; return n })
+      setDownloading((p) => { const n = { ...p }; delete n[fileId]; return n })
     }
   }
 
@@ -920,7 +902,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 file={file}
                 viewMode="grid"
                 canDownload={canDownload}
-                dlProgress={dlProgress[file.id]}
+                downloading={!!downloading[file.id]}
                 selected={selectedIds.has(file.id)}
                 onSelect={canDownload ? toggleSelect : undefined}
                 onContextMenu={handleContextMenu}
@@ -964,7 +946,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 file={file}
                 viewMode="list"
                 canDownload={canDownload}
-                dlProgress={dlProgress[file.id]}
+                downloading={!!downloading[file.id]}
                 selected={selectedIds.has(file.id)}
                 onSelect={canDownload ? toggleSelect : undefined}
                 onContextMenu={handleContextMenu}

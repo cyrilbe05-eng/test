@@ -1221,7 +1221,17 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
     }
     // Team members can access signed URLs for any project file
 
-    const signedUrl = await getPresignedDownloadUrl(file.storage_key)
+    // Two modes via ?download=1: download mode signs in Content-Disposition:
+    // attachment + correct filename so the browser saves the file with the
+    // right name/extension (critical on mobile, where missing CD makes
+    // Android Chrome misclassify the bytes and open them in a text viewer).
+    // Inline mode (no flag) is for the in-page video player — adding
+    // Content-Disposition: attachment there would force a download instead
+    // of allowing playback.
+    const wantDownload = String((req.query as any).download ?? '') === '1'
+    const signedUrl = wantDownload
+      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, file.mime_type)
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, file.mime_type)
 
     // Trigger: team member downloading a source file moves project pending_assignment → in_progress
     if (profile.role === 'team' && file.file_type === 'source_video') {
@@ -1975,7 +1985,10 @@ async function handleGetGallerySignedUrl(req: VercelRequest, res: VercelResponse
       res.status(403).json({ error: 'Forbidden' }); return
     }
 
-    const url = await getPresignedDownloadUrl(file.storage_key)
+    const wantDownload = String((req.query as any).download ?? '') === '1'
+    const url = wantDownload
+      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, file.mime_type)
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, file.mime_type)
     res.json({ url })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -3193,7 +3206,14 @@ async function handleDownload(req: VercelRequest, res: VercelResponse) {
     if (!file) { res.status(404).json({ error: 'File not found' }); return }
     if (!file.approved) { res.status(403).json({ error: 'File not approved for download' }); return }
 
-    const signedUrl = await getPresignedDownloadUrl(file.storage_key, 3600)
+    // ?download=1 forces an attachment Content-Disposition with the correct
+    // filename + content-type so the browser saves the file natively.
+    // Without it (the legacy default), the URL is inline and the browser
+    // sniffs the bytes — which misclassifies binary as text on mobile.
+    const wantDownload = String((req.query as any).download ?? '') === '1'
+    const signedUrl = wantDownload
+      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, file.mime_type)
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, file.mime_type)
     res.json({ signedUrl })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })

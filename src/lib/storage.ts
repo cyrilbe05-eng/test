@@ -118,10 +118,19 @@ export function useStorageAdapter(): StorageAdapter {
   }
 }
 
-// Keep a plain (non-hook) version for components that use getSignedUrl by file id
-export async function getSignedUrlById(apiFetch: ReturnType<typeof useApiFetch>, fileId: string): Promise<string> {
+// Keep a plain (non-hook) version for components that use getSignedUrl by file id.
+// Pass `forDownload: true` to get a URL that forces a Save As dialog with the
+// original filename + correct content-type (mobile browsers otherwise sniff
+// the bytes and save with a wrong extension that opens as text/gibberish).
+// Default (no flag) returns an inline URL suitable for the video player.
+export async function getSignedUrlById(
+  apiFetch: ReturnType<typeof useApiFetch>,
+  fileId: string,
+  forDownload = false,
+): Promise<string> {
+  const qs = forDownload ? '?download=1' : ''
   const { signedUrl } = await apiFetch<{ signedUrl: string }>(
-    `/api/project-files/${fileId}/signed-url`
+    `/api/project-files/${fileId}/signed-url${qs}`
   )
   return signedUrl
 }

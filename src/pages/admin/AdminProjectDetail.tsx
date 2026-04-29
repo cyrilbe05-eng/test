@@ -75,8 +75,18 @@ function FileRow({ name, size, fileId, iconOnly }: { name: string; size: number 
   const handleDownload = async () => {
     setLoading(true)
     try {
-      const url = await getSignedUrlById(apiFetch, fileId)
-      window.open(url, '_blank')
+      // forDownload=true so R2 returns Content-Disposition: attachment with the
+      // original filename + correct content-type. Using <a download> instead
+      // of window.open avoids the mobile-Safari quirk where the new tab is
+      // closed by the OS before the download completes.
+      const url = await getSignedUrlById(apiFetch, fileId, true)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
     } catch {
       toast.error('Failed to get download link')
     } finally {

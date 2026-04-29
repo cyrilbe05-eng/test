@@ -36,13 +36,43 @@ export async function getPresignedUploadUrl(key: string, _mimeType: string, expi
   return getSignedUrl(s3, command, { expiresIn })
 }
 
-/** Generate a pre-signed URL for a browser to GET a file from R2 (download/stream) */
-export async function getPresignedDownloadUrl(key: string, expiresIn = 3600): Promise<string> {
+/** Generate a pre-signed URL for a browser to GET a file from R2 (download/stream).
+ *
+ *  Pass `downloadFileName` to make the URL force a download with that exact
+ *  filename — R2 returns Content-Disposition: attachment from the signed
+ *  ResponseContentDisposition parameter. Without this, mobile browsers
+ *  (notably Android Chrome) sniff the bytes, often misclassify them as
+ *  text/plain, and save the file with a wrong extension or open it in a
+ *  text viewer that displays the raw binary as gibberish.
+ *
+ *  Pass `contentType` to override the Content-Type header on the GET so the
+ *  browser/OS knows what the file actually is, instead of falling back to
+ *  whatever R2 stored or the browser sniffs.
+ */
+export async function getPresignedDownloadUrl(
+  key: string,
+  expiresIn = 3600,
+  downloadFileName?: string | null,
+  contentType?: string | null,
+): Promise<string> {
   const command = new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
+    ResponseContentDisposition: downloadFileName
+      ? `attachment; filename="${sanitizeFilenameForHeader(downloadFileName)}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`
+      : undefined,
+    ResponseContentType: contentType ?? undefined,
   })
   return getSignedUrl(s3, command, { expiresIn })
+}
+
+/** Strip characters that break a quoted Content-Disposition filename.
+ *  We keep ASCII printable safe chars; the filename* (RFC 5987) param
+ *  carries the full UTF-8 form for clients that support it. */
+function sanitizeFilenameForHeader(name: string): string {
+  return name
+    .replace(/[\\/"\r\n]/g, '_')
+    .replace(/[^\x20-\x7E]/g, '_')
 }
 
 /** Hard delete a file from R2 */

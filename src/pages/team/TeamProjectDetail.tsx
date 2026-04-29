@@ -68,42 +68,30 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
   canDelete?: boolean; onDelete?: () => void
 }) {
   const apiFetch = useApiFetch()
-  const [dlProgress, setDlProgress] = useState<number | null>(null)
+  const [downloading, setDownloading] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   const handleDownload = async () => {
-    setDlProgress(0)
+    setDownloading(true)
     try {
-      const url = await getSignedUrlById(apiFetch, fileId)
-      // Stream download with progress
-      const resp = await fetch(url)
-      const total = Number(resp.headers.get('content-length') ?? 0)
-      const reader = resp.body?.getReader()
-      if (!reader || total === 0) {
-        // fallback: just open URL
-        window.open(url, '_blank')
-        setDlProgress(null)
-        return
-      }
-      const chunks: BlobPart[] = []
-      let received = 0
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        chunks.push(value)
-        received += value.length
-        setDlProgress(Math.round((received / total) * 100))
-      }
-      const blob = new Blob(chunks)
+      // Use the download-mode signed URL: R2 returns Content-Disposition:
+      // attachment + correct filename + correct content-type, so the browser
+      // saves the file natively with the right name. The previous in-app
+      // streaming approach (fetch → blob → click) corrupted file types on
+      // mobile (Android Chrome saved the bytes as text/plain) and showed a
+      // misleading 0→100% bar before the real browser download started.
+      const url = await getSignedUrlById(apiFetch, fileId, true)
       const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
+      a.href = url
       a.download = name
+      a.rel = 'noopener'
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(a.href)
+      document.body.removeChild(a)
     } catch {
       toast.error('Failed to get download link')
     } finally {
-      setDlProgress(null)
+      setDownloading(false)
     }
   }
 
@@ -127,7 +115,7 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
       <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-muted/60 transition-colors group">
       <button
         onClick={handleDownload}
-        disabled={dlProgress !== null}
+        disabled={downloading}
         className="flex items-center gap-3 flex-1 text-left disabled:opacity-60 min-w-0"
       >
         <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
@@ -137,14 +125,12 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate text-foreground group-hover:text-primary transition-colors">{name}</p>
-          <p className="text-xs text-muted-foreground">
-            {dlProgress !== null ? `Downloading… ${dlProgress}%` : formatBytes(size)}
-          </p>
+          <p className="text-xs text-muted-foreground">{formatBytes(size)}</p>
         </div>
         {badge && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">{badge}</span>
         )}
-        {dlProgress !== null && <div className="w-3.5 h-3.5 rounded-full border border-primary border-t-transparent animate-spin flex-shrink-0" />}
+        {downloading && <div className="w-3.5 h-3.5 rounded-full border border-primary border-t-transparent animate-spin flex-shrink-0" />}
       </button>
       {canDelete && (
         <button
@@ -160,12 +146,6 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
         </button>
       )}
       </div>
-      {/* Download progress bar */}
-      {dlProgress !== null && dlProgress > 0 && (
-        <div className="h-0.5 bg-muted">
-          <div className="h-full bg-primary transition-all" style={{ width: `${dlProgress}%` }} />
-        </div>
-      )}
     </div>
   )
 }
