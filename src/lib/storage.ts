@@ -17,12 +17,14 @@ export interface StorageAdapter {
   deleteById(id: string): Promise<void>
 }
 
-// Files this size or larger go through the multipart path. Below this we keep
-// the simpler single-PUT flow — multipart adds N+2 round-trips and only pays
-// off when failure-recovery on bad networks matters.
-const MULTIPART_THRESHOLD = 100 * 1024 * 1024 // 100 MB
-const PART_SIZE = 50 * 1024 * 1024 // 50 MB per part — retry cost on failure
-const PART_CONCURRENCY = 3
+// Multipart kicks in only when a single PUT physically can't handle the file.
+// R2's single-PUT hard ceiling is 5 GB; below that, single-PUT is faster
+// because multipart adds N+2 round-trips and serializes throughput across
+// PART_CONCURRENCY parallel connections. We pick 4.5 GB as the threshold to
+// give a safety margin under R2's 5 GB cap.
+const MULTIPART_THRESHOLD = 4.5 * 1024 * 1024 * 1024 // 4.5 GB
+const PART_SIZE = 100 * 1024 * 1024 // 100 MB per part — fewer round-trips, retry cost still small
+const PART_CONCURRENCY = 4
 const PART_MAX_RETRIES = 5
 
 /**
