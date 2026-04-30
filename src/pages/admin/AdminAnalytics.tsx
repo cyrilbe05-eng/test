@@ -117,7 +117,17 @@ export default function AdminAnalytics() {
     const completed = assignedProjects.filter((p) => p.status === 'client_approved').length
     const active = assignedProjects.filter((p) => p.status !== 'client_approved').length
 
-    return { id: member.id, name: member.full_name, completed, active, total: assignedProjects.length, avgDays, fastestDays, slowestDays, pastDue }
+    // Revision stats: sum of client revision counts across the editor's
+    // projects. avgRevisions is per-project (over all assigned projects)
+    // so it's comparable between editors with different workloads — a high
+    // total just from many projects shouldn't look worse than a high
+    // per-project rate from rework.
+    const totalRevisions = assignedProjects.reduce((sum, p) => sum + (p.client_revision_count ?? 0), 0)
+    const avgRevisions = assignedProjects.length > 0
+      ? (totalRevisions / assignedProjects.length).toFixed(1)
+      : null
+
+    return { id: member.id, name: member.full_name, completed, active, total: assignedProjects.length, avgDays, fastestDays, slowestDays, pastDue, totalRevisions, avgRevisions }
   }).filter((e) => e.total > 0)
 
   // Deadline by team member
@@ -261,7 +271,7 @@ export default function AdminAnalytics() {
         {editorStats.length > 0 && (
           <div className="clay-card p-6">
             <h3 className="font-heading font-semibold mb-1">Editor Performance</h3>
-            <p className="text-xs text-muted-foreground mb-4">Work time from assignment to completion, active load, and late projects</p>
+            <p className="text-xs text-muted-foreground mb-4">Work time from assignment to completion, active load, late projects, and revision rate</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -273,6 +283,7 @@ export default function AdminAnalytics() {
                     <th className="text-center px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wide">Avg Days</th>
                     <th className="text-center px-3 py-2 text-xs text-green-600 font-semibold uppercase tracking-wide">Fastest</th>
                     <th className="text-center px-3 py-2 text-xs text-orange-600 font-semibold uppercase tracking-wide">Slowest</th>
+                    <th className="text-center px-3 py-2 text-xs text-purple-600 font-semibold uppercase tracking-wide" title="Average revision requests per project">Revisions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
@@ -298,6 +309,12 @@ export default function AdminAnalytics() {
                       </td>
                       <td className="px-3 py-2.5 text-center">
                         {e.slowestDays !== null ? <span className="text-orange-600 font-semibold">{e.slowestDays}d</span> : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-center" title={`${e.totalRevisions} revision request${e.totalRevisions === 1 ? '' : 's'} across ${e.total} project${e.total === 1 ? '' : 's'}`}>
+                        {e.avgRevisions !== null
+                          ? <span className={Number(e.avgRevisions) === 0 ? 'text-green-600 font-semibold' : Number(e.avgRevisions) <= 1 ? 'text-purple-600 font-semibold' : 'text-red-600 font-bold'}>{e.avgRevisions}</span>
+                          : <span className="text-muted-foreground">—</span>
+                        }
                       </td>
                     </tr>
                   ))}
