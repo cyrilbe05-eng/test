@@ -10,7 +10,15 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60, // 1 minute
-      retry: 1,
+      // Don't retry permanent failures. A 401/403/404 means the request is
+      // never going to succeed with the same input — retrying just burns
+      // serverless invocations and floods logs (we were seeing 5x retries
+      // on inaccessible gallery files in Vercel logs).
+      retry: (failureCount, error: any) => {
+        const status = error?.status
+        if (status === 401 || status === 403 || status === 404) return false
+        return failureCount < 1
+      },
     },
   },
 })
