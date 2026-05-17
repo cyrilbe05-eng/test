@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { decodeJwt } from 'jose'
 import { requireAuth, requireRole, signJwt, hashPassword, comparePassword } from './_helpers/auth.js'
 import { dbQuery, dbExecute, newId, nowIso } from './_helpers/db.js'
 import {
@@ -3365,7 +3366,42 @@ async function handleAuthChangePassword(req: VercelRequest, res: VercelResponse)
 // MAIN ROUTER
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Decode the JWT without verifying — used only for log enrichment. We're
+ *  not making auth decisions here; route handlers still call requireAuth
+ *  which does full verification. Decoding lets us tag every request with
+ *  the caller's role + user id in Vercel logs, so a 403 in the dashboard
+ *  immediately tells you whether it was an admin, client, or editor. */
+function readCallerFromHeader(authHeader: string | undefined): { sub?: string; role?: string } {
+  if (!authHeader?.startsWith('Bearer ')) return {}
+  try {
+    const payload = decodeJwt(authHeader.slice(7))
+    return { sub: typeof payload.sub === 'string' ? payload.sub : undefined,
+             role: typeof payload.role === 'string' ? payload.role : undefined }
+  } catch { return {} }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // ── Caller tagging for logs ──────────────────────────────────────────────
+  // Pull role + user id from the bearer token (best-effort, no verification)
+  // so the access log line tells us *who* triggered each request. Anonymous
+  // requests get role='anon'. We log on response 'finish' so we capture the
+  // final status code regardless of which handler resolved the request.
+  const caller = readCallerFromHeader(req.headers.authorization)
+  const startedAt = Date.now()
+  res.on('finish', () => {
+    const line = {
+      role: caller.role ?? 'anon',
+      user: caller.sub ?? null,
+      method: req.method,
+      path: req.url?.split('?')[0],
+      status: res.statusCode,
+      ms: Date.now() - startedAt,
+    }
+    // 4xx/5xx → warn so they're easy to filter in Vercel; 2xx/3xx → info.
+    const log = res.statusCode >= 400 ? console.warn : console.log
+    log(`[req] ${JSON.stringify(line)}`)
+  })
+
   // When routed via explicit routes rule, slug may be a string like "auth/login"
   // or an array. Normalize to always be a string array.
   const rawSlug = req.query.slug
