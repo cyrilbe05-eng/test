@@ -27,6 +27,7 @@ import DemoClientCalendar from '@/demo/pages/DemoClientCalendar'
 import DemoClientAnalytics from '@/demo/pages/DemoClientAnalytics'
 
 // ─── Production imports ───────────────────────────────────────────────────────
+import { useVersionCheck } from '@/hooks/useVersionCheck'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import Login from '@/pages/Login'
 import ChangePassword from '@/pages/ChangePassword'
@@ -122,6 +123,7 @@ function DemoApp() {
 
 // ─── Production App ───────────────────────────────────────────────────────────
 function ProductionApp() {
+  useVersionCheck()
   return (
     <BrowserRouter>
         <Routes>
