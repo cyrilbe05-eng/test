@@ -1969,19 +1969,15 @@ async function handleGetGallerySignedUrl(req: VercelRequest, res: VercelResponse
 
     const file = rows[0]
 
+    // Access policy: owners, admins, and any team member can read any
+    // gallery file. Editors need this so they can browse client galleries
+    // for unassigned projects (e.g. when claiming new work) — restricting
+    // to assigned clients only would block that flow and produce a wave
+    // of 403s on the team gallery sidebar.
     if (file.owner_id === clerkUserId) {
       // owner allowed
-    } else if (profile.role === 'admin') {
-      // admin allowed
-    } else if (profile.role === 'team') {
-      const assigned = await dbQuery<{ id: string }>(
-        `SELECT pa.id FROM project_assignments pa
-         JOIN projects p ON p.id = pa.project_id
-         WHERE pa.team_member_id = ? AND p.client_id = ?
-         LIMIT 1`,
-        [clerkUserId, file.owner_id]
-      )
-      if (!assigned[0]) { res.status(403).json({ error: 'Forbidden' }); return }
+    } else if (profile.role === 'admin' || profile.role === 'team') {
+      // admin and any team member allowed
     } else {
       res.status(403).json({ error: 'Forbidden' }); return
     }
