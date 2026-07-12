@@ -971,7 +971,7 @@ async function authorizeKeyForUpload(profile: any, key: string): Promise<void> {
   if (profile.role === 'client' && project.client_id === profile.id) return
   if (profile.role === 'team') {
     const [assignment] = await dbQuery<{ id: string }>(
-      'SELECT id FROM project_assignments WHERE project_id = ? AND user_id = ?',
+      'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
       [projectId, profile.id],
     )
     if (assignment) return
