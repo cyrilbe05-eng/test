@@ -112,9 +112,18 @@ export interface TimelineComment {
   author_id: string
   author_role: CommentAuthorRole
   timestamp_sec: number | null
+  /** End of a range comment (B2). null/undefined = single-point comment.
+   *  Optional because rows may predate migration 002. */
+  timestamp_end_sec?: number | null
   comment_text: string
   revision_round: number
   created_at: string
+  /** Set when the comment text was edited (B1). */
+  edited_at?: string | null
+  /** Revision-checklist state (B3): 0/1 in D1. */
+  resolved?: number
+  resolved_by?: string | null
+  resolved_at?: string | null
 }
 
 export interface Notification {

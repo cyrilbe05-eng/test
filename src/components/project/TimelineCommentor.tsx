@@ -38,7 +38,7 @@ interface Props {
   onTheaterToggle?: () => void
 }
 
-export function TimelineCommentor({ fileId, projectId, comments, currentUserRole, canComment, revisionRound, onCommentAdded, theater = false, onTheaterToggle }: Props) {
+export function TimelineCommentor({ fileId, projectId, comments, currentUserId, currentUserRole, canComment, revisionRound, onCommentAdded, theater = false, onTheaterToggle }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<Plyr | null>(null)
   const playerContainerRef = useRef<HTMLDivElement>(null)
@@ -48,6 +48,11 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
   const [loadingSource, setLoadingSource] = useState(true)
   const [urlError, setUrlError] = useState<string | null>(null)
   const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(new Set())
+  // B2: optional range end for the comment being composed
+  const [rangeEndTs, setRangeEndTs] = useState<number | null>(null)
+  // B1: inline edit state
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
   const apiFetch = useApiFetch()
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CommentForm>({ resolver: zodResolver(commentSchema) })
 
@@ -132,7 +137,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
     const player = new Plyr(video, { controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'fullscreen'] })
     playerRef.current = player
     player.on('pause', () => { setCurrentTs(player.currentTime); setShowAddComment(canCommentRef.current) })
-    player.on('play', () => setShowAddComment(false))
+    player.on('play', () => { setShowAddComment(false); setRangeEndTs(null) })
     player.on('ready', () => { if (player.duration) setDuration(player.duration) })
     player.on('loadedmetadata', () => { if (player.duration) setDuration(player.duration) })
     player.on('playing', () => gateRef.current.reset())
@@ -161,19 +166,30 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
     const bar = playerContainerRef.current.querySelector('.plyr__progress')
     if (!bar) return
     // Remove old markers
-    bar.querySelectorAll('.comment-marker').forEach((el) => el.remove())
+    bar.querySelectorAll('.comment-marker, .comment-range').forEach((el) => el.remove())
+    ;(bar as HTMLElement).style.position = 'relative'
     // Add new markers (filter admin comments for clients)
     const markerComments = currentUserRole === 'client' ? comments.filter((c) => c.author_role !== 'admin') : comments
+    const pctOf = (sec: number) => Math.min(100, Math.max(0, (sec / duration) * 100))
+    // Range bands first so point dots render above them
+    markerComments.filter((c) => c.timestamp_sec != null && c.timestamp_end_sec != null).forEach((c) => {
+      const startPct = pctOf(c.timestamp_sec ?? 0)
+      const endPct = pctOf(c.timestamp_end_sec ?? 0)
+      if (endPct <= startPct) return
+      const band = document.createElement('span')
+      band.className = 'comment-range'
+      band.style.cssText = `position:absolute;top:0;bottom:0;left:${startPct}%;width:${endPct - startPct}%;background:hsl(var(--primary)/0.35);border-radius:3px;z-index:9;pointer-events:none;`
+      bar.appendChild(band)
+    })
     const seen = new Set<number>()
     markerComments.filter((c) => c.timestamp_sec != null).forEach((c) => {
-      const pct = Math.min(100, Math.max(0, ((c.timestamp_sec ?? 0) / duration) * 100))
+      const pct = pctOf(c.timestamp_sec ?? 0)
       const key = Math.round(pct * 10)
       if (seen.has(key)) return
       seen.add(key)
       const dot = document.createElement('span')
       dot.className = 'comment-marker'
       dot.style.cssText = `position:absolute;top:50%;left:${pct}%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:hsl(var(--primary));border:2px solid white;cursor:pointer;z-index:10;pointer-events:none;`
-      ;(bar as HTMLElement).style.position = 'relative'
       bar.appendChild(dot)
     })
   }, [comments, currentUserRole, duration])
@@ -181,12 +197,58 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
   const seekTo = (sec: number) => { if (playerRef.current) playerRef.current.currentTime = sec }
 
   const onSubmit = async (data: CommentForm) => {
+    const isRange = rangeEndTs != null && rangeEndTs > currentTs
+    const label = isRange
+      ? `[${formatTimestamp(currentTs)}–${formatTimestamp(rangeEndTs)}]`
+      : `[${formatTimestamp(currentTs)}]`
     try {
       await apiFetch('/api/timeline-comments/create', {
         method: 'POST',
-        body: JSON.stringify({ project_id: projectId, author_role: currentUserRole, timestamp_sec: currentTs, comment_text: '[' + formatTimestamp(currentTs) + '] — ' + data.comment_text, revision_round: revisionRound }),
+        body: JSON.stringify({
+          project_id: projectId,
+          author_role: currentUserRole,
+          timestamp_sec: currentTs,
+          ...(isRange ? { timestamp_end_sec: rangeEndTs } : {}),
+          comment_text: label + ' — ' + data.comment_text,
+          revision_round: revisionRound,
+        }),
       })
-      reset(); setShowAddComment(false); onCommentAdded(); toast.success('Comment added')
+      reset(); setShowAddComment(false); setRangeEndTs(null); onCommentAdded(); toast.success('Comment added')
+    } catch (e: any) { toast.error(e.message) }
+  }
+
+  const markRangeEnd = () => {
+    const t = playerRef.current?.currentTime ?? 0
+    if (t <= currentTs) { toast.error('Scrub past the start point first, then set the range end') ; return }
+    setRangeEndTs(t)
+  }
+
+  const saveEdit = async (commentId: string) => {
+    if (!editText.trim()) { toast.error('Comment cannot be empty'); return }
+    try {
+      await apiFetch(`/api/timeline-comments/${commentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ comment_text: editText.trim() }),
+      })
+      setEditingId(null); onCommentAdded(); toast.success('Comment updated')
+    } catch (e: any) { toast.error(e.message) }
+  }
+
+  const deleteComment = async (commentId: string) => {
+    if (!confirm('Delete this comment? This cannot be undone.')) return
+    try {
+      await apiFetch(`/api/timeline-comments/${commentId}`, { method: 'DELETE' })
+      onCommentAdded(); toast.success('Comment deleted')
+    } catch (e: any) { toast.error(e.message) }
+  }
+
+  const toggleResolved = async (comment: TimelineComment) => {
+    try {
+      await apiFetch(`/api/timeline-comments/${comment.id}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify({ resolved: !comment.resolved }),
+      })
+      onCommentAdded()
     } catch (e: any) { toast.error(e.message) }
   }
 
@@ -256,9 +318,31 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
       {/* Comment input (shown after pause) */}
       {showAddComment && canComment && (
         <form onSubmit={handleSubmit(onSubmit)} className="clay-card p-4 space-y-3 border-primary/30">
-          <p className="text-sm text-muted-foreground font-medium">
-            Add comment at <span className="text-primary font-semibold font-mono">[{formatTimestamp(currentTs)}]</span>
-          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm text-muted-foreground font-medium">
+              Add comment at <span className="text-primary font-semibold font-mono">
+                [{formatTimestamp(currentTs)}{rangeEndTs != null ? `–${formatTimestamp(rangeEndTs)}` : ''}]
+              </span>
+            </p>
+            {rangeEndTs == null ? (
+              <button
+                type="button"
+                onClick={markRangeEnd}
+                title="Scrub the video to the end of the section, then click"
+                className="text-[11px] text-muted-foreground hover:text-primary underline decoration-dotted transition-colors"
+              >
+                + set range end at playhead
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setRangeEndTs(null)}
+                className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+              >
+                clear range ✕
+              </button>
+            )}
+          </div>
           <textarea
             {...register('comment_text')}
             rows={2}
@@ -278,7 +362,19 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
         <div className="px-4 py-3 border-b border-border flex items-center gap-2">
           <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
           <h3 className="font-heading font-semibold text-sm">Comments</h3>
-          <span className="ml-auto text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{visibleComments.length}</span>
+          <div className="ml-auto flex items-center gap-1.5">
+            {currentUserRole !== 'client' && visibleComments.length > 0 && (
+              <span className={cn(
+                'text-xs px-2 py-0.5 rounded-full',
+                visibleComments.some((c) => !c.resolved)
+                  ? 'bg-amber-500/15 text-amber-600'
+                  : 'bg-green-500/15 text-green-600',
+              )}>
+                {visibleComments.filter((c) => !c.resolved).length} open
+              </span>
+            )}
+            <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{visibleComments.length}</span>
+          </div>
         </div>
 
         <div className={cn('overflow-y-auto', theater ? 'max-h-80' : 'max-h-64')}>
@@ -300,18 +396,65 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
                 {!isCollapsed && (
                   <div className="divide-y divide-border/40">
                     {roundComments.map((comment) => (
-                      <div key={comment.id} className="px-4 py-3">
+                      <div key={comment.id} className={cn('px-4 py-3', comment.resolved ? 'opacity-60' : '')}>
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          {/* B3: revision checklist — team/admin check items off as addressed */}
+                          {currentUserRole !== 'client' && (
+                            <button
+                              onClick={() => toggleResolved(comment)}
+                              title={comment.resolved ? 'Mark as outstanding' : 'Mark as addressed'}
+                              className={cn(
+                                'w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors',
+                                comment.resolved ? 'bg-green-500 border-green-500 text-white' : 'border-muted-foreground/50 hover:border-green-500',
+                              )}
+                            >
+                              {comment.resolved ? (
+                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                              ) : null}
+                            </button>
+                          )}
                           <span className="text-xs font-semibold">{comment.profiles.full_name}</span>
                           <span className="text-[10px] text-muted-foreground capitalize">{comment.author_role}</span>
                           {comment.timestamp_sec !== null && (
                             <button onClick={() => seekTo(comment.timestamp_sec!)} className="text-[10px] font-mono bg-primary/15 text-primary px-1.5 py-0.5 rounded hover:bg-primary/25 transition-colors">
                               {formatTimestamp(comment.timestamp_sec)}
+                              {comment.timestamp_end_sec != null && `–${formatTimestamp(comment.timestamp_end_sec)}`}
                             </button>
                           )}
+                          {comment.edited_at && <span className="text-[10px] text-muted-foreground italic">(edited)</span>}
                           <span className="text-[10px] text-muted-foreground ml-auto">{formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}</span>
+                          {/* B1: author can edit; author or admin can delete */}
+                          {comment.author_id === currentUserId && editingId !== comment.id && (
+                            <button
+                              onClick={() => { setEditingId(comment.id); setEditText(comment.comment_text) }}
+                              title="Edit comment"
+                              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                            >✎</button>
+                          )}
+                          {(comment.author_id === currentUserId || currentUserRole === 'admin') && (
+                            <button
+                              onClick={() => deleteComment(comment.id)}
+                              title="Delete comment"
+                              className="text-[10px] text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                            >🗑</button>
+                          )}
                         </div>
-                        <p className="text-xs text-foreground/80 leading-relaxed">{comment.comment_text}</p>
+                        {editingId === comment.id ? (
+                          <div className="space-y-1.5">
+                            <textarea
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              rows={2}
+                              className="w-full px-2 py-1.5 bg-input border border-border rounded-lg text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={() => saveEdit(comment.id)} className="text-[10px] font-semibold text-primary hover:underline">Save</button>
+                              <button onClick={() => setEditingId(null)} className="text-[10px] text-muted-foreground hover:text-foreground">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className={cn('text-xs text-foreground/80 leading-relaxed', comment.resolved ? 'line-through' : '')}>{comment.comment_text}</p>
+                        )}
                       </div>
                     ))}
                   </div>

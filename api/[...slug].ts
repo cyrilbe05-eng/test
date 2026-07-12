@@ -3060,10 +3060,15 @@ async function handleCreateTimelineComment(req: VercelRequest, res: VercelRespon
   try {
     const { clerkUserId, profile } = await requireAuth(req)
 
-    const { project_id, timestamp_sec, comment_text, revision_round } = req.body
+    const { project_id, timestamp_sec, timestamp_end_sec, comment_text, revision_round } = req.body
 
     if (!project_id || !comment_text) {
       res.status(400).json({ error: 'project_id and comment_text required' }); return
+    }
+    if (timestamp_end_sec != null) {
+      if (typeof timestamp_end_sec !== 'number' || typeof timestamp_sec !== 'number' || timestamp_end_sec <= timestamp_sec) {
+        res.status(400).json({ error: 'timestamp_end_sec must be a number greater than timestamp_sec' }); return
+      }
     }
 
     if (profile.role === 'client') {
@@ -3083,15 +3088,107 @@ async function handleCreateTimelineComment(req: VercelRequest, res: VercelRespon
     const id = newId()
     const now = nowIso()
 
-    await dbExecute(
-      `INSERT INTO timeline_comments (id, project_id, author_id, author_role, timestamp_sec, comment_text, revision_round, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, project_id, clerkUserId, author_role, timestamp_sec ?? null, comment_text, revision_round ?? 1, now]
-    )
+    // timestamp_end_sec is only included when provided so point comments keep
+    // working on databases where migration 002 hasn't been applied yet.
+    if (timestamp_end_sec != null) {
+      await dbExecute(
+        `INSERT INTO timeline_comments (id, project_id, author_id, author_role, timestamp_sec, timestamp_end_sec, comment_text, revision_round, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, project_id, clerkUserId, author_role, timestamp_sec ?? null, timestamp_end_sec, comment_text, revision_round ?? 1, now]
+      )
+    } else {
+      await dbExecute(
+        `INSERT INTO timeline_comments (id, project_id, author_id, author_role, timestamp_sec, comment_text, revision_round, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, project_id, clerkUserId, author_role, timestamp_sec ?? null, comment_text, revision_round ?? 1, now]
+      )
+    }
 
-    res.status(201).json({ id, project_id, author_id: clerkUserId, author_role, timestamp_sec: timestamp_sec ?? null, comment_text, revision_round: revision_round ?? 1, created_at: now })
+    res.status(201).json({ id, project_id, author_id: clerkUserId, author_role, timestamp_sec: timestamp_sec ?? null, timestamp_end_sec: timestamp_end_sec ?? null, comment_text, revision_round: revision_round ?? 1, created_at: now })
   } catch (e: any) {
-    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+    res.status(e?.status ?? 500).json({ error: friendlyDbError(e) })
+  }
+}
+
+/** Map a raw D1 "no such column" error (schema behind the code) to an
+ *  actionable message instead of a bare 500. */
+function friendlyDbError(e: any): string {
+  const msg: string = e?.message ?? 'Internal error'
+  if (/no such column/i.test(msg)) {
+    return 'This feature needs a database migration (db/migrations) that has not been applied yet.'
+  }
+  return msg
+}
+
+/** PATCH = edit own comment text (sets edited_at). DELETE = author or admin. */
+async function handleModifyTimelineComment(req: VercelRequest, res: VercelResponse) {
+  try {
+    const { clerkUserId, profile } = await requireAuth(req)
+    const commentId = req.query.id as string
+
+    const [comment] = await dbQuery<{ id: string; author_id: string; project_id: string }>(
+      'SELECT id, author_id, project_id FROM timeline_comments WHERE id = ?',
+      [commentId]
+    )
+    if (!comment) { res.status(404).json({ error: 'Comment not found' }); return }
+
+    if (req.method === 'PATCH') {
+      if (comment.author_id !== clerkUserId) {
+        res.status(403).json({ error: 'Only the author can edit a comment' }); return
+      }
+      const { comment_text } = req.body
+      if (!comment_text || typeof comment_text !== 'string' || !comment_text.trim()) {
+        res.status(400).json({ error: 'comment_text required' }); return
+      }
+      await dbExecute(
+        'UPDATE timeline_comments SET comment_text = ?, edited_at = ? WHERE id = ?',
+        [comment_text.trim(), nowIso(), commentId]
+      )
+      const rows = await dbQuery<any>('SELECT * FROM timeline_comments WHERE id = ?', [commentId])
+      res.json(rows[0]); return
+    }
+
+    if (req.method === 'DELETE') {
+      if (comment.author_id !== clerkUserId && profile.role !== 'admin') {
+        res.status(403).json({ error: 'Only the author or an admin can delete a comment' }); return
+      }
+      await dbExecute('DELETE FROM timeline_comments WHERE id = ?', [commentId])
+      res.json({ ok: true }); return
+    }
+
+    res.status(405).json({ error: 'Method not allowed' })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: friendlyDbError(e) })
+  }
+}
+
+/** Toggle the revision-checklist state on a comment (team/admin only). */
+async function handleResolveTimelineComment(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { clerkUserId, profile } = await requireAuth(req)
+    requireRole(profile, 'admin', 'team')
+
+    const commentId = req.query.id as string
+    const { resolved } = req.body
+    if (typeof resolved !== 'boolean') {
+      res.status(400).json({ error: 'resolved (boolean) required' }); return
+    }
+
+    const [comment] = await dbQuery<{ id: string }>(
+      'SELECT id FROM timeline_comments WHERE id = ?',
+      [commentId]
+    )
+    if (!comment) { res.status(404).json({ error: 'Comment not found' }); return }
+
+    await dbExecute(
+      'UPDATE timeline_comments SET resolved = ?, resolved_by = ?, resolved_at = ? WHERE id = ?',
+      resolved ? [1, clerkUserId, nowIso(), commentId] : [0, null, null, commentId]
+    )
+    const rows = await dbQuery<any>('SELECT * FROM timeline_comments WHERE id = ?', [commentId])
+    res.json(rows[0])
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: friendlyDbError(e) })
   }
 }
 
@@ -3768,6 +3865,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (slug[0] === 'timeline-comments') {
     if (slug[1] === 'create' && slug.length === 2) {
       return handleCreateTimelineComment(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'resolve') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleResolveTimelineComment(req, res)
+    }
+    if (slug.length === 2 && (req.method === 'PATCH' || req.method === 'DELETE')) {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleModifyTimelineComment(req, res)
     }
     if (slug.length === 2) {
       ;(req as any).query = { ...(req.query || {}), projectId: slug[1] }
