@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { format, formatDistanceToNow } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -29,4 +30,14 @@ export function generatePassword(length = 16): string {
 /** Sanitize a filename for storage keys */
 export function sanitizeFileName(name: string): string {
   return name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '')
+}
+
+/** Dashboard time label for a project: completed projects show the completion
+ *  date (client_approved is terminal, so updated_at IS the completion moment);
+ *  everything else shows relative time. */
+export function projectTimeLabel(project: { status: string; updated_at: string }): string {
+  if (project.status === 'client_approved') {
+    return `Completed ${format(new Date(project.updated_at), 'd MMM yyyy')}`
+  }
+  return formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })
 }

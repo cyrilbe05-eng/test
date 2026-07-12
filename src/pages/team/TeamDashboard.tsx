@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { formatDistanceToNow } from 'date-fns'
 import { useProjects } from '@/hooks/useProjects'
 import { TeamLayout } from '@/components/workspace/TeamLayout'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
-import { cn } from '@/lib/utils'
+import { cn, projectTimeLabel } from '@/lib/utils'
 import type { Project, ProjectStatus } from '@/types'
 
 // ── Kanban columns ────────────────────────────────────────────────────────────
@@ -78,7 +77,7 @@ function TeamKanban({ projects }: { projects: (Project & { is_assigned?: boolean
                       </p>
                     )}
                     <p className="text-[10px] text-muted-foreground/70 mt-1">
-                      {formatDistanceToNow(new Date(p.updated_at), { addSuffix: true })}
+                      {projectTimeLabel(p)}
                     </p>
                   </Link>
                 </div>
@@ -180,7 +179,7 @@ export default function TeamDashboard() {
                     </td>
                     <td className="px-4 py-3"><ProjectStatusBadge status={p.status} /></td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {formatDistanceToNow(new Date(p.updated_at), { addSuffix: true })}
+                      {projectTimeLabel(p)}
                     </td>
                     <td className="px-4 py-3">
                       {(p as any).is_assigned && (

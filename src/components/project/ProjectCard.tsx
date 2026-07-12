@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatDistanceToNow } from 'date-fns'
+import { projectTimeLabel } from '@/lib/utils'
 import { ProjectStatusBadge } from './ProjectStatusBadge'
 import type { Project } from '@/types'
 
@@ -31,7 +31,7 @@ export function ProjectCard({ project, href, showClient = false }: Props) {
       </div>
 
       <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}</span>
+        <span>{projectTimeLabel(project)}</span>
         {project.max_client_revisions !== -1 && (
           <span className="tabular-nums bg-muted px-2 py-0.5 rounded-full">
             {project.max_client_revisions - project.client_revision_count} rev left

@@ -10,7 +10,7 @@ import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
 import { FileUploader } from '@/components/project/FileUploader'
 import { useQueryClient } from '@tanstack/react-query'
-import { cn } from '@/lib/utils'
+import { cn, projectTimeLabel } from '@/lib/utils'
 
 function formatBytes(bytes: number | null): string {
   if (!bytes || bytes === 0) return '—'
@@ -236,7 +236,7 @@ export default function TeamProjectDetail() {
                     Inspiration video
                   </a>
                 )}
-                <span className="ml-auto">{formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}</span>
+                <span className="ml-auto">{projectTimeLabel(project)}</span>
               </div>
             </div>
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useUpdateProjectStatus } from '@/hooks/useProjects'
-import { formatDistanceToNow } from 'date-fns'
+import { projectTimeLabel } from '@/lib/utils'
 import type { Project, ProjectStatus } from '@/types'
 import { Link } from 'react-router-dom'
 
@@ -99,7 +99,7 @@ export function KanbanBoard({ projects }: Props) {
                       <p className="text-[10px] text-muted-foreground/40 mt-1">Unassigned</p>
                     )}
                     <p className="text-[10px] text-muted-foreground/60 mt-1.5">
-                      {formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}
+                      {projectTimeLabel(project)}
                     </p>
                   </Link>
                 </div>

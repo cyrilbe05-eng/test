@@ -12,7 +12,7 @@ import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { useApiFetch } from '@/lib/api'
 import { useStorageAdapter } from '@/lib/storage'
-import { cn } from '@/lib/utils'
+import { cn, projectTimeLabel } from '@/lib/utils'
 import type { Profile } from '@/types'
 
 function IconLayout() {
@@ -286,7 +286,7 @@ export default function AdminProjects() {
                     <td className="px-4 py-3"><ProjectStatusBadge status={p.status} /></td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{(p as any).assigned_team_names ?? '—'}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{formatDistanceToNow(new Date(p.updated_at), { addSuffix: true })}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{projectTimeLabel(p)}</td>
                   </tr>
                 ))}
               </tbody>

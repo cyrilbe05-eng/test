@@ -343,7 +343,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
           <div className="flex items-center gap-3 flex-wrap">
             {/* Start point */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Start</span>
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Start point</span>
               <button
                 type="button"
                 onClick={() => seekTo(rangeStartTs)}
@@ -364,7 +364,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
             <span className="text-muted-foreground text-xs">→</span>
             {/* End point (optional) */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">End</span>
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">End point</span>
               {rangeEndTs != null ? (
                 <>
                   <button

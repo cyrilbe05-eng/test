@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
-import { cn } from '@/lib/utils'
+import { cn, projectTimeLabel } from '@/lib/utils'
 import type { Project, Plan } from '@/types'
 
 function IconVideo() {
@@ -56,7 +56,7 @@ function ProjectPreviewCard({ project }: { project: Project }) {
         <ProjectStatusBadge status={project.status} />
       </div>
       <div className="px-6 py-3 flex items-center gap-6 text-xs text-muted-foreground border-b border-border/50 bg-muted/20">
-        <span>Updated {formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}</span>
+        <span>{project.status === 'client_approved' ? projectTimeLabel(project) : `Updated ${formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}`}</span>
         {project.max_client_revisions !== -1
           ? <span>{project.max_client_revisions - project.client_revision_count} revision(s) left</span>
           : <span>Unlimited revisions</span>}
@@ -206,7 +206,7 @@ export default function ClientWorkspace() {
                     'bg-indigo-500': p.status === 'admin_approved',
                   })} />
                   <span className="flex-1 text-sm font-medium truncate">{p.title}</span>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">{formatDistanceToNow(new Date(p.updated_at), { addSuffix: true })}</span>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">{projectTimeLabel(p)}</span>
                   <IconChevronRight />
                 </button>
               ))}
