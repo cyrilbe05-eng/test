@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { useStorageAdapter } from '@/lib/storage'
+import { useStorageAdapter, type UploadConnectionState } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 import type { FileType } from '@/types'
 
@@ -22,6 +22,8 @@ interface FileItem {
   file: File
   status: FileStatus
   progress: number
+  /** Connection substate while uploading (retrying / offline). */
+  conn?: UploadConnectionState
   error?: string
 }
 
@@ -74,16 +76,23 @@ export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, o
         projectId,
         fileType,
         onProgress: (pct) => patch(item.id, { progress: pct }),
+        onConnectionState: (state) => patch(item.id, { conn: state }),
       })
-      patch(item.id, { status: 'done', progress: 100 })
+      patch(item.id, { status: 'done', progress: 100, conn: undefined })
       onUploaded?.()
     } catch (err: any) {
-      patch(item.id, { status: 'error', error: err?.message ?? 'Upload failed' })
+      patch(item.id, { status: 'error', conn: undefined, error: err?.message ?? 'Upload failed' })
       toast.error(`${file.name}: ${err?.message ?? 'Upload failed'}`)
     } finally {
       activeRef.current--
       runNext()
     }
+  }
+
+  const retryItem = (id: number) => {
+    patch(id, { status: 'queued', progress: 0, conn: undefined, error: undefined })
+    queueRef.current.push(id)
+    runNext()
   }
 
   const handleFiles = (files: FileList | null) => {
@@ -153,19 +162,38 @@ export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, o
                   </svg>
                 )}
                 {(it.status === 'uploading' || it.status === 'queued') && (
-                  <div className={cn('w-3.5 h-3.5 rounded-full border-2 border-t-transparent flex-shrink-0', it.status === 'uploading' ? 'border-primary animate-spin' : 'border-muted-foreground')} />
+                  <div className={cn(
+                    'w-3.5 h-3.5 rounded-full border-2 border-t-transparent flex-shrink-0',
+                    it.status === 'queued' && 'border-muted-foreground',
+                    it.status === 'uploading' && (it.conn === 'retrying' || it.conn === 'offline' ? 'border-amber-500 animate-spin' : 'border-primary animate-spin'),
+                  )} />
                 )}
                 <p className="text-xs font-medium truncate flex-1">{it.file.name}</p>
-                <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                <span className={cn('text-[10px] flex-shrink-0', it.conn === 'retrying' || it.conn === 'offline' ? 'text-amber-500' : 'text-muted-foreground')}>
                   {it.status === 'queued' && 'Queued'}
-                  {it.status === 'uploading' && `${it.progress}%`}
+                  {it.status === 'uploading' && (
+                    it.conn === 'offline' ? 'Offline — will resume automatically'
+                    : it.conn === 'retrying' ? `Connection unstable — retrying… ${it.progress}%`
+                    : `${it.progress}%`
+                  )}
                   {it.status === 'done' && 'Done'}
                   {it.status === 'error' && 'Failed'}
                 </span>
+                {it.status === 'error' && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); retryItem(it.id) }}
+                    className="text-[10px] font-semibold text-primary hover:underline flex-shrink-0"
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
               {it.status === 'uploading' && (
                 <div className="h-1 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-200" style={{ width: `${it.progress}%` }} />
+                  <div className={cn(
+                    'h-full transition-all duration-200',
+                    it.conn === 'retrying' || it.conn === 'offline' ? 'bg-amber-500' : 'bg-gradient-to-r from-primary to-secondary',
+                  )} style={{ width: `${it.progress}%` }} />
                 </div>
               )}
               {it.status === 'error' && it.error && (
