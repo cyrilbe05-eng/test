@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-07-12 — Workstream B: review features (B1–B3) (`c6faadf`)
+
+> **⚠️ ACTION REQUIRED (one-time):** run the additive migration before the new comment actions work:
+> `wrangler d1 execute <db-name> --remote --file=db/migrations/002_comment_features.sql`
+> (Rollback available: `002_comment_features.down.sql`.) Deploy-safe pre-migration: all existing
+> flows keep working; only edit/range/resolve return a clear "needs migration" error until applied.
+
+- **B1 edit/delete:** author-only edit with "(edited)" stamp; delete by author or admin with
+  confirmation. `PATCH/DELETE /api/timeline-comments/:id` in the existing catch-all router.
+- **B2 range comments:** optional `timestamp_end_sec`; compose form gets "set range end at
+  playhead"; ranges show as translucent bands on the scrubber; chip label `MM:SS–MM:SS` seeks to
+  range start. Point comments unchanged.
+- **B3 revision checklist:** team/admin check comments off as addressed (`resolved`,
+  `resolved_by`, `resolved_at`); resolved items dim + strikethrough; open-items counter in the
+  comments header. Clients don't see checklist controls.
+- Files: `api/[...slug].ts`, `src/components/project/TimelineCommentor.tsx`, `src/types/index.ts`,
+  `db/migrations/002_*`. Demo pages intentionally not mirrored (mock-only surface — divergence noted).
+
+---
+
 ## 2026-07-12 — Workstream A complete (P0 bugs) + Phase 0 foundations
 
 Operator confirmations incorporated: storage stays Cloudflare R2; the single catch-all API function
