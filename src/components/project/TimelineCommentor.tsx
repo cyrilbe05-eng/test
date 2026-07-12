@@ -42,13 +42,14 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<Plyr | null>(null)
   const playerContainerRef = useRef<HTMLDivElement>(null)
-  const [currentTs, setCurrentTs] = useState(0)
   const [duration, setDuration] = useState(0)
   const [showAddComment, setShowAddComment] = useState(false)
   const [loadingSource, setLoadingSource] = useState(true)
   const [urlError, setUrlError] = useState<string | null>(null)
   const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(new Set())
-  // B2: optional range end for the comment being composed
+  // B2: selectable range for the comment being composed. Start defaults to the
+  // pause position; both ends can be re-pinned from the live playhead.
+  const [rangeStartTs, setRangeStartTs] = useState(0)
   const [rangeEndTs, setRangeEndTs] = useState<number | null>(null)
   // B1: inline edit state
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -136,7 +137,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     if (!video) return
     const player = new Plyr(video, { controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'fullscreen'] })
     playerRef.current = player
-    player.on('pause', () => { setCurrentTs(player.currentTime); setShowAddComment(canCommentRef.current) })
+    player.on('pause', () => { setRangeStartTs(player.currentTime); setShowAddComment(canCommentRef.current) })
     player.on('play', () => { setShowAddComment(false); setRangeEndTs(null) })
     player.on('ready', () => { if (player.duration) setDuration(player.duration) })
     player.on('loadedmetadata', () => { if (player.duration) setDuration(player.duration) })
@@ -166,8 +167,17 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     const bar = playerContainerRef.current.querySelector('.plyr__progress')
     if (!bar) return
     // Remove old markers
-    bar.querySelectorAll('.comment-marker, .comment-range').forEach((el) => el.remove())
+    bar.querySelectorAll('.comment-marker, .comment-range, .compose-range').forEach((el) => el.remove())
     ;(bar as HTMLElement).style.position = 'relative'
+    // Live preview of the range being composed (brighter, dashed outline)
+    if (showAddComment && rangeEndTs != null && rangeEndTs > rangeStartTs) {
+      const s = Math.min(100, Math.max(0, (rangeStartTs / duration) * 100))
+      const e = Math.min(100, Math.max(0, (rangeEndTs / duration) * 100))
+      const preview = document.createElement('span')
+      preview.className = 'compose-range'
+      preview.style.cssText = `position:absolute;top:-2px;bottom:-2px;left:${s}%;width:${e - s}%;background:hsl(var(--primary)/0.45);border:1px dashed hsl(var(--primary));border-radius:3px;z-index:11;pointer-events:none;`
+      bar.appendChild(preview)
+    }
     // Add new markers (filter admin comments for clients)
     const markerComments = currentUserRole === 'client' ? comments.filter((c) => c.author_role !== 'admin') : comments
     const pctOf = (sec: number) => Math.min(100, Math.max(0, (sec / duration) * 100))
@@ -192,22 +202,22 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
       dot.style.cssText = `position:absolute;top:50%;left:${pct}%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:hsl(var(--primary));border:2px solid white;cursor:pointer;z-index:10;pointer-events:none;`
       bar.appendChild(dot)
     })
-  }, [comments, currentUserRole, duration])
+  }, [comments, currentUserRole, duration, showAddComment, rangeStartTs, rangeEndTs])
 
   const seekTo = (sec: number) => { if (playerRef.current) playerRef.current.currentTime = sec }
 
   const onSubmit = async (data: CommentForm) => {
-    const isRange = rangeEndTs != null && rangeEndTs > currentTs
+    const isRange = rangeEndTs != null && rangeEndTs > rangeStartTs
     const label = isRange
-      ? `[${formatTimestamp(currentTs)}–${formatTimestamp(rangeEndTs)}]`
-      : `[${formatTimestamp(currentTs)}]`
+      ? `[${formatTimestamp(rangeStartTs)}–${formatTimestamp(rangeEndTs)}]`
+      : `[${formatTimestamp(rangeStartTs)}]`
     try {
       await apiFetch('/api/timeline-comments/create', {
         method: 'POST',
         body: JSON.stringify({
           project_id: projectId,
           author_role: currentUserRole,
-          timestamp_sec: currentTs,
+          timestamp_sec: rangeStartTs,
           ...(isRange ? { timestamp_end_sec: rangeEndTs } : {}),
           comment_text: label + ' — ' + data.comment_text,
           revision_round: revisionRound,
@@ -217,9 +227,18 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     } catch (e: any) { toast.error(e.message) }
   }
 
+  const markRangeStart = () => {
+    const t = playerRef.current?.currentTime ?? 0
+    if (rangeEndTs != null && t >= rangeEndTs) {
+      setRangeEndTs(null)
+      toast.info('Start moved past the end point — end cleared, set it again')
+    }
+    setRangeStartTs(t)
+  }
+
   const markRangeEnd = () => {
     const t = playerRef.current?.currentTime ?? 0
-    if (t <= currentTs) { toast.error('Scrub past the start point first, then set the range end') ; return }
+    if (t <= rangeStartTs) { toast.error('Scrub past the start point first, then set the range end'); return }
     setRangeEndTs(t)
   }
 
@@ -318,31 +337,76 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
       {/* Comment input (shown after pause) */}
       {showAddComment && canComment && (
         <form onSubmit={handleSubmit(onSubmit)} className="clay-card p-4 space-y-3 border-primary/30">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm text-muted-foreground font-medium">
-              Add comment at <span className="text-primary font-semibold font-mono">
-                [{formatTimestamp(currentTs)}{rangeEndTs != null ? `–${formatTimestamp(rangeEndTs)}` : ''}]
-              </span>
-            </p>
-            {rangeEndTs == null ? (
+          <p className="text-sm text-foreground font-medium">
+            {rangeEndTs != null ? 'New comment on a section' : 'New comment'}
+          </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Start point */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Start</span>
               <button
                 type="button"
-                onClick={markRangeEnd}
-                title="Scrub the video to the end of the section, then click"
-                className="text-[11px] text-muted-foreground hover:text-primary underline decoration-dotted transition-colors"
+                onClick={() => seekTo(rangeStartTs)}
+                title="Jump the video to the start point"
+                className="text-xs font-mono bg-primary/15 text-primary px-2 py-1 rounded-lg hover:bg-primary/25 transition-colors"
               >
-                + set range end at playhead
+                {formatTimestamp(rangeStartTs)}
               </button>
-            ) : (
               <button
                 type="button"
-                onClick={() => setRangeEndTs(null)}
-                className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+                onClick={markRangeStart}
+                title="Pin the start to where the video currently is"
+                className="text-[10px] text-muted-foreground hover:text-primary underline decoration-dotted transition-colors"
               >
-                clear range ✕
+                use playhead
               </button>
-            )}
+            </div>
+            <span className="text-muted-foreground text-xs">→</span>
+            {/* End point (optional) */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">End</span>
+              {rangeEndTs != null ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => seekTo(rangeEndTs)}
+                    title="Jump the video to the end point"
+                    className="text-xs font-mono bg-primary/15 text-primary px-2 py-1 rounded-lg hover:bg-primary/25 transition-colors"
+                  >
+                    {formatTimestamp(rangeEndTs)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={markRangeEnd}
+                    title="Pin the end to where the video currently is"
+                    className="text-[10px] text-muted-foreground hover:text-primary underline decoration-dotted transition-colors"
+                  >
+                    use playhead
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRangeEndTs(null)}
+                    title="Remove the end point (comment on a single moment)"
+                    className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    ✕
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={markRangeEnd}
+                  title="Scrub the video to the end of the section, then click"
+                  className="text-xs border border-dashed border-muted-foreground/40 text-muted-foreground px-2 py-1 rounded-lg hover:border-primary hover:text-primary transition-colors"
+                >
+                  + set at playhead
+                </button>
+              )}
+            </div>
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            Scrub the video to a moment, then pin it with “use playhead”. Leave the end empty to comment on a single moment — the selected section is highlighted on the timeline.
+          </p>
           <textarea
             {...register('comment_text')}
             rows={2}
@@ -351,8 +415,10 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
           />
           {errors.comment_text && <p className="text-destructive text-xs">{errors.comment_text.message}</p>}
           <div className="flex gap-2">
-            <button type="submit" className="btn-gradient">Add comment</button>
-            <button type="button" onClick={() => setShowAddComment(false)} className="px-4 py-1.5 bg-muted rounded-xl text-muted-foreground text-sm hover:bg-muted/80 transition-colors">Cancel</button>
+            <button type="submit" className="btn-gradient">
+              {rangeEndTs != null ? `Comment on ${formatTimestamp(rangeStartTs)}–${formatTimestamp(rangeEndTs)}` : 'Add comment'}
+            </button>
+            <button type="button" onClick={() => { setShowAddComment(false); setRangeEndTs(null) }} className="px-4 py-1.5 bg-muted rounded-xl text-muted-foreground text-sm hover:bg-muted/80 transition-colors">Cancel</button>
           </div>
         </form>
       )}
