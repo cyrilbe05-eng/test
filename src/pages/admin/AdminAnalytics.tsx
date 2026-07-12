@@ -6,8 +6,33 @@ import {
   BarChart, Bar, Legend,
 } from 'recharts'
 import { useApiFetch } from '@/lib/api'
+import { getToken } from '@/lib/auth'
+import { toast } from 'sonner'
 import { format, startOfMonth, eachMonthOfInterval, subMonths } from 'date-fns'
 import type { Project, ProjectAssignment, Profile, ProjectStatus } from '@/types'
+
+/** Download the C1 status-history CSV with the auth header attached
+ *  (a plain <a href> can't carry the Bearer token). */
+async function exportStatusHistory() {
+  try {
+    const res = await fetch('/api/projects/status-history-export', {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }))
+      throw new Error(body.error ?? 'Export failed')
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'status-history.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    toast.error(e?.message ?? 'Export failed')
+  }
+}
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   pending_assignment: '#f59e0b',
@@ -146,7 +171,17 @@ export default function AdminAnalytics() {
   return (
     <AdminLayout>
       <main className="px-6 py-8 space-y-8">
-        <h2 className="text-2xl font-heading font-semibold tracking-tight">Analytics</h2>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-2xl font-heading font-semibold tracking-tight">Analytics</h2>
+          <button
+            onClick={exportStatusHistory}
+            title="Download every status change (project, old → new, who, when) for billing"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors border border-border"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Export status history (CSV)
+          </button>
+        </div>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

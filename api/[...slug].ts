@@ -646,6 +646,78 @@ async function handleUnassignProject(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+/** Append-only status audit (C1). Fire-and-forget: never blocks or breaks the
+ *  calling flow — before migration 003 the table doesn't exist and this
+ *  silently no-ops (logged for diagnosis). */
+async function recordStatusChange(
+  projectId: string,
+  oldStatus: string | null,
+  newStatus: string,
+  actorId: string | null,
+): Promise<void> {
+  try {
+    await dbExecute(
+      'INSERT INTO status_history (id, project_id, old_status, new_status, actor_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [newId(), projectId, oldStatus, newStatus, actorId, nowIso()]
+    )
+  } catch (e: any) {
+    console.warn('[status-history] write skipped:', e?.message)
+  }
+}
+
+/** Admin-only: per-project status transition timeline (C1). */
+async function handleGetStatusHistory(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    requireRole(profile, 'admin')
+    const projectId = req.query.id as string
+    const rows = await dbQuery<any>(
+      `SELECT sh.*, p.full_name AS actor_name
+       FROM status_history sh
+       LEFT JOIN profiles p ON p.id = sh.actor_id
+       WHERE sh.project_id = ?
+       ORDER BY sh.created_at ASC`,
+      [projectId]
+    )
+    res.json(rows)
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: friendlyDbError(e) })
+  }
+}
+
+/** Admin-only: all status transitions as CSV, for billing/work measurement (C1). */
+async function handleExportStatusHistory(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    requireRole(profile, 'admin')
+    const rows = await dbQuery<any>(
+      `SELECT sh.created_at, sh.project_id, pr.title AS project_title,
+              cp.full_name AS client_name, sh.old_status, sh.new_status,
+              ap.full_name AS actor_name
+       FROM status_history sh
+       JOIN projects pr ON pr.id = sh.project_id
+       LEFT JOIN profiles cp ON cp.id = pr.client_id
+       LEFT JOIN profiles ap ON ap.id = sh.actor_id
+       ORDER BY sh.created_at ASC`
+    )
+    const esc = (v: unknown) => {
+      const s = v == null ? '' : String(v)
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const header = 'timestamp,project_id,project_title,client_name,old_status,new_status,actor_name'
+    const lines = rows.map((r: any) =>
+      [r.created_at, r.project_id, r.project_title, r.client_name, r.old_status, r.new_status, r.actor_name].map(esc).join(',')
+    )
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', 'attachment; filename="status-history.csv"')
+    res.send([header, ...lines].join('\n'))
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: friendlyDbError(e) })
+  }
+}
+
 /** Admin-only: adjust a project's snapshotted limits (e.g. allow extra
  *  deliverables on a one-off basis without changing the client's plan). */
 async function handleUpdateProjectLimits(req: VercelRequest, res: VercelResponse) {
@@ -705,8 +777,8 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
     }
     // Team members can update status on any project they can see
 
-    const [project] = await dbQuery<{ id: string; title: string; client_id: string }>(
-      'SELECT id, title, client_id FROM projects WHERE id = ?',
+    const [project] = await dbQuery<{ id: string; title: string; client_id: string; status: string }>(
+      'SELECT id, title, client_id, status FROM projects WHERE id = ?',
       [projectId]
     )
     if (!project) { res.status(404).json({ error: 'Project not found' }); return }
@@ -716,6 +788,7 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
       'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',
       [status, now, projectId]
     )
+    await recordStatusChange(projectId, project.status, status, clerkUserId)
 
     // Send notifications on key transitions
     const notifyMessages: { recipientId: string; type: string; message: string }[] = []
@@ -787,8 +860,8 @@ async function handleApproveClient(req: VercelRequest, res: VercelResponse) {
     const projectId = req.query.id as string
     const { file_id } = req.body
 
-    const projects = await dbQuery<{ id: string }>(
-      'SELECT id FROM projects WHERE id = ? AND client_id = ?',
+    const projects = await dbQuery<{ id: string; status: string }>(
+      'SELECT id, status FROM projects WHERE id = ? AND client_id = ?',
       [projectId, clerkUserId]
     )
     if (!projects[0]) { res.status(404).json({ error: 'Project not found' }); return }
@@ -811,6 +884,7 @@ async function handleApproveClient(req: VercelRequest, res: VercelResponse) {
       'UPDATE projects SET status = ?, updated_at = ? WHERE id = ? AND client_id = ?',
       ['client_approved', now, projectId, clerkUserId]
     )
+    await recordStatusChange(projectId, projects[0].status, 'client_approved', clerkUserId)
 
     // Notify assigned team members + admins that client approved
     const [approvedProject] = await dbQuery<{ title: string }>('SELECT title FROM projects WHERE id = ?', [projectId])
@@ -923,6 +997,7 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
       const [proj] = await dbQuery<{ status: string; title: string }>('SELECT status, title FROM projects WHERE id = ?', [project_id])
       if (proj?.status === 'pending_assignment') {
         await dbExecute('UPDATE projects SET status = ?, updated_at = ? WHERE id = ?', ['in_progress', now, project_id])
+        await recordStatusChange(project_id, proj.status, 'in_progress', clerkUserId)
       }
 
       // Notify admins when team uploads a deliverable
@@ -1251,6 +1326,7 @@ async function handleApproveProjectFile(req: VercelRequest, res: VercelResponse)
           'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',
           ['client_reviewing', now, file.project_id]
         )
+        await recordStatusChange(file.project_id, project.status, 'client_reviewing', profile.id)
         await dbExecute(
           'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
           [
@@ -1316,6 +1392,7 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
           'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',
           ['in_progress', nowIso(), file.project_id]
         )
+        await recordStatusChange(file.project_id, 'pending_assignment', 'in_progress', clerkUserId)
       }
     }
 
@@ -3114,7 +3191,7 @@ async function handleCreateTimelineComment(req: VercelRequest, res: VercelRespon
  *  actionable message instead of a bare 500. */
 function friendlyDbError(e: any): string {
   const msg: string = e?.message ?? 'Internal error'
-  if (/no such column/i.test(msg)) {
+  if (/no such column|no such table/i.test(msg)) {
     return 'This feature needs a database migration (db/migrations) that has not been applied yet.'
   }
   return msg
@@ -3311,6 +3388,7 @@ async function handleSubmitRevision(req: VercelRequest, res: VercelResponse) {
       'UPDATE projects SET status = ?, client_revision_count = ?, updated_at = ? WHERE id = ?',
       ['revision_requested', project.client_revision_count + 1, now, project_id]
     )
+    await recordStatusChange(project_id, project.status, 'revision_requested', clerkUserId)
 
     const admins = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
     const assignments = await dbQuery<{ team_member_id: string }>(
@@ -3646,6 +3724,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug[1] === 'create' && slug.length === 2) {
       return handleCreateProject(req, res)
     }
+    if (slug[1] === 'status-history-export' && slug.length === 2) {
+      return handleExportStatusHistory(req, res)
+    }
     if (slug.length === 2) {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleGetProject(req, res)
@@ -3673,6 +3754,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug.length === 3 && slug[2] === 'limits') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleUpdateProjectLimits(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'status-history') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleGetStatusHistory(req, res)
     }
     res.status(404).json({ error: 'Not found' }); return
   }

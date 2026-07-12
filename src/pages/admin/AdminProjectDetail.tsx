@@ -24,6 +24,16 @@ interface Deadline {
   member_full_name: string
 }
 
+interface StatusHistoryEntry {
+  id: string
+  project_id: string
+  old_status: string | null
+  new_status: string
+  actor_id: string | null
+  actor_name: string | null
+  created_at: string
+}
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -149,6 +159,14 @@ export default function AdminProjectDetail() {
     queryKey: ['project_deadlines', id],
     queryFn: () => apiFetch<Deadline[]>(`/api/deadlines/project/${id}`),
     enabled: !!id,
+  })
+
+  // C1: status transition audit trail (empty until migration 003 is applied)
+  const { data: statusHistory = [] } = useQuery<StatusHistoryEntry[]>({
+    queryKey: ['status_history', id],
+    queryFn: () => apiFetch<StatusHistoryEntry[]>(`/api/projects/${id}/status-history`),
+    enabled: !!id,
+    retry: false,
   })
 
   const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable')
@@ -399,6 +417,30 @@ export default function AdminProjectDetail() {
               </div>
             )}
           </Section>
+
+          {/* C1: status transition history (populated once migration 003 runs) */}
+          {statusHistory.length > 0 && (
+            <Section title="Status History">
+              <div className="space-y-2">
+                {[...statusHistory].reverse().map((h) => (
+                  <div key={h.id} className="text-[11px] leading-snug">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {h.old_status && (
+                        <>
+                          <span className="text-muted-foreground">{h.old_status.replace(/_/g, ' ')}</span>
+                          <span className="text-muted-foreground">→</span>
+                        </>
+                      )}
+                      <span className="font-medium">{h.new_status.replace(/_/g, ' ')}</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {h.actor_name ?? 'system'} · {formatDistanceToNow(new Date(h.created_at), { addSuffix: true })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
 
           {/* Inspiration URL */}
           {project.inspiration_url && (
