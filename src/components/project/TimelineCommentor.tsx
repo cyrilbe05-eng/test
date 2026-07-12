@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Plyr from 'plyr'
 import 'plyr/dist/plyr.css'
 import { useForm } from 'react-hook-form'
@@ -8,9 +8,16 @@ import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { useApiFetch } from '@/lib/api'
 import { getSignedUrlById } from '@/lib/storage'
+import { createRecoveryGate } from '@/lib/playbackRecovery'
 import { formatTimestamp } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import type { TimelineComment, CommentAuthorRole } from '@/types'
+
+// Diagnostic breadcrumbs for playback incidents — greppable prefix so a user
+// screenshot/console dump tells us exactly which recovery path fired.
+function logPlayback(msg: string, extra?: unknown) {
+  console.warn(`[playback] ${msg}`, extra ?? '')
+}
 
 const commentSchema = z.object({
   comment_text: z.string().min(1, 'Comment is required'),
@@ -38,36 +45,115 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
   const [currentTs, setCurrentTs] = useState(0)
   const [duration, setDuration] = useState(0)
   const [showAddComment, setShowAddComment] = useState(false)
-  const [signedUrl, setSignedUrl] = useState<string | null>(null)
+  const [loadingSource, setLoadingSource] = useState(true)
   const [urlError, setUrlError] = useState<string | null>(null)
   const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(new Set())
   const apiFetch = useApiFetch()
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CommentForm>({ resolver: zodResolver(commentSchema) })
 
-  useEffect(() => {
-    setSignedUrl(null)
-    setUrlError(null)
-    getSignedUrlById(apiFetch, fileId)
-      .then(setSignedUrl)
-      .catch((e: any) => { setUrlError(e?.message ?? 'Failed to load video'); toast.error('Failed to load video') })
-    // apiFetch is recreated per render; keying on it would refetch every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileId])
+  // The player reads canComment inside event handlers. Keeping it in a ref
+  // means a status/revision refetch flipping canComment does NOT tear down and
+  // rebuild the player mid-playback (that rebuild was the root cause of the
+  // "controls vanish / dead player until refresh" bug).
+  const canCommentRef = useRef(canComment)
+  useEffect(() => { canCommentRef.current = canComment }, [canComment])
 
+  // Rate-limits signed-URL recovery after media errors (see playbackRecovery.ts).
+  const gateRef = useRef(createRecoveryGate())
+  const loadSeq = useRef(0)
+
+  /** Swap the video source in place, optionally restoring position + play state.
+   *  The <video> element and Plyr instance are never torn down — Plyr's control
+   *  DOM stays attached to the element React rendered. */
+  const applySource = useCallback((url: string, resume: boolean) => {
+    const video = videoRef.current
+    if (!video) return
+    const pos = resume ? video.currentTime : 0
+    const wasPlaying = resume && !video.paused && !video.ended
+    video.src = url
+    video.load()
+    if (pos > 0 || wasPlaying) {
+      const onMeta = () => {
+        video.removeEventListener('loadedmetadata', onMeta)
+        if (pos > 0) video.currentTime = pos
+        if (wasPlaying) video.play().catch(() => {})
+      }
+      video.addEventListener('loadedmetadata', onMeta)
+    }
+  }, [])
+
+  /** Fetch a fresh signed URL (3 attempts, linear backoff) and apply it. */
+  const loadSource = useCallback(async (opts: { resume?: boolean } = {}) => {
+    const seq = ++loadSeq.current
+    setUrlError(null)
+    if (!opts.resume) setLoadingSource(true)
+    let lastErr: any
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const url = await getSignedUrlById(apiFetch, fileId)
+        if (seq !== loadSeq.current) return // superseded by a newer load (fileId change)
+        applySource(url, opts.resume ?? false)
+        setLoadingSource(false)
+        return
+      } catch (e: any) {
+        lastErr = e
+        logPlayback(`signed URL fetch failed (attempt ${attempt}/3)`, e?.message)
+        if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 1000))
+      }
+    }
+    if (seq !== loadSeq.current) return
+    setLoadingSource(false)
+    setUrlError(lastErr?.message ?? 'Failed to load video')
+    toast.error('Failed to load video')
+    // apiFetch is recreated per render but behaviourally constant (reads the
+    // token at call time) — keying on it would churn this callback every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileId, applySource])
+
+  // The mount-once player effect below must always call the CURRENT loadSource
+  // (it closes over fileId) — route it through a ref to avoid a stale closure
+  // re-signing an old deliverable after the file switches.
+  const loadSourceRef = useRef(loadSource)
+  useEffect(() => { loadSourceRef.current = loadSource }, [loadSource])
+
+  // (Re)load the source when the deliverable changes.
   useEffect(() => {
-    if (!videoRef.current || !signedUrl) return
-    playerRef.current = new Plyr(videoRef.current, { controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'fullscreen'] })
-    const player = playerRef.current
-    player.on('pause', () => { setCurrentTs(player.currentTime); setShowAddComment(canComment) })
+    gateRef.current.reset()
+    setDuration(0)
+    loadSource({ resume: false })
+  }, [fileId, loadSource])
+
+  // Create the Plyr instance ONCE per mount. Source changes are applied in
+  // place via applySource — never by unmounting the <video> or destroying the
+  // player, so React and Plyr no longer fight over the same DOM node.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const player = new Plyr(video, { controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'fullscreen'] })
+    playerRef.current = player
+    player.on('pause', () => { setCurrentTs(player.currentTime); setShowAddComment(canCommentRef.current) })
     player.on('play', () => setShowAddComment(false))
     player.on('ready', () => { if (player.duration) setDuration(player.duration) })
     player.on('loadedmetadata', () => { if (player.duration) setDuration(player.duration) })
-    let errorRefreshed = false
-    player.on('error', () => { if (!errorRefreshed) { errorRefreshed = true; getSignedUrlById(apiFetch, fileId).then(setSignedUrl).catch(() => {}) } })
+    player.on('playing', () => gateRef.current.reset())
+    player.on('error', () => {
+      // Expired signed URL (R2 default TTL 1 h) and transient network faults
+      // both land here. Recover by re-signing — gated so a broken file can't
+      // loop us forever, with resume so the viewer doesn't lose their spot.
+      const now = Date.now()
+      if (!gateRef.current.canAttempt(now)) {
+        if (gateRef.current.attempts() > 0) {
+          logPlayback('media error — recovery budget exhausted, showing retry UI')
+          setUrlError('Playback failed repeatedly. Check your connection and retry.')
+        }
+        return
+      }
+      gateRef.current.recordAttempt(now)
+      logPlayback(`media error — refreshing signed URL (attempt ${gateRef.current.attempts()})`)
+      loadSourceRef.current({ resume: true })
+    })
     return () => { player.destroy(); playerRef.current = null }
-    // apiFetch is recreated per render; keying on it would rebuild the player every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedUrl, fileId, canComment])
+  }, [])
 
   // Inject comment marker dots into the Plyr progress bar
   useEffect(() => {
@@ -113,18 +199,35 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
 
   return (
     <div className="space-y-4">
-      {/* Video */}
-      <div ref={playerContainerRef} className="rounded-xl overflow-hidden bg-zinc-950 border border-border">
-        {signedUrl
-          ? <video ref={videoRef} src={signedUrl} className="w-full max-h-[80vh] object-contain" />
-          : urlError
-            ? <div className="aspect-video flex flex-col items-center justify-center gap-2 text-red-400 text-sm px-4 text-center">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-                <p>Could not load video</p>
+      {/* Video — the <video> element is always mounted; Plyr owns it for the
+          component's whole lifetime. Loading/error states render as overlays
+          instead of swapping the element out from under the player. */}
+      <div ref={playerContainerRef} className={cn('rounded-xl overflow-hidden bg-zinc-950 border border-border relative', duration === 0 && 'aspect-video')}>
+        {/* Dedicated host div: Plyr re-parents the <video> into its own wrapper
+            inside this div. React must never reconcile other children in here,
+            or insertBefore/removeChild would hit a moved node and throw. */}
+        <div>
+          <video ref={videoRef} playsInline className="w-full max-h-[80vh] object-contain" />
+        </div>
+        {(loadingSource || urlError) && (
+          <div className="absolute inset-0 z-20 bg-zinc-950/90 flex flex-col items-center justify-center gap-2 px-4 text-center">
+            {urlError ? (
+              <>
+                <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                <p className="text-red-400 text-sm">Could not load video</p>
                 <p className="text-xs text-red-300/70">{urlError}</p>
-              </div>
-            : <div className="aspect-video flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
-        }
+                <button
+                  onClick={() => { gateRef.current.reset(); loadSource({ resume: false }) }}
+                  className="mt-2 px-4 py-1.5 bg-muted rounded-xl text-foreground text-sm hover:bg-muted/80 transition-colors"
+                >
+                  Retry
+                </button>
+              </>
+            ) : (
+              <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Theater toggle row */}
