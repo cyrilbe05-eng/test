@@ -285,7 +285,26 @@ export default function AdminProjectDetail() {
           <div className="clay-card p-4">
             <div className="flex items-center justify-between gap-2 mb-3 overflow-hidden">
               <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground truncate">Deliverables</h3>
-              <div className="flex-shrink-0"><DeliverableCounter used={deliverables.length} max={project.max_deliverables} /></div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <DeliverableCounter used={deliverables.length} max={project.max_deliverables} />
+                <button
+                  onClick={async () => {
+                    const input = prompt('Deliverable limit for this project (-1 for unlimited):', String(project.max_deliverables))
+                    if (input === null) return
+                    const value = Number(input)
+                    if (!Number.isInteger(value) || (value !== -1 && value < 1)) { toast.error('Enter -1 or a positive whole number'); return }
+                    try {
+                      await apiFetch(`/api/projects/${id}/limits`, { method: 'PATCH', body: JSON.stringify({ max_deliverables: value }) })
+                      qc.invalidateQueries({ queryKey: ['project', id] })
+                      toast.success('Deliverable limit updated')
+                    } catch (err) { toast.error((err as Error).message) }
+                  }}
+                  className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  title="Change deliverable limit"
+                >
+                  ✎
+                </button>
+              </div>
             </div>
             <div className="space-y-0.5">
               {deliverables.length === 0

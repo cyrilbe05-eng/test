@@ -450,13 +450,23 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
     let maxDeliverables = 1
     let maxRevisions = -1 // unlimited by default
 
-    if (!isAdmin && profile.plan_id) {
-      const plans = await dbQuery<Plan>('SELECT * FROM plans WHERE id = ?', [profile.plan_id])
+    // Snapshot limits from the EFFECTIVE client's plan — not the caller's.
+    // Admin-created projects previously skipped this lookup entirely and
+    // hardcoded max_deliverables = 1, which is why assigning a client at
+    // creation always produced a single-deliverable project.
+    const [clientRow] = await dbQuery<{ plan_id: string | null }>(
+      'SELECT plan_id FROM profiles WHERE id = ?',
+      [effectiveClientId]
+    )
+    if (clientRow?.plan_id) {
+      const plans = await dbQuery<Plan>('SELECT * FROM plans WHERE id = ?', [clientRow.plan_id])
       if (plans[0]) {
         maxDeliverables = plans[0].max_deliverables
         maxRevisions = plans[0].max_client_revisions
 
-        if (plans[0].max_active_projects !== -1) {
+        // Active-project cap applies to client self-service only; an admin
+        // creating on a client's behalf can exceed it deliberately.
+        if (!isAdmin && plans[0].max_active_projects !== -1) {
           const [countRow] = await dbQuery<{ count: number }>(
             `SELECT COUNT(*) AS count FROM projects
              WHERE client_id = ? AND status NOT IN ('client_approved')`,
@@ -631,6 +641,44 @@ async function handleUnassignProject(req: VercelRequest, res: VercelResponse) {
       [projectId, team_member_id]
     )
     res.json({ ok: true })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+/** Admin-only: adjust a project's snapshotted limits (e.g. allow extra
+ *  deliverables on a one-off basis without changing the client's plan). */
+async function handleUpdateProjectLimits(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'PATCH') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    requireRole(profile, 'admin')
+
+    const projectId = req.query.id as string
+    const { max_deliverables, max_client_revisions } = req.body
+
+    const isValidLimit = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && (v === -1 || v >= 1)
+    const sets: string[] = []
+    const params: unknown[] = []
+    if (max_deliverables !== undefined) {
+      if (!isValidLimit(max_deliverables)) { res.status(400).json({ error: 'max_deliverables must be -1 or a positive integer' }); return }
+      sets.push('max_deliverables = ?'); params.push(max_deliverables)
+    }
+    if (max_client_revisions !== undefined) {
+      if (!isValidLimit(max_client_revisions)) { res.status(400).json({ error: 'max_client_revisions must be -1 or a positive integer' }); return }
+      sets.push('max_client_revisions = ?'); params.push(max_client_revisions)
+    }
+    if (sets.length === 0) { res.status(400).json({ error: 'nothing to update' }); return }
+
+    const [project] = await dbQuery<{ id: string }>('SELECT id FROM projects WHERE id = ?', [projectId])
+    if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+
+    sets.push('updated_at = ?'); params.push(nowIso())
+    params.push(projectId)
+    await dbExecute(`UPDATE projects SET ${sets.join(', ')} WHERE id = ?`, params)
+
+    const rows = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [projectId])
+    res.json(rows[0])
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
@@ -905,6 +953,28 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
 interface StorageRow { used_mb: number }
 interface PlanRow { storage_limit_mb: number }
 
+/** Server-side deliverable cap: throws 403 when a non-admin tries to start a
+ *  deliverable upload past the project's max_deliverables snapshot. The UI
+ *  gates this too, but limits must hold at the API (AGENTS.md §3). Runs at
+ *  presigned-URL issuance so no bytes move before the check. */
+async function enforceDeliverableCap(profile: { role: string }, projectId: string, fileType: string): Promise<void> {
+  if (fileType !== 'deliverable' || profile.role === 'admin') return
+  const [proj] = await dbQuery<{ max_deliverables: number }>(
+    'SELECT max_deliverables FROM projects WHERE id = ?',
+    [projectId]
+  )
+  if (!proj || proj.max_deliverables === -1) return
+  const [cnt] = await dbQuery<{ count: number }>(
+    "SELECT COUNT(*) AS count FROM project_files WHERE project_id = ? AND file_type = 'deliverable'",
+    [projectId]
+  )
+  if ((cnt?.count ?? 0) >= proj.max_deliverables) {
+    const e: any = new Error('deliverable_limit_reached')
+    e.status = 403
+    throw e
+  }
+}
+
 async function handleGetProjectFileUploadUrl(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
@@ -915,6 +985,8 @@ async function handleGetProjectFileUploadUrl(req: VercelRequest, res: VercelResp
     if (!projectId || !fileType || !fileName) {
       res.status(400).json({ error: 'projectId, fileType, and fileName required' }); return
     }
+
+    await enforceDeliverableCap(profile, projectId, fileType)
 
     if (profile.role === 'client' && profile.plan_id) {
       const [planRow] = await dbQuery<PlanRow>(
@@ -990,6 +1062,8 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
     if (typeof partCount !== 'number' || partCount < 1 || partCount > 10000) {
       res.status(400).json({ error: 'partCount must be 1..10000' }); return
     }
+
+    await enforceDeliverableCap(profile, projectId, fileType)
 
     // Same plan-storage gate as single-PUT path
     if (profile.role === 'client' && profile.plan_id) {
@@ -3498,6 +3572,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug.length === 3 && slug[2] === 'unassign') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleUnassignProject(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'limits') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleUpdateProjectLimits(req, res)
     }
     res.status(404).json({ error: 'Not found' }); return
   }
