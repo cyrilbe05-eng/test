@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-07-12 — Workstream C: tracking & collaboration (C1–C2) + range UX
+
+> **⚠️ ACTION REQUIRED (one-time):** run migration 003 for the status audit log:
+> `wrangler d1 execute <db-name> --remote --file=db/migrations/003_status_history.sql`
+> Deploy-safe pre-migration: history writes silently no-op; nothing breaks. The migration also
+> backfills each project's current status as its first entry. Down script included.
+
+- **C1 status audit log (`c5f092e`):** append-only `status_history` (old → new, actor, timestamp)
+  written from all six status-mutation paths (manual updates, client approval, revision submit,
+  team upload/download auto-transitions, deliverable approval). Admin project view shows a Status
+  History timeline; Analytics has "Export status history (CSV)" for billing.
+- **C2 forward/share (`5a8df5e`):** `POST /api/projects/:id/share` notifies team members (in-app +
+  branded email with link) without creating an assignment; "Keep in the Loop" panel in admin
+  project view. Clients can never be recipients. Reuses the `team_assigned` notification type —
+  no schema change. *Follow-up option: team-side share UI.*
+- **B2 range UX (`0e27cdb`), per operator feedback:** explicit Start/End selection — labelled
+  chips that seek on click, per-end "use playhead" pins, inline hint, live dashed preview band on
+  the scrubber, submit button reflects the selection.
+
+---
+
 ## 2026-07-12 — Workstream B: review features (B1–B3) (`c6faadf`)
 
 > **⚠️ ACTION REQUIRED (one-time):** run the additive migration before the new comment actions work:
