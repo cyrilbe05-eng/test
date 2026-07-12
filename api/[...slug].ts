@@ -718,6 +718,62 @@ async function handleExportStatusHistory(req: VercelRequest, res: VercelResponse
   }
 }
 
+/** C2: forward/share a project to team members as an FYI — notifies (in-app +
+ *  email) without creating an assignment or deadline. Admin or team callers. */
+async function handleShareProject(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { profile } = await requireAuth(req)
+    requireRole(profile, 'admin', 'team')
+
+    const projectId = req.query.id as string
+    const { team_member_ids, message } = req.body
+    if (!Array.isArray(team_member_ids) || team_member_ids.length === 0) {
+      res.status(400).json({ error: 'team_member_ids[] required' }); return
+    }
+    if (team_member_ids.length > 50) {
+      res.status(400).json({ error: 'too many recipients (max 50)' }); return
+    }
+
+    const [project] = await dbQuery<{ id: string; title: string }>(
+      'SELECT id, title FROM projects WHERE id = ?',
+      [projectId]
+    )
+    if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+
+    // Only existing, enabled team/admin profiles can be shared with — clients
+    // never receive internal forwards.
+    const placeholders = team_member_ids.map(() => '?').join(',')
+    const recipients = await dbQuery<{ id: string; role: string }>(
+      `SELECT id, role FROM profiles WHERE id IN (${placeholders}) AND disabled = 0 AND role IN ('team', 'admin')`,
+      team_member_ids
+    )
+    if (recipients.length === 0) { res.status(400).json({ error: 'no valid recipients' }); return }
+
+    const note = typeof message === 'string' && message.trim() ? ` — “${message.trim().slice(0, 500)}”` : ''
+    const shareMsg = `${profile.full_name} shared "${project.title}" with you${note}`
+    const now = nowIso()
+    // 'team_assigned' is the closest existing notification type; a dedicated
+    // 'project_shared' type would need a CHECK-constraint migration on the
+    // notifications table (SQLite can't amend CHECKs in place).
+    await Promise.all(recipients.map((r) =>
+      dbExecute(
+        'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
+        [newId(), r.id, projectId, 'team_assigned', shareMsg, now]
+      )
+    ))
+    await sendEmailNotifications(recipients.map((r) => ({
+      recipientId: r.id,
+      subject: shareMsg,
+      text: `${shareMsg}\n\nView it here: ${projectUrl(projectId, r.role === 'admin' ? 'admin' : 'team')}`,
+    })))
+
+    res.json({ ok: true, shared: recipients.length })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
 /** Admin-only: adjust a project's snapshotted limits (e.g. allow extra
  *  deliverables on a one-off basis without changing the client's plan). */
 async function handleUpdateProjectLimits(req: VercelRequest, res: VercelResponse) {
@@ -3758,6 +3814,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug.length === 3 && slug[2] === 'status-history') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleGetStatusHistory(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'share') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleShareProject(req, res)
     }
     res.status(404).json({ error: 'Not found' }); return
   }

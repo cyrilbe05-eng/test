@@ -144,6 +144,10 @@ export default function AdminProjectDetail() {
   const { data: comments, refetch: refetchComments } = useTimelineComments(id)
   const updateStatus = useUpdateProjectStatus()
   const [selectedTeamMember, setSelectedTeamMember] = useState('')
+  // C2: forward-as-FYI state
+  const [shareTarget, setShareTarget] = useState('')
+  const [shareNote, setShareNote] = useState('')
+  const [sharing, setSharing] = useState(false)
   const [theater, setTheater] = useState(false)
   const [activeTab, setActiveTab] = useState<'review' | 'storage'>('review')
   const [editDeadlineId, setEditDeadlineId] = useState<string | null>(null)
@@ -416,6 +420,55 @@ export default function AdminProjectDetail() {
                 </button>
               </div>
             )}
+          </Section>
+
+          {/* C2: forward the project to a team member as an FYI (no assignment) */}
+          <Section title="Keep in the Loop">
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Notify a team member about this project without assigning them work.
+            </p>
+            <div className="space-y-1.5">
+              <select
+                value={shareTarget}
+                onChange={(e) => setShareTarget(e.target.value)}
+                className="w-full px-2 py-1.5 bg-input border border-border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Forward to…</option>
+                {(teamMembers ?? []).map((m) => (
+                  <option key={m.id} value={m.id}>{m.full_name}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={shareNote}
+                onChange={(e) => setShareNote(e.target.value)}
+                placeholder="Optional note"
+                maxLength={500}
+                className="w-full px-2 py-1.5 bg-input border border-border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                onClick={async () => {
+                  if (!shareTarget || !id) return
+                  setSharing(true)
+                  try {
+                    await apiFetch(`/api/projects/${id}/share`, {
+                      method: 'POST',
+                      body: JSON.stringify({ team_member_ids: [shareTarget], message: shareNote || undefined }),
+                    })
+                    toast.success('Forwarded — they have been notified')
+                    setShareTarget(''); setShareNote('')
+                  } catch (err) {
+                    toast.error((err as Error).message)
+                  } finally {
+                    setSharing(false)
+                  }
+                }}
+                disabled={!shareTarget || sharing}
+                className="w-full px-2.5 py-1.5 bg-muted rounded-lg text-foreground text-xs font-medium disabled:opacity-40 hover:bg-muted/80 transition-colors"
+              >
+                {sharing ? 'Sending…' : 'Forward & notify'}
+              </button>
+            </div>
           </Section>
 
           {/* C1: status transition history (populated once migration 003 runs) */}
