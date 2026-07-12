@@ -962,20 +962,21 @@ export default function DemoCalendarPage() {
   const [filterType, setFilterType] = useState<ContentType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<ContentStatus | 'all'>('all')
 
-  if (!profile) return null
-
-  const role = profile.role as 'admin' | 'team' | 'client'
+  // Hooks must run unconditionally — the !profile early return lives below them.
+  const role = (profile?.role ?? 'client') as 'admin' | 'team' | 'client'
+  const profileId = profile?.id ?? ''
 
   const visibleProjectIds = useMemo(() => {
+    if (!profileId) return []
     if (role === 'admin') return MOCK_PROJECTS.map((p) => p.id)
-    if (role === 'team') return MOCK_ASSIGNMENTS.filter((a) => a.team_member_id === profile.id).map((a) => a.project_id)
-    return MOCK_PROJECTS.filter((p) => p.client_id === profile.id).map((p) => p.id)
-  }, [profile.id, role])
+    if (role === 'team') return MOCK_ASSIGNMENTS.filter((a) => a.team_member_id === profileId).map((a) => a.project_id)
+    return MOCK_PROJECTS.filter((p) => p.client_id === profileId).map((p) => p.id)
+  }, [profileId, role])
 
   const allEvents = useMemo(
-    () => getCalendarEventsForUser(profile.id, role, visibleProjectIds),
+    () => (profileId ? getCalendarEventsForUser(profileId, role, visibleProjectIds) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [profile.id, role, visibleProjectIds, forceRender],
+    [profileId, role, visibleProjectIds, forceRender],
   )
 
   const events = useMemo(() => allEvents.filter((e) => {
@@ -983,6 +984,8 @@ export default function DemoCalendarPage() {
     if (filterStatus !== 'all' && e.type === 'manual' && e.content_status !== filterStatus) return false
     return true
   }), [allEvents, filterType, filterStatus])
+
+  if (!profile) return null
 
   // Navigation
   const prev = () => {

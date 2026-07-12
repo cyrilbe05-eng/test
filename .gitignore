@@ -8,7 +8,8 @@ node_modules/
 dist/
 
 # API build artifact generated during Vercel build
-api/[...slug].mjs
+# (brackets escaped — unescaped they act as a glob character class and never match)
+api/\[...slug\].mjs
 dist-ssr/
 *.local
 

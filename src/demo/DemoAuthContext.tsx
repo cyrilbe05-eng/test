@@ -60,6 +60,7 @@ export function DemoAuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- standard context + hook pairing
 export function useDemoAuth() {
   const ctx = useContext(DemoAuthContext)
   if (!ctx) throw new Error('useDemoAuth must be used within DemoAuthProvider')

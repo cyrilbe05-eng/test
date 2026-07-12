@@ -98,6 +98,9 @@ export function ChatPanel({
       onMentionConsumed?.()
       setTimeout(() => inputRef.current?.focus(), 100)
     }
+    // Intentionally keyed on mentionText only — adding onMentionConsumed would
+    // re-run the injection whenever the parent re-renders with a new callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mentionText])
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)

@@ -472,7 +472,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   const [batchDownloading, setBatchDownloading] = useState(false)
 
   const toggleSelect = (id: string) =>
-    setSelectedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) { n.delete(id) } else { n.add(id) } return n })
 
   const selectAll = () => setSelectedIds(new Set(currentFiles.map((f) => f.id)))
   const clearSelection = () => setSelectedIds(new Set())

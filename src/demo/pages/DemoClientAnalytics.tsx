@@ -207,6 +207,8 @@ export default function DemoClientAnalytics() {
       return { start: startOfMonth(today), end: endOfMonth(today) }
     }
     return { start: parseISO(customFrom), end: parseISO(customTo) }
+    // `today` is a render-stable constant for this page's lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeFrame, customFrom, customTo])
 
   function inRange(dateStr: string) {

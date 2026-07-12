@@ -110,6 +110,8 @@ export default function DemoMessagesPage() {
     if (!activeId && conversations.length > 0) {
       setActiveId(conversations[0].id)
     }
+    // Run only when the conversation list first populates, not on every selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations.length])
 
   // Scroll to bottom on new messages
@@ -120,6 +122,8 @@ export default function DemoMessagesPage() {
   // Mark read when thread is open
   useEffect(() => {
     if (activeId) markRead(activeId)
+    // markRead is recreated per render; keying on it would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, threadMsgs.length])
 
   const openThread = (id: string) => {

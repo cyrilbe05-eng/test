@@ -50,6 +50,8 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
     getSignedUrlById(apiFetch, fileId)
       .then(setSignedUrl)
       .catch((e: any) => { setUrlError(e?.message ?? 'Failed to load video'); toast.error('Failed to load video') })
+    // apiFetch is recreated per render; keying on it would refetch every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileId])
 
   useEffect(() => {
@@ -63,6 +65,8 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
     let errorRefreshed = false
     player.on('error', () => { if (!errorRefreshed) { errorRefreshed = true; getSignedUrlById(apiFetch, fileId).then(setSignedUrl).catch(() => {}) } })
     return () => { player.destroy(); playerRef.current = null }
+    // apiFetch is recreated per render; keying on it would rebuild the player every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedUrl, fileId, canComment])
 
   // Inject comment marker dots into the Plyr progress bar
@@ -184,7 +188,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserRole
             return (
               <div key={round}>
                 <button
-                  onClick={() => setCollapsedRounds((s) => { const next = new Set(s); next.has(round) ? next.delete(round) : next.add(round); return next })}
+                  onClick={() => setCollapsedRounds((s) => { const next = new Set(s); if (next.has(round)) { next.delete(round) } else { next.add(round) } return next })}
                   className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted transition-colors"
                 >
                   <span>Round {round} {isCurrentRound && <span className="ml-1 text-primary normal-case font-normal">Current</span>}</span>
