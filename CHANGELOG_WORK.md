@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-07-12 — Workstream A complete (P0 bugs) + Phase 0 foundations
+
+Operator confirmations incorporated: storage stays Cloudflare R2; the single catch-all API function
+is deliberate (Vercel free-tier function limit) — all new endpoints go inside it.
+
+### A3 — Multiple deliverables (`ff17672`)
+Root cause: admin-created projects skipped the plan lookup and hardcoded `max_deliverables = 1`
+(and the lookup read the *caller's* plan, never the assigned client's). Now: limits snapshot from
+the effective client's plan; new admin-only `PATCH /api/projects/:id/limits` + ✎ control in the
+admin project view for one-off overrides; deliverable cap now also enforced server-side at
+presigned-URL issuance (admin bypasses). No schema change; existing projects unaffected.
+
+### A1 — Resilient uploads (`6080957`, prep fix `7704e89`)
+Multipart threshold dropped 4.5 GB → 100 MB with part size scaling 50 MB+ (policy in
+`src/lib/uploadPlanner.ts`, unit-tested) — an interruption now costs one part, not the file.
+Offline gaps pause and auto-resume (online event + poll) without burning retry budget, on both
+paths. Uploader UI shows: %, "Connection unstable — retrying…", "Offline — will resume
+automatically", and a per-file Retry button. Single-PUT now sends fileSize so the plan storage
+gate counts it. **Also fixed a latent prod bug** (`7704e89`): multipart sign/complete/abort
+authorization queried `project_assignments.user_id` (column doesn't exist → 500 for every team
+multipart call); correct column is `team_member_id`.
+*Follow-up (stretch): cross-page-reload resume via ListParts; gallery upload path could adopt the
+same adapter later.*
+
+### A2 — Playback stability (`003f4ed`)
+Root cause: `<video>` was conditionally rendered and the Plyr instance destroyed/recreated when
+`signedUrl`/`canComment` changed; Plyr re-parents the video node, so React reconciliation could
+touch a moved node — controls left bound to detached DOM (vanishing scrubber) and a dead player
+until refresh. Now: one Plyr instance per mount in a dedicated host div, in-place source swaps
+with position/play-state restore, 3-attempt signed-URL fetch with backoff, rate-limited error
+recovery (`src/lib/playbackRecovery.ts`, unit-tested), Retry button, `[playback]` console
+breadcrumbs for future diagnosis.
+
+### Phase 0 — Foundations (`d353031`, `72284c4`)
+- Lint was entirely broken (ESLint 9, no flat config). Added `eslint.config.js` (no new deps),
+  fixed findings incl. a real rules-of-hooks violation in `DemoCalendarPage`; `--max-warnings 0`
+  green. `.gitignore` bracket-glob fix so the built `api/[...slug].mjs` is actually ignored.
+- Vitest + Testing Library (dev-only) with `npm test`; 22 tests green at time of writing.
+- Verified: `tsc`, lint, `npm run build` all green before every push.
+
+---
+
 ## 2026-07-12 — Discovery & planning (no code changes)
 
 **What:** Mapped the codebase, produced `REPO_MAP.md` and `WORKPLAN.md`.
