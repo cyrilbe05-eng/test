@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-07-13 — Section-comment composer rework + completed-column sort (`ea61dcd`)
+
+Operator feedback: the range feature was confusing; completed projects should list newest-first.
+
+- **Composer**: explicit "One moment / A section" toggle. Root flow bug fixed — pressing play
+  previously closed the composer and wiped the draft (users could never *play* to find an end
+  point, only scrub). Composer now persists during playback; section mode is a guided panel with
+  a live playhead readout, "Use current time" buttons, disabled submit until the end is set, and
+  self-explaining button labels. Moment mode unchanged in behaviour (follows latest pause).
+- **Kanban**: Client Approved column sorted by completion date desc (updated_at of the terminal
+  status). Files: `TimelineCommentor.tsx`, `KanbanBoard.tsx`. Demo pages not mirrored (as before).
+
+---
+
 ## 2026-07-12 — Workstream C: tracking & collaboration (C1–C2) + range UX
 
 > **⚠️ ACTION REQUIRED (one-time):** run migration 003 for the status audit log:
