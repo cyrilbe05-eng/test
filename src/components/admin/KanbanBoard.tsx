@@ -60,6 +60,12 @@ export function KanbanBoard({ projects }: Props) {
     <div className="flex gap-3 overflow-x-auto pb-4">
       {COLUMNS.map((col) => {
         const cards = projects.filter((p) => col.statuses.includes(p.status))
+        // Completed column reads as an archive: most recent completion on top.
+        // (client_approved is terminal, so updated_at is the completion moment.
+        // Other columns keep the API's created_at ordering.)
+        if (col.dropTarget === 'client_approved') {
+          cards.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+        }
         return (
           <div
             key={col.dropTarget}
