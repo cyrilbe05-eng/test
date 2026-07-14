@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-15 — HOTFIX: broken review copy blocked client playback (`9a096a7`)
+
+Clients (the only role served review copies) errored out — a bad auto-generated copy had **no
+fallback**. Defense in depth: server HEAD-verifies the preview object (missing/empty → original)
+and reports `quality` in the signed-url response; player falls back to the original on the FIRST
+media error while on a preview (permanent per file). Generator root-cause hardening: **MP4-only**
+(WebM bricked iPhones), video-only recording when the AudioContext can't run (dead-audio-track
+corruption), and probe-decode validation before any copy may be attached. Existing bad copies are
+neutralised by the fallback; removable via the deliverable's Remove control.
+
+---
+
 ## 2026-07-14 — Review copies fully automatic (`e635c6f`)
 
 Operator: no toggles — slow-connection playback must just work. Deliverable videos >25 MB now get
