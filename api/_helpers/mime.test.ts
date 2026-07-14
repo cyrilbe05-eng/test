@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { inferMimeType } from './mime'
+import { inferMimeType, inferPlaybackMimeType } from './mime'
 
 describe('inferMimeType', () => {
   it('keeps a meaningful stored type', () => {
@@ -22,5 +22,23 @@ describe('inferMimeType', () => {
     expect(inferMimeType('project.prproj', 'application/octet-stream')).toBe('application/octet-stream')
     expect(inferMimeType('noextension', '')).toBe(null)
     expect(inferMimeType('archive.xyz', null)).toBe(null)
+  })
+})
+
+describe('inferPlaybackMimeType', () => {
+  it('substitutes video/quicktime with video/mp4 (Chrome refuses declared quicktime)', () => {
+    expect(inferPlaybackMimeType('cut.mov', 'video/quicktime')).toBe('video/mp4')
+    expect(inferPlaybackMimeType('cut.mov', '')).toBe('video/mp4')
+    expect(inferPlaybackMimeType('clip.m4v', null)).toBe('video/mp4')
+  })
+
+  it('keeps already-playable types unchanged', () => {
+    expect(inferPlaybackMimeType('final.mp4', 'video/mp4')).toBe('video/mp4')
+    expect(inferPlaybackMimeType('final.webm', '')).toBe('video/webm')
+    expect(inferPlaybackMimeType('poster.jpg', '')).toBe('image/jpeg')
+  })
+
+  it('returns null when no type can be determined', () => {
+    expect(inferPlaybackMimeType('noextension', '')).toBe(null)
   })
 })

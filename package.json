@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && node build-api.mjs",
+    "build": "tsc && tsc -p tsconfig.api.json && vite build && node build-api.mjs",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -35,7 +35,7 @@ export async function dbQuery<T>(sql: string, params: unknown[] = []): Promise<T
     throw new Error(`D1 HTTP error ${res.status}: ${text}`)
   }
 
-  const json: D1Response<T> = await res.json()
+  const json = (await res.json()) as D1Response<T>
 
   if (!json.success || json.errors?.length) {
     throw new Error(`D1 error: ${JSON.stringify(json.errors)}`)

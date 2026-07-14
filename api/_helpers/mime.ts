@@ -47,3 +47,24 @@ export function inferMimeType(fileName: string, stored?: string | null): string 
   const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
   return EXTENSION_TYPES[ext] ?? (stored || null)
 }
+
+// Types that are truthful but that browsers REFUSE to play when explicitly
+// declared on a <video> source. Chrome rejects video/quicktime outright —
+// and unlike an octet-stream response, an asserted type disables sniffing,
+// so declaring it breaks files that previously played. QuickTime (.mov) is
+// the same ISO-BMFF container family as MP4: H.264/AAC .mov files play fine
+// in Chrome AND Safari when labelled video/mp4. (A ProRes .mov won't decode
+// in any browser regardless of label.)
+const PLAYBACK_SUBSTITUTES: Record<string, string> = {
+  'video/quicktime': 'video/mp4',
+  'video/x-m4v': 'video/mp4',
+}
+
+/** Content type to sign for INLINE playback: the truthful type, substituted
+ *  where the truthful label itself blocks browser playback. Downloads should
+ *  keep the truthful type — this is only for streaming into a player. */
+export function inferPlaybackMimeType(fileName: string, stored?: string | null): string | null {
+  const truthful = inferMimeType(fileName, stored)
+  if (!truthful) return null
+  return PLAYBACK_SUBSTITUTES[truthful] ?? truthful
+}

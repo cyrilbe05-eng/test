@@ -12,6 +12,7 @@ import {
   abortMultipartUpload,
 } from './_helpers/r2.js'
 import { ok, err, handleError } from './_helpers/respond.js'
+import { inferMimeType, inferPlaybackMimeType } from './_helpers/mime.js'
 import { sanitizeFileName } from '../src/lib/utils.js'
 import { sendEmailNotifications, sendEmailNotification, projectUrl } from './_helpers/email.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
@@ -1438,12 +1439,14 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
     // Content-Disposition: attachment there would force a download instead
     // of allowing playback.
     const wantDownload = String((req.query as any).download ?? '') === '1'
-    // Repair missing/octet-stream stored types from the filename — iOS Safari
-    // refuses to play video served without a real Content-Type (desktop sniffs).
-    const contentType = inferMimeType(file.file_name, file.mime_type)
+    // Downloads get the truthful type (repaired from the extension when the
+    // stored one is missing/octet-stream). Inline playback gets the
+    // browser-playable variant — e.g. .mov signs as video/mp4, because an
+    // asserted video/quicktime makes Chrome refuse without sniffing, while
+    // iOS needs SOME real video type. See _helpers/mime.ts.
     const signedUrl = wantDownload
-      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, contentType)
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, contentType)
+      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, inferPlaybackMimeType(file.file_name, file.mime_type))
 
     // Trigger: team member downloading a source file moves project pending_assignment → in_progress
     if (profile.role === 'team' && file.file_type === 'source_video') {
@@ -2197,10 +2200,9 @@ async function handleGetGallerySignedUrl(req: VercelRequest, res: VercelResponse
     }
 
     const wantDownload = String((req.query as any).download ?? '') === '1'
-    const galleryContentType = inferMimeType(file.file_name, file.mime_type)
     const url = wantDownload
-      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, galleryContentType)
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, galleryContentType)
+      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, inferPlaybackMimeType(file.file_name, file.mime_type))
     res.json({ url })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -3521,10 +3523,9 @@ async function handleDownload(req: VercelRequest, res: VercelResponse) {
     // Without it (the legacy default), the URL is inline and the browser
     // sniffs the bytes — which misclassifies binary as text on mobile.
     const wantDownload = String((req.query as any).download ?? '') === '1'
-    const downloadContentType = inferMimeType(file.file_name, file.mime_type)
     const signedUrl = wantDownload
-      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, downloadContentType)
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, downloadContentType)
+      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, inferPlaybackMimeType(file.file_name, file.mime_type))
     res.json({ signedUrl })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
