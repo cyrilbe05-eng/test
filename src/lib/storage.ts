@@ -61,7 +61,10 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  *  must-revalidate, so this costs almost nothing. */
 async function probeReachable(signal?: AbortSignal): Promise<boolean> {
   const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 5000)
+  // 8 s, not 5: while several parts saturate the uplink, even this tiny
+  // probe's response can queue behind upload traffic — a too-tight timeout
+  // reads a busy-but-healthy link as offline and pauses the upload for nothing.
+  const timer = setTimeout(() => ctrl.abort(), 8000)
   const onAbort = () => ctrl.abort()
   signal?.addEventListener('abort', onAbort, { once: true })
   try {
@@ -196,7 +199,11 @@ export function useStorageAdapter(): StorageAdapter {
             netFailures++
             reporter.set(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'retrying')
             await waitForConnectivity()
-            await sleep(backoffDelayMs(Math.min(netFailures, 3)))
+            // Probe verified the link — retry immediately; only pause when
+            // failures repeat back-to-back (see multipart path).
+            if (netFailures > 2) {
+              await sleep(Math.min(2000, 500 * (netFailures - 2)) + Math.random() * 300)
+            }
             continue
           }
           // Real HTTP rejection from R2 (not expiry): retry a little, then surface.
@@ -379,7 +386,13 @@ async function uploadMultipart(args: {
           reporter.set(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'retrying')
           await waitForConnectivity(abortController.signal)
           if (abortController.signal.aborted) throw new Error('aborted')
-          await sleep(backoffDelayMs(Math.min(netFailures, 3)), abortController.signal)
+          // The probe just verified a working link — sleeping on top of it is
+          // dead time that makes flaky-connection uploads feel slow. Retry
+          // immediately; add only a short jittered pause when THIS part keeps
+          // dying instantly despite passing probes (avoids a tight loop).
+          if (netFailures > 2) {
+            await sleep(Math.min(2000, 500 * (netFailures - 2)) + Math.random() * 300, abortController.signal)
+          }
           continue
         }
         // Real HTTP rejection from R2 on this part (not expiry, not network).

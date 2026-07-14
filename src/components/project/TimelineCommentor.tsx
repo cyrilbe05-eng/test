@@ -46,6 +46,9 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
   const [showAddComment, setShowAddComment] = useState(false)
   const [loadingSource, setLoadingSource] = useState(true)
   const [urlError, setUrlError] = useState<string | null>(null)
+  // True while playback is starved for data (high-bitrate file vs slow link).
+  // Surfaced as a chip so a stalled video reads as "buffering", not "broken".
+  const [buffering, setBuffering] = useState(false)
   const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(new Set())
   // B2: the comment being composed is either anchored to one moment or to a
   // section (start → end). Moment mode mirrors the latest pause position;
@@ -176,6 +179,30 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     player.on('ready', () => { if (player.duration) setDuration(player.duration) })
     player.on('loadedmetadata', () => { if (player.duration) setDuration(player.duration) })
     player.on('playing', () => gateRef.current.reset())
+
+    // Buffering visibility: `waiting` fires when the decoder runs out of
+    // data. Debounced 800 ms so normal seek hiccups don't flash the chip;
+    // logged with buffer state so reports can distinguish starvation
+    // (bufferedAhead ≈ 0 → link slower than the file's bitrate) from stalls.
+    let bufferingTimer: ReturnType<typeof setTimeout> | null = null
+    const clearBuffering = () => {
+      if (bufferingTimer) { clearTimeout(bufferingTimer); bufferingTimer = null }
+      setBuffering(false)
+    }
+    player.on('waiting', () => {
+      if (bufferingTimer) clearTimeout(bufferingTimer)
+      bufferingTimer = setTimeout(() => {
+        const buf = video.buffered
+        const ahead = buf.length ? buf.end(buf.length - 1) - video.currentTime : 0
+        logPlayback('buffering — playback starved for data', {
+          currentTime: Math.round(video.currentTime * 10) / 10,
+          bufferedAhead: Math.round(ahead * 10) / 10,
+        })
+        setBuffering(true)
+      }, 800)
+    })
+    player.on('playing', clearBuffering)
+    player.on('pause', clearBuffering)
     player.on('error', () => {
       // Expired signed URL (R2 default TTL 1 h) and transient network faults
       // both land here. Recover by re-signing — gated so a broken file can't
@@ -198,7 +225,11 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
       logPlayback(`media error — refreshing signed URL (attempt ${gateRef.current.attempts()})`, { code: mediaErr?.code, message: mediaErr?.message })
       loadSourceRef.current({ resume: true })
     })
-    return () => { player.destroy(); playerRef.current = null }
+    return () => {
+      if (bufferingTimer) clearTimeout(bufferingTimer)
+      player.destroy()
+      playerRef.current = null
+    }
   }, [])
 
   // Inject comment marker dots into the Plyr progress bar
@@ -339,6 +370,12 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
         <div>
           <video ref={videoRef} playsInline preload="metadata" className="w-full max-h-[80vh] object-contain" />
         </div>
+        {buffering && !loadingSource && !urlError && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
+            <div className="w-3 h-3 rounded-full border-2 border-white/80 border-t-transparent animate-spin" />
+            Buffering…
+          </div>
+        )}
         {(loadingSource || urlError) && (
           <div className="absolute inset-0 z-20 bg-zinc-950/90 flex flex-col items-center justify-center gap-2 px-4 text-center">
             {urlError ? (
