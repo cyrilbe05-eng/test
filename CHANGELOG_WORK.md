@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-07-14 — A1 round 2: uploads survive *bad* connections, not just offline (`ce37bed`)
+
+Operator report: uploads still failing on bad internet. Root causes — the resilience only keyed on
+`navigator.onLine` (which stays `true` on a zero-throughput link); any part exhausting 5 retries
+**aborted the whole multipart upload and deleted every uploaded part**; control-plane calls
+(create/sign/complete/register) were single-shot (a drop at `/complete` discarded a 100%-uploaded
+file; a drop during re-sign escaped the retry loop entirely); 50 MB parts can never finish on a
+link that drops every 30 s.
+
+Fixes: verified-reachability probe (tiny same-origin fetch) gates all waits; transport failures now
+pause-and-resume indefinitely and never discard parts (budgets apply only to real HTTP rejections);
+resilient wrapper for all control-plane calls (network → wait+retry, 5xx → 3 retries, 4xx →
+surface); threshold 100→32 MB, min part 50→16 MB; single-PUT path gets the same policy + idle
+watchdog + URL re-issue on expiry. `putPart` → shared `putBlob`. 26 unit tests green.
+Files: `src/lib/storage.ts`, `src/lib/uploadPlanner.ts` (+tests), `FileUploader.tsx`.
+*Known limit (follow-up): resume across page reload still restarts the file (needs ListParts +
+persisted state).*
+
+---
+
 ## 2026-07-13 — Section-comment composer rework + completed-column sort (`ea61dcd`)
 
 Operator feedback: the range feature was confusing; completed projects should list newest-first.
