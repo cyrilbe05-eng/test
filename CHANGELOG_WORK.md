@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-14 — In-browser compression + buffering overlay (`b4dfc53`)
+
+Review copies are now generated **in the editor's browser** — pick the normal full-quality export,
+it re-encodes to ≤720p @ ~3 Mbit/s locally (canvas + MediaRecorder, no deps, no server cost) and
+uploads the small result. Real-time encode (video-length wait) with progress; ≤25 MB files skip
+compression; unsupported browsers get a clear fallback message. Buffering cue upgraded: centered
+overlay on a dimmed player, escalating after 3 stalls to explain the connection is the limit.
+
+---
+
 ## 2026-07-14 — Upload retune for 2–5 Mbit/s + review copies (`5020b2e`, `515c39d`)
 
 > **⚠️ ACTION REQUIRED (one-time):** run migration 004 in the D1 console (ppingu):
