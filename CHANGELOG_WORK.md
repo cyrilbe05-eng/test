@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-15 — HOTFIX 2: legacy-file playback timeout (`ea338f4`)
+
+Operator confirmed the breakage hit **pre-review-copy projects** — root cause there was the inline
+metadata repair (`ensurePlayableObject`): a synchronous CopyObject on multi-GB legacy files blew
+the 60 s function limit → signed-url request failed on every attempt. Size gate 4.5 → 1.5 GB and
+the copy now races a 25 s budget (timeout → serve override URL immediately; copy may still finish
+in the background for next time).
+
+---
+
 ## 2026-07-15 — HOTFIX: broken review copy blocked client playback (`9a096a7`)
 
 Clients (the only role served review copies) errored out — a bad auto-generated copy had **no
