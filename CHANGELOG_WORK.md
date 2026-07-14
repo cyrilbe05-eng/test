@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-07-14 — Review copies fully automatic (`e635c6f`)
+
+Operator: no toggles — slow-connection playback must just work. Deliverable videos >25 MB now get
+their review copy generated **automatically right after upload** (browser compresses the local file
+it still holds — no R2 re-download, no CORS dependency). Upload row shows "Uploaded ✓ — generating
+review copy… %". Non-fatal on failure (original streams; manual generate remains as backfill).
+
+**Bug fixed from the earlier manual flow:** review-copy bytes were registered as their own
+deliverable row (showed in lists, ate `max_deliverables`, 403 for at-limit team). New
+`previewArtifact` flag: skips cap + registration, keys under `projects/{id}/preview/`;
+`upload()` returns `fileId` for the attach call.
+
+---
+
 ## 2026-07-14 — One-click review-copy generation from the original (`8c95625`)
 
 "⚙ Generate review copy" streams the uploaded deliverable straight from R2 into the in-browser
