@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-07-14 — Mobile video playback fix (`993bfcf`)
+
+Operator report: playback broken on mobile. Root cause: videos served without a real Content-Type —
+`File.type` is blank for common uploads (.mov/.mkv on Windows) and was stored as `''`; multipart R2
+objects carry no type at all; and the signed-URL override let `''` through (`?? undefined` doesn't
+catch it). Desktop browsers sniff the bytes and play anyway; **iOS Safari refuses**.
+
+Fix: `api/_helpers/mime.ts` `inferMimeType()` repairs missing/octet-stream types from the file
+extension — applied at **read time** in all three signed-URL handlers (existing uploads fixed with
+no migration) and at write time in both register handlers. Gallery register no longer 400s on blank
+mime. Player: `play-large` control (mobile tap target), `preload="metadata"`, and MediaError codes
+surfaced in the error overlay + `[playback]` logs (persistent code 4 now says "format may be
+unsupported" instead of blaming the connection). 30 unit tests green.
+
+---
+
 ## 2026-07-14 — A1 round 2: uploads survive *bad* connections, not just offline (`ce37bed`)
 
 Operator report: uploads still failing on bad internet. Root causes — the resilience only keyed on
