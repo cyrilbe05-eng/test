@@ -1043,7 +1043,9 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
     await dbExecute(
       `INSERT INTO project_files (id, project_id, uploader_id, file_type, storage_key, file_name, file_size, mime_type, approved, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-      [id, project_id, clerkUserId, file_type, storage_key, file_name, file_size ?? null, mime_type ?? null, now]
+      // Normalise the mime at write time too (File.type is often blank for
+      // .mov/.mkv) so new rows don't depend on the read-time repair.
+      [id, project_id, clerkUserId, file_type, storage_key, file_name, file_size ?? null, inferMimeType(file_name, mime_type), now]
     )
 
     const rows = await dbQuery<ProjectFile>('SELECT * FROM project_files WHERE id = ?', [id])
@@ -1436,9 +1438,12 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
     // Content-Disposition: attachment there would force a download instead
     // of allowing playback.
     const wantDownload = String((req.query as any).download ?? '') === '1'
+    // Repair missing/octet-stream stored types from the filename — iOS Safari
+    // refuses to play video served without a real Content-Type (desktop sniffs).
+    const contentType = inferMimeType(file.file_name, file.mime_type)
     const signedUrl = wantDownload
-      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, file.mime_type)
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, file.mime_type)
+      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, contentType)
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, contentType)
 
     // Trigger: team member downloading a source file moves project pending_assignment → in_progress
     if (profile.role === 'team' && file.file_type === 'source_video') {
@@ -2059,8 +2064,10 @@ async function handleRegisterGalleryFile(req: VercelRequest, res: VercelResponse
 
     const { fileName, mimeType, fileSize, storageKey, folderId, ownerId: bodyOwnerId } = req.body
 
-    if (!fileName || !mimeType || !storageKey) {
-      res.status(400).json({ error: 'fileName, mimeType, and storageKey are required' }); return
+    // mimeType is NOT required: File.type is blank for e.g. .mov/.mkv on some
+    // platforms — we infer a type from the extension at insert time instead.
+    if (!fileName || !storageKey) {
+      res.status(400).json({ error: 'fileName and storageKey are required' }); return
     }
 
     // Admins can specify an ownerId to register files on behalf of a client
@@ -2072,7 +2079,7 @@ async function handleRegisterGalleryFile(req: VercelRequest, res: VercelResponse
     await dbExecute(
       `INSERT INTO gallery_files (id, owner_id, folder_id, file_name, file_size, mime_type, storage_key, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, ownerId, folderId ?? null, fileName, fileSize ?? 0, mimeType, storageKey, now]
+      [id, ownerId, folderId ?? null, fileName, fileSize ?? 0, inferMimeType(fileName, mimeType), storageKey, now]
     )
 
     const rows = await dbQuery<GalleryFile>('SELECT * FROM gallery_files WHERE id = ?', [id])
@@ -2190,9 +2197,10 @@ async function handleGetGallerySignedUrl(req: VercelRequest, res: VercelResponse
     }
 
     const wantDownload = String((req.query as any).download ?? '') === '1'
+    const galleryContentType = inferMimeType(file.file_name, file.mime_type)
     const url = wantDownload
-      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, file.mime_type)
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, file.mime_type)
+      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, galleryContentType)
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, galleryContentType)
     res.json({ url })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -3513,9 +3521,10 @@ async function handleDownload(req: VercelRequest, res: VercelResponse) {
     // Without it (the legacy default), the URL is inline and the browser
     // sniffs the bytes — which misclassifies binary as text on mobile.
     const wantDownload = String((req.query as any).download ?? '') === '1'
+    const downloadContentType = inferMimeType(file.file_name, file.mime_type)
     const signedUrl = wantDownload
-      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, file.mime_type)
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, file.mime_type)
+      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, downloadContentType)
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, downloadContentType)
     res.json({ signedUrl })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })

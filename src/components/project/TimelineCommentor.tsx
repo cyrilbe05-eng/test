@@ -147,7 +147,9 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-    const player = new Plyr(video, { controls: ['play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'fullscreen'] })
+    // play-large gives mobile a proper tap target — without it, phones only
+    // get the thin control-strip play button.
+    const player = new Plyr(video, { controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'fullscreen'] })
     playerRef.current = player
     player.on('pause', () => {
       const t = player.currentTime
@@ -178,16 +180,22 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
       // Expired signed URL (R2 default TTL 1 h) and transient network faults
       // both land here. Recover by re-signing — gated so a broken file can't
       // loop us forever, with resume so the viewer doesn't lose their spot.
+      const mediaErr = video.error
       const now = Date.now()
       if (!gateRef.current.canAttempt(now)) {
         if (gateRef.current.attempts() > 0) {
-          logPlayback('media error — recovery budget exhausted, showing retry UI')
-          setUrlError('Playback failed repeatedly. Check your connection and retry.')
+          logPlayback('media error — recovery budget exhausted, showing retry UI', { code: mediaErr?.code, message: mediaErr?.message })
+          // MediaError code 4 = SRC_NOT_SUPPORTED: after several fresh signed
+          // URLs it is a codec/container problem, not a connection problem —
+          // say so instead of blaming the network (classic iOS symptom).
+          setUrlError(mediaErr?.code === 4
+            ? 'This device could not play the video (format may be unsupported). Try downloading it, or contact support.'
+            : `Playback failed repeatedly. Check your connection and retry.${mediaErr ? ` (error ${mediaErr.code})` : ''}`)
         }
         return
       }
       gateRef.current.recordAttempt(now)
-      logPlayback(`media error — refreshing signed URL (attempt ${gateRef.current.attempts()})`)
+      logPlayback(`media error — refreshing signed URL (attempt ${gateRef.current.attempts()})`, { code: mediaErr?.code, message: mediaErr?.message })
       loadSourceRef.current({ resume: true })
     })
     return () => { player.destroy(); playerRef.current = null }
@@ -329,7 +337,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
             inside this div. React must never reconcile other children in here,
             or insertBefore/removeChild would hit a moved node and throw. */}
         <div>
-          <video ref={videoRef} playsInline className="w-full max-h-[80vh] object-contain" />
+          <video ref={videoRef} playsInline preload="metadata" className="w-full max-h-[80vh] object-contain" />
         </div>
         {(loadingSource || urlError) && (
           <div className="absolute inset-0 z-20 bg-zinc-950/90 flex flex-col items-center justify-center gap-2 px-4 text-center">

@@ -61,7 +61,10 @@ export async function getPresignedDownloadUrl(
     ResponseContentDisposition: downloadFileName
       ? `attachment; filename="${sanitizeFilenameForHeader(downloadFileName)}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`
       : undefined,
-    ResponseContentType: contentType ?? undefined,
+    // `|| undefined`, not `?? undefined`: an empty-string mime (stored when the
+    // browser's File.type was blank) must not be signed as a literal empty
+    // Content-Type — iOS Safari refuses to play video served that way.
+    ResponseContentType: contentType || undefined,
   })
   return getSignedUrl(s3, command, { expiresIn })
 }
