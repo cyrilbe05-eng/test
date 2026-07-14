@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-07-14 — iOS stall at 0–1s: fix R2 object metadata, drop playback URL overrides (`e929a5f`)
+
+After the type fix, iOS rendered the first frame but never advanced — iPhones stream via byte
+ranges and our inline URLs always forced a signed `response-content-type` override (multipart
+objects, stored as octet-stream, depended on it). Now playback URLs need **no overrides**:
+multipart create bakes a playable Content-Type into the object (server-side call — the browser-CORS
+reason for omitting it never applied there), and `ensurePlayableObject()` lazily repairs existing
+objects' metadata via one-time CopyObject (≤4.5 GB) on first view — self-healing, no migration.
+Oversized objects keep the override fallback; downloads unchanged.
+
+---
+
 ## 2026-07-14 — HOTFIX for `993bfcf` regression + API typecheck guardrail (`c92544a`)
 
 `993bfcf` shipped **without its import line** (the edit failed mid-session and wasn't re-applied):
