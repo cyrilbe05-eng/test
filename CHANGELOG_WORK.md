@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-07-14 — HOTFIX for `993bfcf` regression + API typecheck guardrail (`c92544a`)
+
+`993bfcf` shipped **without its import line** (the edit failed mid-session and wasn't re-applied):
+every signed-URL/register endpoint threw `ReferenceError: inferMimeType is not defined` → video
+previews errored in production. **Nothing caught it because `api/` was never type-checked**
+(tsconfig includes only `src/`; esbuild bundles unbound identifiers silently). Fixed + guardrail:
+`tsconfig.api.json` now covers `api/**` and runs inside `npm run build`, so this whole bug class
+fails the build from now on.
+
+Also corrected the 993bfcf content-type policy: declaring truthful `video/quicktime` on inline URLs
+makes Chrome refuse `.mov` files it previously played by sniffing. Inline playback now signs a
+browser-playable substitute (`quicktime`/`x-m4v` → `video/mp4`, same container family); downloads
+keep the truthful type. 33 tests green.
+
+---
+
 ## 2026-07-14 — Mobile video playback fix (`993bfcf`)
 
 Operator report: playback broken on mobile. Root cause: videos served without a real Content-Type —
