@@ -35,7 +35,10 @@ export interface StorageAdapter {
 // above MULTIPART_THRESHOLD go multipart so an interruption costs one part
 // instead of the whole file — that resume-not-restart property is worth the
 // extra round-trips on anything a flaky connection takes minutes to move.
-const PART_CONCURRENCY = 6
+// 3, not 6: on a 2–5 Mbit/s uplink more parallel streams just congest each
+// other (slower per-part completion, more bytes at risk per drop). Three
+// streams still saturate links well beyond that.
+const PART_CONCURRENCY = 3
 const PART_MAX_RETRIES = 5
 // Idle-progress timeout: abort a part PUT only if no bytes move for this long.
 // Replaces the old total-time timeout, which would kill long-running parts
@@ -118,8 +121,10 @@ async function apiFetchResilient<T>(
       if (typeof err?.status === 'number') {
         if (err.status < 500) throw err
         serverErrors++
-        if (serverErrors > 3) throw err
-        await sleep(backoffDelayMs(serverErrors), opts.signal)
+        // 8 attempts ≈ 90 s of patience: losing a slow-link upload to a
+        // transient burst of 5xx (e.g. at /complete) is far worse than waiting.
+        if (serverErrors > 8) throw err
+        await sleep(backoffDelayMs(Math.min(serverErrors, 4)), opts.signal)
         continue
       }
       if (!isNetworkError(err)) throw err
@@ -350,6 +355,7 @@ async function uploadMultipart(args: {
     // rejections (and fatal config errors) consume the retry budget.
     let httpFailures = 0
     let netFailures = 0
+    let serverFailures = 0
     for (;;) {
       if (abortController.signal.aborted) throw new Error('aborted')
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -395,7 +401,16 @@ async function uploadMultipart(args: {
           }
           continue
         }
-        // Real HTTP rejection from R2 on this part (not expiry, not network).
+        // R2 5xx = transient server trouble. On a slow link a killed upload
+        // costs the user an hour of transfer — pause and retry indefinitely
+        // (capped backoff, cancellable) instead of dying.
+        if (typeof err?.status === 'number' && err.status >= 500) {
+          serverFailures++
+          reporter.set('retrying')
+          await sleep(backoffDelayMs(Math.min(serverFailures, 4)), abortController.signal)
+          continue
+        }
+        // 4xx rejection from R2 on this part (not expiry): a real refusal.
         httpFailures++
         if (httpFailures >= PART_MAX_RETRIES) {
           throw new Error(`part ${partNumber} was rejected ${PART_MAX_RETRIES} times: ${err?.message ?? 'unknown'}`)

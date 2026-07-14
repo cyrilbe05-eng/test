@@ -3,20 +3,23 @@
  * Kept free of DOM/network so the sizing and backoff behaviour is unit-testable.
  */
 
+// Tuned for the operator's real-world uplink: 2–5 Mbit/s (~0.25–0.6 MB/s)
+// and flaky. Every constant below assumes that link, not office fibre.
+
 /** Files at or above this size upload via R2 multipart so an interruption
- *  costs one part, not the whole file. Below it, a single PUT is cheaper
- *  (multipart adds create/complete round-trips) and a restart is cheap —
- *  at 1 MB/s a full 32 MB restart costs ~30 s, which is tolerable. */
-export const MULTIPART_THRESHOLD = 32 * 1024 * 1024 // 32 MB
+ *  costs one part, not the whole file. At 0.4 MB/s a 16 MB restart already
+ *  costs ~40 s — anything bigger must be resumable. */
+export const MULTIPART_THRESHOLD = 16 * 1024 * 1024 // 16 MB
 
 /** Smallest part we ever use. S3/R2 require ≥5 MB (except the last part).
- *  16 MB keeps the retry cost on a genuinely bad link short (~16 s at
- *  1 MB/s) — a connection that drops every 30 s can still finish a part,
- *  which it never could at 50 MB. Concurrency hides the extra round-trips. */
-export const MIN_PART_SIZE = 16 * 1024 * 1024 // 16 MB
+ *  8 MB ≈ 20–30 s per part at 2–4 Mbit/s, so a connection that drops every
+ *  minute still completes parts and loses at most a few MB per drop. */
+export const MIN_PART_SIZE = 8 * 1024 * 1024 // 8 MB
 
-/** Aim for at most this many parts; bigger files get bigger parts. */
-export const TARGET_MAX_PARTS = 500
+/** Aim for at most this many parts; bigger files get bigger parts.
+ *  2000 × 8 MB keeps small parts up to 16 GB files (part-count overhead is
+ *  trivial next to transfer time on a slow link). */
+export const TARGET_MAX_PARTS = 2000
 
 /** Hard S3/R2 protocol limit. */
 export const MAX_PARTS = 10_000

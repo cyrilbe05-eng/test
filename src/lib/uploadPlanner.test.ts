@@ -37,11 +37,15 @@ describe('computePartSize / computePartCount', () => {
   it('a 200 MB file gets multipart with small, cheap-to-retry parts', () => {
     const size = 200 * MB
     expect(size >= MULTIPART_THRESHOLD).toBe(true)
-    expect(computePartCount(size, computePartSize(size))).toBe(13) // 16 MB parts
+    expect(computePartCount(size, computePartSize(size))).toBe(25) // 8 MB parts
   })
 
-  it('a 40 MB file is above the threshold (resume-not-restart for typical videos)', () => {
-    expect(40 * MB >= MULTIPART_THRESHOLD).toBe(true)
+  it('a 20 MB file is above the threshold (resume-not-restart on a 2–5 Mbit/s link)', () => {
+    expect(20 * MB >= MULTIPART_THRESHOLD).toBe(true)
+  })
+
+  it('parts stay small (cheap to retry) up to multi-GB files', () => {
+    expect(computePartSize(4 * GB)).toBe(MIN_PART_SIZE) // 8 MB parts even at 4 GB
   })
 })
 
