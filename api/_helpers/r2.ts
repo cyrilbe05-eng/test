@@ -132,9 +132,14 @@ export async function replaceObjectContentType(key: string, contentType: string)
   }))
 }
 
-// CopyObject's single-request ceiling; larger objects would need multipart
-// copy, so we leave those to the response-override fallback instead.
-const COPY_REPAIR_MAX_BYTES = 4.5 * 1024 * 1024 * 1024
+// Ceiling for the INLINE lazy repair. This copy runs synchronously inside a
+// signed-URL request, and the Vercel function dies at 60 s — a multi-GB
+// CopyObject can blow straight through that, which made playback of large
+// LEGACY files (wrong stored metadata) fail with a timeout on every attempt.
+// 1.5 GB copies complete comfortably within budget; anything larger keeps the
+// response-override fallback (plays everywhere desktop; iPhones may still
+// prefer a review copy for those legacy giants).
+const COPY_REPAIR_MAX_BYTES = 1.5 * 1024 * 1024 * 1024
 
 /** Make sure an object streams with a playable Content-Type, preferring to
  *  FIX THE OBJECT over overriding per-request.
@@ -158,8 +163,17 @@ export async function ensurePlayableObject(
     if (!head) return playback
     if (head.contentType === playback) return null
     if (head.size > 0 && head.size <= COPY_REPAIR_MAX_BYTES) {
-      await replaceObjectContentType(key, playback)
-      return null
+      // Hard time budget even within the size gate: a slow copy must not
+      // hold the playback request hostage. On timeout we serve the override
+      // now; if the copy still completes, the next view finds clean metadata.
+      const copy = replaceObjectContentType(key, playback)
+        .then(() => 'done' as const)
+        .catch(() => 'failed' as const)
+      const outcome = await Promise.race([
+        copy,
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 25_000)),
+      ])
+      if (outcome === 'done') return null
     }
   } catch {
     // Repair is best-effort — the override below still yields a working URL.
