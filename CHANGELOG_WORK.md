@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-14 — One-click review-copy generation from the original (`8c95625`)
+
+"⚙ Generate review copy" streams the uploaded deliverable straight from R2 into the in-browser
+compressor — no local file, no re-export. Recorder pauses while the remote source buffers (stalls
+aren't encoded into the output). Local-file path stays as fallback. **Requires R2 bucket CORS to
+allow GET from the app origin** — generation fails with an actionable message if missing.
+≤25 MB originals short-circuit ("already small enough").
+
+---
+
 ## 2026-07-14 — In-browser compression + buffering overlay (`b4dfc53`)
 
 Review copies are now generated **in the editor's browser** — pick the normal full-quality export,
