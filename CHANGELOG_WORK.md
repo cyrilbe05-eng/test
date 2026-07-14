@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-14 — Buffering visibility + upload retry pacing (`c363663`)
+
+Mobile "plays 7–8 s then stops" = buffer starvation (high-bitrate export vs slow link), not a
+defect: player now shows a debounced "Buffering…" chip and logs `bufferedAhead` so starvation is
+distinguishable from stalls. *Durable fix if clients review on cellular would be preview renditions
+/ adaptive streaming (e.g. Cloudflare Stream) — operator decision, costs money.*
+
+Upload slowdown report: we probe-verified the link after each network failure and then ALSO slept
+1–4 s backoff — dead time removed (immediate retry after a passing probe; short jittered pause only
+on back-to-back failures). Probe timeout 5→8 s so a saturated uplink isn't misread as offline.
+
+---
+
 ## 2026-07-14 — iOS stall at 0–1s: fix R2 object metadata, drop playback URL overrides (`e929a5f`)
 
 After the type fix, iOS rendered the first frame but never advanced — iPhones stream via byte
