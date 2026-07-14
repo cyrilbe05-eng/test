@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-07-14 — Upload retune for 2–5 Mbit/s + review copies (`5020b2e`, `515c39d`)
+
+> **⚠️ ACTION REQUIRED (one-time):** run migration 004 in the D1 console (ppingu):
+> `ALTER TABLE project_files ADD COLUMN preview_storage_key TEXT;`
+> `ALTER TABLE project_files ADD COLUMN preview_file_size INTEGER;`
+> Deploy-safe pre-migration; only "Add review copy" errors until applied. Down script included.
+
+- **Upload pipeline retuned for the operator's real uplink (2–5 Mbit/s, flaky):** 8 MB parts
+  (was 16), concurrency 3 (was 6 — thin uplinks congest), threshold 16 MB, TARGET_MAX_PARTS 2000.
+  R2 5xx on parts no longer kills uploads (endless capped-backoff retry, cancellable);
+  control-plane 5xx patience 3→8 attempts.
+- **Zero-cost slow-link playback ("do the 0 cost one"):** deliverables can carry a low-bitrate
+  review copy. Clients stream it automatically; admin/team QC and all downloads use the original.
+  Attach/replace/remove under each deliverable (team uploader or admin). R2 cleanup on delete.
+
+---
+
 ## 2026-07-14 — Buffering visibility + upload retry pacing (`c363663`)
 
 Mobile "plays 7–8 s then stops" = buffer starvation (high-bitrate export vs slow link), not a
