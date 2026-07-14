@@ -14,7 +14,8 @@ import type { FileType } from '@/types'
 export type { UploadConnectionState }
 
 export interface StorageAdapter {
-  /** Upload a file. Returns an opaque storage key — never a URL. */
+  /** Upload a file. Returns an opaque storage key — never a URL — plus the
+   *  registered project_files row id (absent for preview artifacts). */
   upload(params: {
     file: File
     projectId: string
@@ -22,7 +23,12 @@ export interface StorageAdapter {
     onProgress?: (percent: number) => void
     /** Fires when the connection quality state changes (retrying/offline/uploading). */
     onConnectionState?: (state: UploadConnectionState) => void
-  }): Promise<{ key: string }>
+    /** Review-copy bytes: skips project_files registration and the
+     *  deliverable cap; stored under the project's preview/ key namespace.
+     *  The caller attaches the returned key to a deliverable row via
+     *  POST /api/project-files/:id/preview. */
+    previewArtifact?: boolean
+  }): Promise<{ key: string; fileId?: string }>
 
   /** Get a short-lived signed URL. Never cache or persist this. */
   getSignedUrl(key: string, expiresInSeconds?: number): Promise<string>
@@ -142,11 +148,12 @@ export function useStorageAdapter(): StorageAdapter {
   const apiFetch = useApiFetch()
 
   return {
-    async upload({ file, projectId, fileType, onProgress, onConnectionState }) {
+    async upload({ file, projectId, fileType, onProgress, onConnectionState, previewArtifact }) {
       if (file.size >= MULTIPART_THRESHOLD) {
-        const key = await uploadMultipart({ file, projectId, fileType, onProgress, onConnectionState, apiFetch })
-        await registerWithRetry({ apiFetch, projectId, fileType, key, file })
-        return { key }
+        const key = await uploadMultipart({ file, projectId, fileType, onProgress, onConnectionState, apiFetch, previewArtifact })
+        if (previewArtifact) return { key }
+        const registered = await registerWithRetry({ apiFetch, projectId, fileType, key, file })
+        return { key, fileId: registered?.id }
       }
 
       // ── Single-PUT path (small files, < 32 MB) ──────────────────────────
@@ -167,6 +174,7 @@ export function useStorageAdapter(): StorageAdapter {
               fileName: file.name,
               mimeType: file.type,
               fileSize: file.size,
+              previewArtifact: previewArtifact ?? false,
             }),
           },
           { onNetworkWait: () => reporter.set('offline') },
@@ -219,8 +227,9 @@ export function useStorageAdapter(): StorageAdapter {
         }
       }
 
-      await registerWithRetry({ apiFetch, projectId, fileType, key, file })
-      return { key }
+      if (previewArtifact) return { key }
+      const registered = await registerWithRetry({ apiFetch, projectId, fileType, key, file })
+      return { key, fileId: registered?.id }
     },
 
     async getSignedUrl(_key, _expiresInSeconds = 3600) {
@@ -268,8 +277,9 @@ async function uploadMultipart(args: {
   onProgress?: (percent: number) => void
   onConnectionState?: (state: UploadConnectionState) => void
   apiFetch: ReturnType<typeof useApiFetch>
+  previewArtifact?: boolean
 }): Promise<string> {
-  const { file, projectId, fileType, onProgress, onConnectionState, apiFetch } = args
+  const { file, projectId, fileType, onProgress, onConnectionState, apiFetch, previewArtifact } = args
   const reporter = createConnectionReporter(onConnectionState)
 
   const partSize = computePartSize(file.size)
@@ -291,6 +301,7 @@ async function uploadMultipart(args: {
       mimeType: file.type,
       fileSize: file.size,
       partCount,
+      previewArtifact: previewArtifact ?? false,
     }),
   }, { onNetworkWait: () => reporter.set('offline') })
   reporter.set('uploading')
@@ -574,13 +585,13 @@ async function registerWithRetry(args: {
   fileType: FileType
   key: string
   file: File
-}): Promise<void> {
+}): Promise<{ id?: string } | null> {
   const { apiFetch, projectId, fileType, key, file } = args
   try {
     // Resilient: the file is already safe in R2 at this point — losing the
     // registration to a network blip would orphan it, so network failures
     // wait for connectivity and retry rather than giving up after 3 tries.
-    await apiFetchResilient(apiFetch, '/api/project-files/register', {
+    return await apiFetchResilient<{ id?: string }>(apiFetch, '/api/project-files/register', {
       method: 'POST',
       body: JSON.stringify({
         project_id: projectId,

@@ -1115,13 +1115,16 @@ async function handleGetProjectFileUploadUrl(req: VercelRequest, res: VercelResp
   try {
     const { profile } = await requireAuth(req)
 
-    const { projectId, fileType, fileName, mimeType, fileSize } = req.body
+    const { projectId, fileType, fileName, mimeType, fileSize, previewArtifact } = req.body
 
     if (!projectId || !fileType || !fileName) {
       res.status(400).json({ error: 'projectId, fileType, and fileName required' }); return
     }
 
-    await enforceDeliverableCap(profile, projectId, fileType)
+    // Review-copy artifacts attach to an EXISTING deliverable row (they never
+    // become their own project_files row), so the deliverable cap does not
+    // apply to them. Storage limits below still do.
+    if (!previewArtifact) await enforceDeliverableCap(profile, projectId, fileType)
 
     if (profile.role === 'client' && profile.plan_id) {
       const [planRow] = await dbQuery<PlanRow>(
@@ -1144,7 +1147,8 @@ async function handleGetProjectFileUploadUrl(req: VercelRequest, res: VercelResp
       }
     }
 
-    const key = `projects/${projectId}/${fileType}/${Date.now()}-${sanitizeFileName(fileName)}`
+    const keyKind = previewArtifact ? 'preview' : fileType
+    const key = `projects/${projectId}/${keyKind}/${Date.now()}-${sanitizeFileName(fileName)}`
     const uploadUrl = await getPresignedUploadUrl(key, mimeType ?? 'application/octet-stream')
 
     res.json({ uploadUrl, key })
@@ -1190,7 +1194,7 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     const { profile } = await requireAuth(req)
-    const { projectId, fileType, fileName, fileSize, partCount, mimeType } = req.body
+    const { projectId, fileType, fileName, fileSize, partCount, mimeType, previewArtifact } = req.body
     if (!projectId || !fileType || !fileName || !partCount) {
       res.status(400).json({ error: 'projectId, fileType, fileName, partCount required' }); return
     }
@@ -1198,7 +1202,9 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ error: 'partCount must be 1..10000' }); return
     }
 
-    await enforceDeliverableCap(profile, projectId, fileType)
+    // See handleGetProjectFileUploadUrl: preview artifacts bypass the
+    // deliverable cap (they attach to an existing row), not storage limits.
+    if (!previewArtifact) await enforceDeliverableCap(profile, projectId, fileType)
 
     // Same plan-storage gate as single-PUT path
     if (profile.role === 'client' && profile.plan_id) {
@@ -1222,7 +1228,7 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const key = `projects/${projectId}/${fileType}/${Date.now()}-${sanitizeFileName(fileName)}`
+    const key = `projects/${projectId}/${previewArtifact ? 'preview' : fileType}/${Date.now()}-${sanitizeFileName(fileName)}`
     // Bake a playable Content-Type into the assembled object (server-side
     // call, no browser CORS involved) so playback never needs per-request
     // response-content-type overrides — iOS range-streams plain URLs best.

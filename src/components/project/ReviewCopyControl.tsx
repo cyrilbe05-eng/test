@@ -51,6 +51,9 @@ export function ReviewCopyControl({ file, projectId, canEdit, onChanged }: Props
         file: toUpload,
         projectId,
         fileType: 'deliverable',
+        // Review copies attach to the existing deliverable row — never
+        // registered as their own deliverable (and exempt from the cap).
+        previewArtifact: true,
         onProgress: (pct) => setPhase({ kind: 'uploading', pct }),
       })
       await apiFetch(`/api/project-files/${file.id}/preview`, {
