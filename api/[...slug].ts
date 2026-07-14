@@ -1353,6 +1353,68 @@ async function handleDeleteProjectFile(req: VercelRequest, res: VercelResponse) 
 
     await dbExecute('DELETE FROM project_files WHERE id = ?', [fileId])
     await deleteObject(file.storage_key)
+    // Best-effort: also remove the low-bitrate review copy if one exists.
+    if (file.preview_storage_key) {
+      await deleteObject(file.preview_storage_key).catch(() => {})
+    }
+    res.json({ ok: true })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+/** Attach (POST) or remove (DELETE) a low-bitrate review copy on a
+ *  deliverable. The copy is a separate R2 object the client player streams
+ *  instead of the full-quality original — the zero-cost answer to mobile /
+ *  slow-connection playback. Admin, or the team member who uploaded the
+ *  deliverable, can manage it. */
+async function handleProjectFilePreview(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST' && req.method !== 'DELETE') {
+    res.status(405).json({ error: 'Method not allowed' }); return
+  }
+  try {
+    const { clerkUserId, profile } = await requireAuth(req)
+    const fileId = req.query.id as string
+
+    const [file] = await dbQuery<ProjectFile>(
+      'SELECT * FROM project_files WHERE id = ?',
+      [fileId]
+    )
+    if (!file) { res.status(404).json({ error: 'File not found' }); return }
+    if (file.file_type !== 'deliverable') {
+      res.status(400).json({ error: 'Review copies only apply to deliverables' }); return
+    }
+    if (profile.role !== 'admin' && !(profile.role === 'team' && file.uploader_id === clerkUserId)) {
+      res.status(403).json({ error: 'Forbidden' }); return
+    }
+
+    if (req.method === 'POST') {
+      const { storage_key, file_size } = req.body
+      if (!storage_key) { res.status(400).json({ error: 'storage_key required' }); return }
+      const previous = file.preview_storage_key
+      try {
+        await dbExecute(
+          'UPDATE project_files SET preview_storage_key = ?, preview_file_size = ? WHERE id = ?',
+          [storage_key, file_size ?? null, fileId]
+        )
+      } catch (e: any) {
+        // Column missing until the operator runs db/migrations/004.
+        res.status(500).json({ error: 'Review copies need database migration 004 — run db/migrations/004_preview_copies.sql' }); return
+      }
+      if (previous && previous !== storage_key) {
+        await deleteObject(previous).catch(() => {})
+      }
+      res.json({ ok: true }); return
+    }
+
+    // DELETE — remove the review copy, keep the deliverable.
+    if (file.preview_storage_key) {
+      await deleteObject(file.preview_storage_key).catch(() => {})
+      await dbExecute(
+        'UPDATE project_files SET preview_storage_key = NULL, preview_file_size = NULL WHERE id = ?',
+        [fileId]
+      )
+    }
     res.json({ ok: true })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -1448,9 +1510,17 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
     // object's stored Content-Type (one-time lazy repair) so the URL carries
     // no response overrides at all — iOS range-streams plain URLs the most
     // reliably; overrides only remain as a fallback for un-repairable files.
+    //
+    // Clients stream the low-bitrate REVIEW COPY when one is attached (their
+    // links are 2–5 Mbit/s in practice; the full export starves the buffer).
+    // Admin/team keep the original for quality control, and downloads are
+    // always the original.
+    const previewKey = !wantDownload && profile.role === 'client' ? file.preview_storage_key : null
     const signedUrl = wantDownload
       ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
+      : previewKey
+        ? await getPresignedDownloadUrl(previewKey, 3600, undefined, await ensurePlayableObject(previewKey, previewKey.split('/').pop() ?? file.file_name, null))
+        : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
 
     // Trigger: team member downloading a source file moves project pending_assignment → in_progress
     if (profile.role === 'team' && file.file_type === 'source_video') {
@@ -3858,6 +3928,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug.length === 2 && req.method === 'DELETE') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleDeleteProjectFile(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'preview') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleProjectFilePreview(req, res)
     }
     if (slug.length === 3 && slug[2] === 'approve') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }

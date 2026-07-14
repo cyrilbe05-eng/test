@@ -8,6 +8,7 @@ import { useProject, useProjectFiles, useProjectAssignments, useTimelineComments
 import { TimelineCommentor } from '@/components/project/TimelineCommentor'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
+import { ReviewCopyControl } from '@/components/project/ReviewCopyControl'
 import { useAuth } from '@/hooks/useAuth'
 import { useApiFetch } from '@/lib/api'
 import { formatDistanceToNow } from 'date-fns'
@@ -331,7 +332,17 @@ export default function AdminProjectDetail() {
             <div className="space-y-0.5">
               {deliverables.length === 0
                 ? <p className="text-xs text-muted-foreground">None uploaded</p>
-                : deliverables.map((f) => <FileRow key={f.id} name={f.file_name} size={f.file_size} fileId={f.id} />)}
+                : deliverables.map((f) => (
+                    <div key={f.id}>
+                      <FileRow name={f.file_name} size={f.file_size} fileId={f.id} />
+                      <ReviewCopyControl
+                        file={f}
+                        projectId={project.id}
+                        canEdit
+                        onChanged={() => qc.invalidateQueries({ queryKey: ['project_files', id] })}
+                      />
+                    </div>
+                  ))}
             </div>
           </div>
 

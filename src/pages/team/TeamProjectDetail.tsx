@@ -9,6 +9,7 @@ import { useProject, useProjectFiles, useTimelineComments, useUpdateProjectStatu
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
 import { FileUploader } from '@/components/project/FileUploader'
+import { ReviewCopyControl } from '@/components/project/ReviewCopyControl'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn, projectTimeLabel } from '@/lib/utils'
 
@@ -313,14 +314,21 @@ export default function TeamProjectDetail() {
               </div>
               <div className="p-3 space-y-1">
                 {deliverables.map((f) => (
-                  <FileRow
-                    key={f.id}
-                    name={f.file_name}
-                    size={f.file_size}
-                    fileId={f.id}
-                    canDelete={canUpload}
-                    onDelete={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
-                  />
+                  <div key={f.id}>
+                    <FileRow
+                      name={f.file_name}
+                      size={f.file_size}
+                      fileId={f.id}
+                      canDelete={canUpload}
+                      onDelete={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
+                    />
+                    <ReviewCopyControl
+                      file={f}
+                      projectId={project.id}
+                      canEdit={canUpload}
+                      onChanged={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
+                    />
+                  </div>
                 ))}
               </div>
               {canUpload && (deliverables.length < project.max_deliverables || project.max_deliverables === -1) && (

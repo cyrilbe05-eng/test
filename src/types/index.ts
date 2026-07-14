@@ -96,6 +96,10 @@ export interface ProjectFile {
   mime_type: string | null
   approved: boolean
   created_at: string
+  /** Optional low-bitrate review copy (migration 004). Clients stream this
+   *  instead of the full-quality original when present. */
+  preview_storage_key?: string | null
+  preview_file_size?: number | null
 }
 
 export interface ProjectAssignment {
