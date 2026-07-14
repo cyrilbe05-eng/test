@@ -47,8 +47,10 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
   const [loadingSource, setLoadingSource] = useState(true)
   const [urlError, setUrlError] = useState<string | null>(null)
   // True while playback is starved for data (high-bitrate file vs slow link).
-  // Surfaced as a chip so a stalled video reads as "buffering", not "broken".
+  // Surfaced as a centered overlay so a stalled video reads as "buffering",
+  // not "broken"; repeated stalls escalate the message.
   const [buffering, setBuffering] = useState(false)
+  const [stallCount, setStallCount] = useState(0)
   const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(new Set())
   // B2: the comment being composed is either anchored to one moment or to a
   // section (start → end). Moment mode mirrors the latest pause position;
@@ -199,6 +201,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
           bufferedAhead: Math.round(ahead * 10) / 10,
         })
         setBuffering(true)
+        setStallCount((c) => c + 1)
       }, 800)
     })
     player.on('playing', clearBuffering)
@@ -371,9 +374,14 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
           <video ref={videoRef} playsInline preload="metadata" className="w-full max-h-[80vh] object-contain" />
         </div>
         {buffering && !loadingSource && !urlError && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
-            <div className="w-3 h-3 rounded-full border-2 border-white/80 border-t-transparent animate-spin" />
-            Buffering…
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2.5 bg-black/45 pointer-events-none">
+            <div className="w-10 h-10 rounded-full border-[3px] border-white/85 border-t-transparent animate-spin" />
+            <p className="text-white text-sm font-medium drop-shadow">Buffering…</p>
+            {stallCount >= 3 && (
+              <p className="text-white/85 text-xs px-8 text-center max-w-sm drop-shadow">
+                Your connection is slower than this video’s quality — playback will pause now and then to load. It resumes by itself.
+              </p>
+            )}
           </div>
         )}
         {(loadingSource || urlError) && (
