@@ -10,6 +10,7 @@ import {
   getPresignedPartUrl,
   completeMultipartUpload,
   abortMultipartUpload,
+  ensurePlayableObject,
 } from './_helpers/r2.js'
 import { ok, err, handleError } from './_helpers/respond.js'
 import { inferMimeType, inferPlaybackMimeType } from './_helpers/mime.js'
@@ -1189,7 +1190,7 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     const { profile } = await requireAuth(req)
-    const { projectId, fileType, fileName, fileSize, partCount } = req.body
+    const { projectId, fileType, fileName, fileSize, partCount, mimeType } = req.body
     if (!projectId || !fileType || !fileName || !partCount) {
       res.status(400).json({ error: 'projectId, fileType, fileName, partCount required' }); return
     }
@@ -1222,7 +1223,10 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
     }
 
     const key = `projects/${projectId}/${fileType}/${Date.now()}-${sanitizeFileName(fileName)}`
-    const uploadId = await createMultipartUpload(key)
+    // Bake a playable Content-Type into the assembled object (server-side
+    // call, no browser CORS involved) so playback never needs per-request
+    // response-content-type overrides — iOS range-streams plain URLs best.
+    const uploadId = await createMultipartUpload(key, inferPlaybackMimeType(fileName, mimeType))
     // Presign every part URL up front (1 hour). For very long uploads the
     // client can call /multipart/sign again to refresh expired URLs.
     const partUrls = await Promise.all(
@@ -1440,13 +1444,13 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
     // of allowing playback.
     const wantDownload = String((req.query as any).download ?? '') === '1'
     // Downloads get the truthful type (repaired from the extension when the
-    // stored one is missing/octet-stream). Inline playback gets the
-    // browser-playable variant — e.g. .mov signs as video/mp4, because an
-    // asserted video/quicktime makes Chrome refuse without sniffing, while
-    // iOS needs SOME real video type. See _helpers/mime.ts.
+    // stored one is missing/octet-stream). Inline playback prefers FIXING the
+    // object's stored Content-Type (one-time lazy repair) so the URL carries
+    // no response overrides at all — iOS range-streams plain URLs the most
+    // reliably; overrides only remain as a fallback for un-repairable files.
     const signedUrl = wantDownload
       ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, inferPlaybackMimeType(file.file_name, file.mime_type))
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
 
     // Trigger: team member downloading a source file moves project pending_assignment → in_progress
     if (profile.role === 'team' && file.file_type === 'source_video') {
@@ -2202,7 +2206,7 @@ async function handleGetGallerySignedUrl(req: VercelRequest, res: VercelResponse
     const wantDownload = String((req.query as any).download ?? '') === '1'
     const url = wantDownload
       ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, inferPlaybackMimeType(file.file_name, file.mime_type))
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
     res.json({ url })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -3525,7 +3529,7 @@ async function handleDownload(req: VercelRequest, res: VercelResponse) {
     const wantDownload = String((req.query as any).download ?? '') === '1'
     const signedUrl = wantDownload
       ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, inferPlaybackMimeType(file.file_name, file.mime_type))
+      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
     res.json({ signedUrl })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })

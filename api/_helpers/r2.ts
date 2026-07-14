@@ -3,12 +3,15 @@ import {
   DeleteObjectCommand,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  CopyObjectCommand,
   CreateMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
   UploadPartCommand,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { inferPlaybackMimeType } from './mime.js'
 
 const BUCKET = process.env.CLOUDFLARE_R2_BUCKET_NAME!
 const ACCOUNT_ID = process.env.CLOUDFLARE_R2_ACCOUNT_ID!
@@ -89,12 +92,79 @@ export async function deleteObject(key: string): Promise<void> {
 // MULTIPART_THRESHOLD through this path so that retries cost one part, not
 // the whole file.
 
-/** Start a multipart upload. Returns the uploadId R2 uses to tie parts together. */
-export async function createMultipartUpload(key: string): Promise<string> {
-  // ContentType is intentionally omitted (same reasoning as getPresignedUploadUrl).
-  const out = await s3.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: key }))
+/** Start a multipart upload. Returns the uploadId R2 uses to tie parts together.
+ *
+ *  ContentType here is SAFE to set (unlike on presigned browser PUTs): this is
+ *  a server→R2 API call, so no browser CORS preflight is involved, and it
+ *  becomes the assembled object's stored Content-Type. Without it, multipart
+ *  objects land as application/octet-stream and video playback then depends
+ *  on per-request response-content-type overrides — which iOS streaming
+ *  handles poorly. */
+export async function createMultipartUpload(key: string, contentType?: string | null): Promise<string> {
+  const out = await s3.send(new CreateMultipartUploadCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: contentType || undefined,
+  }))
   if (!out.UploadId) throw new Error('R2 did not return UploadId')
   return out.UploadId
+}
+
+/** Read an object's stored metadata (null if it does not exist). */
+export async function headObject(key: string): Promise<{ contentType: string | null; size: number } | null> {
+  try {
+    const out = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }))
+    return { contentType: out.ContentType ?? null, size: out.ContentLength ?? 0 }
+  } catch {
+    return null
+  }
+}
+
+/** Rewrite an object's stored Content-Type in place (metadata-replace copy).
+ *  R2 CopyObject supports objects up to ~5 GB; callers must gate on size. */
+export async function replaceObjectContentType(key: string, contentType: string): Promise<void> {
+  await s3.send(new CopyObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    CopySource: encodeURIComponent(`${BUCKET}/${key}`),
+    MetadataDirective: 'REPLACE',
+    ContentType: contentType,
+  }))
+}
+
+// CopyObject's single-request ceiling; larger objects would need multipart
+// copy, so we leave those to the response-override fallback instead.
+const COPY_REPAIR_MAX_BYTES = 4.5 * 1024 * 1024 * 1024
+
+/** Make sure an object streams with a playable Content-Type, preferring to
+ *  FIX THE OBJECT over overriding per-request.
+ *
+ *  Returns the response-content-type override to sign, or null when the
+ *  object's own metadata is already correct (the ideal case: iOS streams
+ *  ranged video most reliably from plain URLs with no response overrides).
+ *  When metadata is wrong (e.g. multipart uploads landed as octet-stream
+ *  before create started setting ContentType), repair it in place — a
+ *  one-time metadata copy per file — so every future URL is override-free.
+ *  Objects too large to copy fall back to the signed override. */
+export async function ensurePlayableObject(
+  key: string,
+  fileName: string,
+  dbMime?: string | null,
+): Promise<string | null> {
+  const playback = inferPlaybackMimeType(fileName, dbMime)
+  if (!playback) return null
+  try {
+    const head = await headObject(key)
+    if (!head) return playback
+    if (head.contentType === playback) return null
+    if (head.size > 0 && head.size <= COPY_REPAIR_MAX_BYTES) {
+      await replaceObjectContentType(key, playback)
+      return null
+    }
+  } catch {
+    // Repair is best-effort — the override below still yields a working URL.
+  }
+  return playback
 }
 
 /** Presign a single UploadPart URL. Each part gets its own signed PUT URL.
