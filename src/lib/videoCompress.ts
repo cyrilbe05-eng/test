@@ -1,18 +1,28 @@
 /**
  * In-browser video compression for review copies — no server, no deps.
  *
- * The deliverable plays once (silently, rerouted through WebAudio) into a
- * downscaled canvas while MediaRecorder re-encodes the result at a bitrate
- * a 2–5 Mbit/s client connection can actually stream. Encoding runs in real
- * time, so a 3-minute video takes ~3 minutes — still far cheaper than a
- * second export round-trip through the editing suite, and the upload that
- * follows is ~10× smaller than the original.
+ * The source (a local file, or the already-uploaded deliverable streamed
+ * straight from R2 via its signed URL) plays once — silently, rerouted
+ * through WebAudio — into a downscaled canvas while MediaRecorder re-encodes
+ * the result at a bitrate a 2–5 Mbit/s client connection can actually
+ * stream. Encoding runs in real time (a 3-minute video takes ~3 minutes);
+ * when the remote source buffers, the recorder pauses so stalls don't get
+ * baked into the output.
  */
 
 const TARGET_HEIGHT = 720
 const VIDEO_BITS_PER_SECOND = 3_000_000 // ~3 Mbit/s video
 const AUDIO_BITS_PER_SECOND = 128_000
 const FPS = 30
+
+export type CompressSource =
+  | File
+  | {
+      /** Signed URL of the uploaded original (must be CORS-readable). */
+      url: string
+      /** Original filename — used to name the compressed output. */
+      name: string
+    }
 
 interface MimeChoice {
   mime: string
@@ -50,15 +60,23 @@ export function canCompressInBrowser(): boolean {
  *  Throws with a human-readable message on any failure — callers fall back to
  *  letting the user upload a pre-compressed file. */
 export async function compressVideoInBrowser(
-  source: File,
+  source: CompressSource,
   onProgress?: (percent: number) => void,
 ): Promise<File> {
   const picked = pickMimeType()
   if (!picked) throw new Error('This browser cannot compress video — upload a pre-compressed file instead')
 
-  const url = URL.createObjectURL(source)
+  const isLocalFile = source instanceof File
+  const sourceName = isLocalFile ? source.name : source.name
+  const objectUrl = isLocalFile ? URL.createObjectURL(source) : null
+
   const video = document.createElement('video')
-  video.src = url
+  // Remote sources need CORS-clean frames, or drawImage taints the canvas and
+  // the capture goes black. With crossOrigin set, a bucket whose CORS policy
+  // lacks GET fails LOUDLY at load time instead — which we turn into a
+  // actionable error message below.
+  if (!isLocalFile) video.crossOrigin = 'anonymous'
+  video.src = objectUrl ?? (source as { url: string }).url
   video.playsInline = true
   video.preload = 'auto'
 
@@ -69,7 +87,11 @@ export async function compressVideoInBrowser(
   try {
     await new Promise<void>((resolve, reject) => {
       video.onloadedmetadata = () => resolve()
-      video.onerror = () => reject(new Error('Could not read this video file'))
+      video.onerror = () => reject(new Error(
+        isLocalFile
+          ? 'Could not read this video file'
+          : 'Could not load the original from storage — the R2 bucket CORS policy must allow GET from this site. You can still pick a local file instead.',
+      ))
     })
 
     const duration = video.duration
@@ -113,6 +135,22 @@ export async function compressVideoInBrowser(
       recorder.onerror = () => reject(new Error('Compression failed while encoding'))
     })
 
+    // A remote source stalls when the downlink can't keep up. Pause the
+    // recorder during those gaps so frozen frames don't get encoded into
+    // the review copy; resume when playback resumes.
+    let recordingStarted = false
+    video.addEventListener('playing', () => {
+      if (!recordingStarted) {
+        recordingStarted = true
+        recorder.start(1000)
+      } else if (recorder.state === 'paused') {
+        recorder.resume()
+      }
+    })
+    video.addEventListener('waiting', () => {
+      if (recorder.state === 'recording') recorder.pause()
+    })
+
     // setInterval (not requestAnimationFrame): rAF halts completely in a
     // backgrounded tab; an interval keeps painting — throttled, but the
     // recording survives brief tab switches.
@@ -123,7 +161,6 @@ export async function compressVideoInBrowser(
       }
     }, 1000 / FPS)
 
-    recorder.start(1000)
     await audioCtx.resume().catch(() => {})
     try {
       await video.play()
@@ -132,17 +169,18 @@ export async function compressVideoInBrowser(
     }
     await new Promise<void>((resolve) => { video.onended = () => resolve() })
     ctx.drawImage(video, 0, 0, w, h) // make sure the final frame lands
-    recorder.stop()
+    if (recorder.state !== 'inactive') recorder.stop()
     const blob = await recorded
 
     if (blob.size === 0) throw new Error('Compression produced an empty file')
     onProgress?.(100)
-    const base = source.name.replace(/\.[^.]+$/, '')
+    const base = sourceName.replace(/\.[^.]+$/, '')
     return new File([blob], `${base}_review.${picked.ext}`, { type: blob.type })
   } finally {
     if (paint) clearInterval(paint)
     canvasStream?.getTracks().forEach((t) => t.stop())
     audioCtx?.close().catch(() => {})
-    URL.revokeObjectURL(url)
+    video.removeAttribute('src')
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
   }
 }

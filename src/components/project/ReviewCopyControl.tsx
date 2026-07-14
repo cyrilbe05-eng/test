@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useApiFetch } from '@/lib/api'
-import { useStorageAdapter } from '@/lib/storage'
-import { canCompressInBrowser, compressVideoInBrowser } from '@/lib/videoCompress'
+import { useStorageAdapter, getSignedUrlById } from '@/lib/storage'
+import { canCompressInBrowser, compressVideoInBrowser, type CompressSource } from '@/lib/videoCompress'
 import type { ProjectFile } from '@/types'
 
 interface Props {
@@ -37,17 +37,14 @@ export function ReviewCopyControl({ file, projectId, canEdit, onChanged }: Props
 
   const hasPreview = !!file.preview_storage_key
 
-  const attach = async (picked: File) => {
+  const compressAndAttach = async (source: CompressSource, alreadySmall = false) => {
     try {
-      let toUpload = picked
-      if (picked.size > SKIP_COMPRESS_UNDER_BYTES && canCompressInBrowser()) {
+      let toUpload: File
+      if (alreadySmall && source instanceof File) {
+        toUpload = source
+      } else {
         setPhase({ kind: 'compressing', pct: 0 })
-        toUpload = await compressVideoInBrowser(picked, (pct) => setPhase({ kind: 'compressing', pct }))
-      } else if (picked.size > SKIP_COMPRESS_UNDER_BYTES) {
-        // Browser can't compress and the file is heavy — uploading it as a
-        // "review copy" would defeat the purpose.
-        toast.error('This browser cannot compress video. Export a smaller file (~720p) and upload that instead.')
-        return
+        toUpload = await compressVideoInBrowser(source, (pct) => setPhase({ kind: 'compressing', pct }))
       }
       setPhase({ kind: 'uploading', pct: 0 })
       const { key } = await storageAdapter.upload({
@@ -67,6 +64,36 @@ export function ReviewCopyControl({ file, projectId, canEdit, onChanged }: Props
     } finally {
       setPhase(null)
     }
+  }
+
+  /** One-click: stream the uploaded original from R2 into the compressor. */
+  const generateFromOriginal = async () => {
+    if (!canCompressInBrowser()) {
+      toast.error('This browser cannot compress video — pick a pre-compressed local file instead.')
+      return
+    }
+    if ((file.file_size ?? 0) > 0 && (file.file_size ?? 0) <= SKIP_COMPRESS_UNDER_BYTES) {
+      toast.info('The original is already small enough to stream — no review copy needed.')
+      return
+    }
+    try {
+      setPhase({ kind: 'compressing', pct: 0 })
+      const url = await getSignedUrlById(apiFetch, file.id)
+      await compressAndAttach({ url, name: file.file_name })
+    } catch (e: any) {
+      setPhase(null)
+      toast.error(e?.message ?? 'Failed to generate review copy')
+    }
+  }
+
+  const attach = async (picked: File) => {
+    if (picked.size > SKIP_COMPRESS_UNDER_BYTES && !canCompressInBrowser()) {
+      // Browser can't compress and the file is heavy — uploading it as a
+      // "review copy" would defeat the purpose.
+      toast.error('This browser cannot compress video. Export a smaller file (~720p) and upload that instead.')
+      return
+    }
+    await compressAndAttach(picked, picked.size <= SKIP_COMPRESS_UNDER_BYTES)
   }
 
   const remove = async () => {
@@ -93,11 +120,19 @@ export function ReviewCopyControl({ file, projectId, canEdit, onChanged }: Props
         <>
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
-            title="Pick your full-quality export — it is compressed to ~720p in the browser and clients stream that instead of the heavy original. Fixes buffering on slow connections."
+            onClick={generateFromOriginal}
+            title="Streams the uploaded original and compresses it to ~720p in your browser — takes about the video's length. Clients then stream the small copy instead of the heavy original."
             className="text-[10px] text-primary hover:underline"
           >
-            {hasPreview ? 'Replace review copy' : '+ Add review copy for slow connections'}
+            {hasPreview ? 'Regenerate review copy' : '⚙ Generate review copy for slow connections'}
+          </button>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            title="Alternatively, pick a local file (your full-quality export gets compressed in the browser, or a small file uploads as-is)."
+            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            from local file
           </button>
           {hasPreview && (
             <button type="button" onClick={remove} className="text-[10px] text-muted-foreground hover:text-destructive transition-colors">
