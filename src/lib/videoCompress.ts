@@ -29,14 +29,15 @@ interface MimeChoice {
   ext: string
 }
 
-/** Prefer MP4/H.264 (plays everywhere incl. iOS); fall back to WebM. */
+/** MP4/H.264 ONLY. WebM output was originally a fallback, but review copies
+ *  are watched by clients on iPhones — where WebM support is unreliable — so
+ *  a WebM copy can render the review page unplayable. Browsers that cannot
+ *  record MP4 simply don't offer compression (manual upload still works). */
 function pickMimeType(): MimeChoice | null {
   if (typeof MediaRecorder === 'undefined') return null
   const candidates: MimeChoice[] = [
     { mime: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext: 'mp4' },
     { mime: 'video/mp4', ext: 'mp4' },
-    { mime: 'video/webm;codecs=vp9,opus', ext: 'webm' },
-    { mime: 'video/webm', ext: 'webm' },
   ]
   for (const c of candidates) {
     try {
@@ -46,6 +47,30 @@ function pickMimeType(): MimeChoice | null {
     }
   }
   return null
+}
+
+/** Sanity-check that the produced file actually decodes as a video with a
+ *  known finite duration. MediaRecorder output can be subtly broken (no
+ *  duration metadata, dead audio track from a suspended AudioContext) — a
+ *  copy that fails this probe must never reach clients. */
+function probeDecodable(candidate: File): Promise<boolean> {
+  const url = URL.createObjectURL(candidate)
+  return new Promise<boolean>((resolve) => {
+    const probe = document.createElement('video')
+    probe.preload = 'metadata'
+    const timer = setTimeout(() => finish(false), 15_000)
+    const finish = (ok: boolean) => {
+      clearTimeout(timer)
+      probe.removeAttribute('src')
+      URL.revokeObjectURL(url)
+      resolve(ok)
+    }
+    probe.onloadedmetadata = () => {
+      finish(isFinite(probe.duration) && probe.duration > 0 && probe.videoWidth > 0)
+    }
+    probe.onerror = () => finish(false)
+    probe.src = url
+  })
 }
 
 export function canCompressInBrowser(): boolean {
@@ -117,10 +142,17 @@ export async function compressVideoInBrowser(
       // Source-less (no audio) videos still record fine with a silent track.
     }
 
+    // If the AudioContext never reaches 'running' (autoplay policy without a
+    // fresh user gesture), its destination track produces NO samples — and a
+    // recorder waiting forever for audio data can emit a broken file. Record
+    // video-only in that case rather than risk a corrupt copy.
+    await audioCtx.resume().catch(() => {})
+    const audioTracks = audioCtx.state === 'running' ? dest.stream.getAudioTracks() : []
+
     canvasStream = canvas.captureStream(FPS)
     const stream = new MediaStream([
       ...canvasStream.getVideoTracks(),
-      ...dest.stream.getAudioTracks(),
+      ...audioTracks,
     ])
 
     const recorder = new MediaRecorder(stream, {
@@ -161,7 +193,6 @@ export async function compressVideoInBrowser(
       }
     }, 1000 / FPS)
 
-    await audioCtx.resume().catch(() => {})
     try {
       await video.play()
     } catch {
@@ -173,9 +204,14 @@ export async function compressVideoInBrowser(
     const blob = await recorded
 
     if (blob.size === 0) throw new Error('Compression produced an empty file')
-    onProgress?.(100)
     const base = sourceName.replace(/\.[^.]+$/, '')
-    return new File([blob], `${base}_review.${picked.ext}`, { type: blob.type })
+    const out = new File([blob], `${base}_review.${picked.ext}`, { type: blob.type })
+    // Never ship a copy this browser can't even decode itself.
+    if (!(await probeDecodable(out))) {
+      throw new Error('Compression produced an unplayable file — clients will stream the original instead')
+    }
+    onProgress?.(100)
+    return out
   } finally {
     if (paint) clearInterval(paint)
     canvasStream?.getTracks().forEach((t) => t.stop())

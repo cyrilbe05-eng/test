@@ -11,6 +11,7 @@ import {
   completeMultipartUpload,
   abortMultipartUpload,
   ensurePlayableObject,
+  headObject,
 } from './_helpers/r2.js'
 import { ok, err, handleError } from './_helpers/respond.js'
 import { inferMimeType, inferPlaybackMimeType } from './_helpers/mime.js'
@@ -1521,12 +1522,26 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
     // links are 2–5 Mbit/s in practice; the full export starves the buffer).
     // Admin/team keep the original for quality control, and downloads are
     // always the original.
-    const previewKey = !wantDownload && profile.role === 'client' ? file.preview_storage_key : null
+    //
+    // A review copy must NEVER be able to take playback down: ?original=1
+    // lets the player force the original (its automatic fallback when a
+    // preview errors), and a preview whose object is missing/broken in R2 is
+    // skipped server-side. The response says which quality was served so the
+    // player knows whether a fallback exists.
+    const wantOriginal = String((req.query as any).original ?? '') === '1'
+    let previewKey = !wantDownload && !wantOriginal && profile.role === 'client'
+      ? (file.preview_storage_key ?? null)
+      : null
+    if (previewKey) {
+      const head = await headObject(previewKey)
+      if (!head || head.size === 0) previewKey = null
+    }
     const signedUrl = wantDownload
       ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
       : previewKey
         ? await getPresignedDownloadUrl(previewKey, 3600, undefined, await ensurePlayableObject(previewKey, previewKey.split('/').pop() ?? file.file_name, null))
         : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
+    const servedQuality: 'preview' | 'original' = previewKey ? 'preview' : 'original'
 
     // Trigger: team member downloading a source file moves project pending_assignment → in_progress
     if (profile.role === 'team' && file.file_type === 'source_video') {
@@ -1540,7 +1555,7 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
       }
     }
 
-    res.json({ signedUrl })
+    res.json({ signedUrl, quality: servedQuality })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }

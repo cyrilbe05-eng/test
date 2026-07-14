@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { useApiFetch } from '@/lib/api'
-import { getSignedUrlById } from '@/lib/storage'
+import { getPlaybackSource } from '@/lib/storage'
 import { createRecoveryGate } from '@/lib/playbackRecovery'
 import { formatTimestamp } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -105,6 +105,13 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     }
   }, [])
 
+  // Which quality the server actually gave us, and whether we've fallen back
+  // to the original. A broken review copy must never block review: the first
+  // media error while on 'preview' switches to the original permanently for
+  // this file, instead of burning recovery attempts on a bad copy.
+  const qualityRef = useRef<'preview' | 'original'>('original')
+  const forceOriginalRef = useRef(false)
+
   /** Fetch a fresh signed URL (3 attempts, linear backoff) and apply it. */
   const loadSource = useCallback(async (opts: { resume?: boolean } = {}) => {
     const seq = ++loadSeq.current
@@ -113,9 +120,10 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     let lastErr: any
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const url = await getSignedUrlById(apiFetch, fileId)
+        const { signedUrl, quality } = await getPlaybackSource(apiFetch, fileId, { forceOriginal: forceOriginalRef.current })
         if (seq !== loadSeq.current) return // superseded by a newer load (fileId change)
-        applySource(url, opts.resume ?? false)
+        qualityRef.current = quality
+        applySource(signedUrl, opts.resume ?? false)
         setLoadingSource(false)
         return
       } catch (e: any) {
@@ -142,6 +150,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
   // (Re)load the source when the deliverable changes.
   useEffect(() => {
     gateRef.current.reset()
+    forceOriginalRef.current = false
     setDuration(0)
     loadSource({ resume: false })
   }, [fileId, loadSource])
@@ -207,6 +216,14 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     player.on('playing', clearBuffering)
     player.on('pause', clearBuffering)
     player.on('error', () => {
+      // A failing REVIEW COPY falls back to the original immediately — a bad
+      // preview must never block review (the original always exists).
+      if (qualityRef.current === 'preview' && !forceOriginalRef.current) {
+        forceOriginalRef.current = true
+        logPlayback('review copy failed to play — falling back to the original', { code: video.error?.code })
+        loadSourceRef.current({ resume: true })
+        return
+      }
       // Expired signed URL (R2 default TTL 1 h) and transient network faults
       // both land here. Recover by re-signing — gated so a broken file can't
       // loop us forever, with resume so the viewer doesn't lose their spot.

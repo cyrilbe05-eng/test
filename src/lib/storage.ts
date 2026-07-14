@@ -259,6 +259,21 @@ export async function getSignedUrlById(
   return signedUrl
 }
 
+/** Playback source with quality info: clients may get the low-bitrate review
+ *  copy ('preview'); pass forceOriginal to demand the original — the player's
+ *  automatic fallback when a preview turns out to be unplayable. */
+export async function getPlaybackSource(
+  apiFetch: ReturnType<typeof useApiFetch>,
+  fileId: string,
+  opts: { forceOriginal?: boolean } = {},
+): Promise<{ signedUrl: string; quality: 'preview' | 'original' }> {
+  const qs = opts.forceOriginal ? '?original=1' : ''
+  const res = await apiFetch<{ signedUrl: string; quality?: 'preview' | 'original' }>(
+    `/api/project-files/${fileId}/signed-url${qs}`
+  )
+  return { signedUrl: res.signedUrl, quality: res.quality ?? 'original' }
+}
+
 // ── Multipart upload ────────────────────────────────────────────────────────
 // Splits the file into computePartSize() chunks, uploads PART_CONCURRENCY at a time
 // directly to R2 via presigned URLs, retries each chunk independently on
