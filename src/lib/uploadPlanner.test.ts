@@ -8,6 +8,7 @@ import {
   computePartCount,
   computePartSize,
   createConnectionReporter,
+  isNetworkError,
 } from './uploadPlanner'
 
 const GB = 1024 * 1024 * 1024
@@ -33,10 +34,35 @@ describe('computePartSize / computePartCount', () => {
     }
   })
 
-  it('a 200 MB file gets multipart with a handful of parts', () => {
+  it('a 200 MB file gets multipart with small, cheap-to-retry parts', () => {
     const size = 200 * MB
     expect(size >= MULTIPART_THRESHOLD).toBe(true)
-    expect(computePartCount(size, computePartSize(size))).toBe(4)
+    expect(computePartCount(size, computePartSize(size))).toBe(13) // 16 MB parts
+  })
+
+  it('a 40 MB file is above the threshold (resume-not-restart for typical videos)', () => {
+    expect(40 * MB >= MULTIPART_THRESHOLD).toBe(true)
+  })
+})
+
+describe('isNetworkError', () => {
+  it('classifies transport-level failures as network errors', () => {
+    expect(isNetworkError(new Error('network'))).toBe(true) // XHR onerror marker
+    expect(isNetworkError(new Error('part upload stalled — no progress'))).toBe(true)
+    expect(isNetworkError(new TypeError('Failed to fetch'))).toBe(true) // Chrome
+    expect(isNetworkError(new TypeError('NetworkError when attempting to fetch resource.'))).toBe(true) // Firefox
+  })
+
+  it('never classifies an error carrying an HTTP status as a network error', () => {
+    expect(isNetworkError(Object.assign(new Error('Failed to fetch'), { status: 500 }))).toBe(false)
+    expect(isNetworkError(Object.assign(new Error('Forbidden'), { status: 403 }))).toBe(false)
+    expect(isNetworkError(Object.assign(new Error('upload failed (500)'), { status: 500 }))).toBe(false)
+  })
+
+  it('does not classify ordinary errors as network errors', () => {
+    expect(isNetworkError(new Error('revision_limit_reached'))).toBe(false)
+    expect(isNetworkError(null)).toBe(false)
+    expect(isNetworkError(undefined)).toBe(false)
   })
 })
 

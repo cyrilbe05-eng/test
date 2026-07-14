@@ -172,7 +172,7 @@ export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, o
                 <span className={cn('text-[10px] flex-shrink-0', it.conn === 'retrying' || it.conn === 'offline' ? 'text-amber-500' : 'text-muted-foreground')}>
                   {it.status === 'queued' && 'Queued'}
                   {it.status === 'uploading' && (
-                    it.conn === 'offline' ? 'Offline — will resume automatically'
+                    it.conn === 'offline' ? 'Connection lost — will resume automatically'
                     : it.conn === 'retrying' ? `Connection unstable — retrying… ${it.progress}%`
                     : `${it.progress}%`
                   )}

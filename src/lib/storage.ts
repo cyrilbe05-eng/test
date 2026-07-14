@@ -6,6 +6,7 @@ import {
   computePartCount,
   computePartSize,
   createConnectionReporter,
+  isNetworkError,
   type UploadConnectionState,
 } from './uploadPlanner'
 import type { FileType } from '@/types'
@@ -31,9 +32,9 @@ export interface StorageAdapter {
 }
 
 // Sizing/backoff policy lives in uploadPlanner.ts (unit-tested). Files at or
-// above MULTIPART_THRESHOLD (100 MB) go multipart so an interruption costs one
-// part instead of the whole file — that resume-not-restart property is worth
-// the extra round-trips on anything a flaky connection takes minutes to move.
+// above MULTIPART_THRESHOLD go multipart so an interruption costs one part
+// instead of the whole file — that resume-not-restart property is worth the
+// extra round-trips on anything a flaky connection takes minutes to move.
 const PART_CONCURRENCY = 6
 const PART_MAX_RETRIES = 5
 // Idle-progress timeout: abort a part PUT only if no bytes move for this long.
@@ -44,23 +45,85 @@ const PART_IDLE_TIMEOUT_MS = 90_000 // 90s with zero progress = stalled
 // using it. Below the 24h server TTL with comfortable margin.
 const URL_PROACTIVE_REFRESH_MS = 18 * 60 * 60 * 1000 // 18 hours
 
-/** Resolve once the browser reports connectivity. `online` events are the
- *  primary signal; a poll backs them up (some platforms fire them late or
- *  not at all). Resolves immediately when already online. */
-function waitForOnline(signal?: AbortSignal): Promise<void> {
-  if (typeof navigator === 'undefined' || navigator.onLine) return Promise.resolve()
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    let timer: ReturnType<typeof setInterval> | null = null
-    const finish = () => {
-      if (timer) clearInterval(timer)
-      window.removeEventListener('online', finish)
-      signal?.removeEventListener('abort', finish)
-      resolve()
-    }
-    window.addEventListener('online', finish)
-    signal?.addEventListener('abort', finish)
-    timer = setInterval(() => { if (navigator.onLine) finish() }, 3000)
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', finish); resolve() }, ms)
+    const finish = () => { clearTimeout(timer); resolve() }
+    signal?.addEventListener('abort', finish, { once: true })
   })
+}
+
+/** One cheap reachability check against our own origin. `navigator.onLine`
+ *  alone is NOT trustworthy: it reports "online" whenever a network interface
+ *  is up, even if the link has zero real throughput (flaky Wi-Fi, dead
+ *  cellular, captive portals) — which is exactly the "bad internet" case
+ *  uploads kept dying on. version.txt is a ~10-byte static asset served with
+ *  must-revalidate, so this costs almost nothing. */
+async function probeReachable(signal?: AbortSignal): Promise<boolean> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 5000)
+  const onAbort = () => ctrl.abort()
+  signal?.addEventListener('abort', onAbort, { once: true })
+  try {
+    // ANY HTTP response proves the link works (a 404 in dev — version.txt only
+    // exists in build output — still made a full round-trip). Only a rejected
+    // fetch means the network path is actually down.
+    await fetch(`/version.txt?probe=${Date.now()}`, { cache: 'no-store', signal: ctrl.signal })
+    return true
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
+  }
+}
+
+/** Resolve once the connection is VERIFIED working (probe round-trip), not
+ *  merely when the browser claims to be online. Returns quickly when the
+ *  link is actually fine. Resolves (without throwing) on abort — callers
+ *  check the signal themselves. */
+async function waitForConnectivity(signal?: AbortSignal): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    if (signal?.aborted) return
+    if (typeof navigator === 'undefined' || navigator.onLine) {
+      if (await probeReachable(signal)) return
+    }
+    if (signal?.aborted) return
+    await sleep(Math.min(15_000, 2000 * attempt), signal)
+  }
+}
+
+/** apiFetch with bad-network semantics for upload control-plane calls
+ *  (multipart create/sign/complete, upload-url, register):
+ *  - transport failures: wait for verified connectivity, retry indefinitely
+ *    (the upload is paused, not dead — cancel via signal)
+ *  - HTTP 5xx: transient server hiccup, retry a few times with backoff
+ *  - HTTP 4xx: real answer (auth/validation/limits) — surface immediately */
+async function apiFetchResilient<T>(
+  apiFetch: ReturnType<typeof useApiFetch>,
+  path: string,
+  init: RequestInit,
+  opts: { signal?: AbortSignal; onNetworkWait?: () => void } = {},
+): Promise<T> {
+  let serverErrors = 0
+  for (;;) {
+    if (opts.signal?.aborted) throw new Error('aborted')
+    try {
+      return await apiFetch<T>(path, init)
+    } catch (err: any) {
+      if (opts.signal?.aborted) throw new Error('aborted')
+      if (typeof err?.status === 'number') {
+        if (err.status < 500) throw err
+        serverErrors++
+        if (serverErrors > 3) throw err
+        await sleep(backoffDelayMs(serverErrors), opts.signal)
+        continue
+      }
+      if (!isNetworkError(err)) throw err
+      opts.onNetworkWait?.()
+      await waitForConnectivity(opts.signal)
+    }
+  }
 }
 
 /**
@@ -78,75 +141,69 @@ export function useStorageAdapter(): StorageAdapter {
         return { key }
       }
 
-      // ── Single-PUT path (small files) ───────────────────────────────────
-      // Below MULTIPART_THRESHOLD a restart is cheap; we still wait out
-      // offline gaps (without burning the retry budget) and surface state.
+      // ── Single-PUT path (small files, < 32 MB) ──────────────────────────
+      // A restart is cheap at this size, so no multipart bookkeeping — but the
+      // failure policy matches multipart: transport-level failures pause the
+      // upload until connectivity is VERIFIED, then retry; they never kill it.
+      // Only real HTTP rejections (and repeated 5xx) fail the upload.
       const reporter = createConnectionReporter(onConnectionState)
-      const { uploadUrl, key } = await apiFetch<{ uploadUrl: string; key: string }>(
-        '/api/project-files/upload-url',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            projectId,
-            fileType,
-            fileName: file.name,
-            mimeType: file.type,
-            fileSize: file.size,
-          }),
-        }
-      )
+      const requestUploadUrl = () =>
+        apiFetchResilient<{ uploadUrl: string; key: string }>(
+          apiFetch,
+          '/api/project-files/upload-url',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              projectId,
+              fileType,
+              fileName: file.name,
+              mimeType: file.type,
+              fileSize: file.size,
+            }),
+          },
+          { onNetworkWait: () => reporter.set('offline') },
+        )
 
-      const MAX_RETRIES = 3
-      let attempt = 0
+      let { uploadUrl, key } = await requestUploadUrl()
+      reporter.set('uploading')
+
+      let httpFailures = 0
+      let netFailures = 0
       for (;;) {
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           reporter.set('offline')
-          await waitForOnline()
+          await waitForConnectivity()
           reporter.set('uploading')
         }
         try {
-          await new Promise<void>((resolve, reject) => {
-            const xhr = new XMLHttpRequest()
-            xhr.open('PUT', uploadUrl)
-            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
-
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable) {
-                onProgress?.(Math.round((e.loaded / e.total) * 100))
-              }
-            }
-
-            xhr.onload = () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                onProgress?.(100)
-                resolve()
-              } else {
-                const msg = xhr.responseText?.match(/<Message>(.*?)<\/Message>/)?.[1]
-                reject(new Error(msg ?? `Upload failed (${xhr.status})`))
-              }
-            }
-
-            xhr.onerror = () => reject(new Error('network'))
-            xhr.onabort = () => reject(new Error('Upload was cancelled'))
-            xhr.ontimeout = () => reject(new Error('network'))
-            xhr.timeout = Math.max(300_000, Math.ceil(file.size / (10 * 1024 * 1024)) * 60_000)
-            xhr.send(file)
-          })
+          await putBlob(uploadUrl, file, file.size, undefined, (loaded) => {
+            onProgress?.(Math.round((loaded / file.size) * 100))
+          }, { contentType: file.type || 'application/octet-stream', requireEtag: false })
+          onProgress?.(100)
           reporter.set('uploading')
           break
         } catch (err: any) {
-          const isRetryable = err.message === 'network'
-          if (!isRetryable) throw err
+          if (err?.fatal) throw err
           onProgress?.(0)
-          // A failure while the browser reports offline doesn't consume an
-          // attempt — we pause and auto-resume when connectivity returns.
-          if (typeof navigator !== 'undefined' && !navigator.onLine) continue
-          attempt++
-          if (attempt >= MAX_RETRIES) {
-            throw new Error(`Upload failed after ${MAX_RETRIES} attempts — check your connection`)
+          if (err?.expired) {
+            // Presigned PUT URL expired (long stall / long pause). Get a fresh
+            // one — this issues a new storage key, which is fine: the old key
+            // was never written.
+            ;({ uploadUrl, key } = await requestUploadUrl())
+            continue
           }
+          if (isNetworkError(err)) {
+            netFailures++
+            reporter.set(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'retrying')
+            await waitForConnectivity()
+            await sleep(backoffDelayMs(Math.min(netFailures, 3)))
+            continue
+          }
+          // Real HTTP rejection from R2 (not expiry): retry a little, then surface.
+          httpFailures++
+          if (httpFailures >= 3) throw err
           reporter.set('retrying')
-          await new Promise((r) => setTimeout(r, backoffDelayMs(attempt)))
+          await sleep(backoffDelayMs(httpFailures))
         }
       }
 
@@ -209,11 +266,11 @@ async function uploadMultipart(args: {
     throw new Error(`File too large: would require ${partCount} parts (max ${MAX_PARTS})`)
   }
 
-  const { key, uploadId, partUrls } = await apiFetch<{
+  const { key, uploadId, partUrls } = await apiFetchResilient<{
     key: string
     uploadId: string
     partUrls: Array<{ partNumber: number; url: string }>
-  }>('/api/project-files/multipart/create', {
+  }>(apiFetch, '/api/project-files/multipart/create', {
     method: 'POST',
     body: JSON.stringify({
       projectId,
@@ -223,7 +280,8 @@ async function uploadMultipart(args: {
       fileSize: file.size,
       partCount,
     }),
-  })
+  }, { onNetworkWait: () => reporter.set('offline') })
+  reporter.set('uploading')
 
   // Map partNumber → { url, signedAt } so we can pre-refresh URLs that are
   // close to their server-side TTL before sending. Without this, parts started
@@ -249,12 +307,14 @@ async function uploadMultipart(args: {
   const abortController = new AbortController()
 
   const refreshUrl = async (partNumber: number): Promise<string> => {
-    const { partUrls: refreshed } = await apiFetch<{
+    // Resilient: a dropped connection during re-sign pauses and retries
+    // instead of throwing out of the part loop and killing the whole upload.
+    const { partUrls: refreshed } = await apiFetchResilient<{
       partUrls: Array<{ partNumber: number; url: string }>
-    }>('/api/project-files/multipart/sign', {
+    }>(apiFetch, '/api/project-files/multipart/sign', {
       method: 'POST',
       body: JSON.stringify({ key, uploadId, partNumbers: [partNumber] }),
-    })
+    }, { signal: abortController.signal, onNetworkWait: () => reporter.set('offline') })
     const url = refreshed[0]?.url
     if (!url) throw new Error('failed to refresh part URL')
     urlByPart.set(partNumber, { url, signedAt: Date.now() })
@@ -276,15 +336,18 @@ async function uploadMultipart(args: {
     const blob = file.slice(start, end)
     const blobSize = end - start
 
-    let lastErr: any
-    let attempt = 0
-    while (attempt < PART_MAX_RETRIES) {
+    // Failure policy: transport-level failures (drop, stall, DNS) NEVER kill
+    // the upload — on a bad connection they are expected. We pause until the
+    // link passes a real reachability probe, back off a little, and try the
+    // part again; completed parts are never thrown away. Only genuine HTTP
+    // rejections (and fatal config errors) consume the retry budget.
+    let httpFailures = 0
+    let netFailures = 0
+    for (;;) {
       if (abortController.signal.aborted) throw new Error('aborted')
-      // Offline gap: pause (keeping completed parts) and auto-resume when
-      // connectivity returns. Waiting costs no retry budget.
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         reporter.set('offline')
-        await waitForOnline(abortController.signal)
+        await waitForConnectivity(abortController.signal)
         if (abortController.signal.aborted) throw new Error('aborted')
         reporter.set('uploading')
       }
@@ -292,10 +355,10 @@ async function uploadMultipart(args: {
       // happy path (one Map lookup + Date.now()).
       const url = await getFreshUrl(partNumber)
       try {
-        const etag = await putPart(url, blob, blobSize, abortController.signal, (loaded) => {
+        const etag = await putBlob(url, blob, blobSize, abortController.signal, (loaded) => {
           bytesByPart[partNumber - 1] = loaded
           reportProgress()
-        })
+        }, { requireEtag: true })
         bytesByPart[partNumber - 1] = blobSize
         reportProgress()
         reporter.set('uploading')
@@ -303,7 +366,6 @@ async function uploadMultipart(args: {
       } catch (err: any) {
         if (abortController.signal.aborted) throw err
         if (err?.fatal) throw err
-        lastErr = err
         bytesByPart[partNumber - 1] = 0
         reportProgress()
         // 403 = stale presigned URL: free retry, no backoff, no budget cost.
@@ -312,16 +374,23 @@ async function uploadMultipart(args: {
           await refreshUrl(partNumber)
           continue
         }
-        // Went offline mid-part: loop back to the offline wait above without
-        // consuming an attempt.
-        if (typeof navigator !== 'undefined' && !navigator.onLine) continue
-        attempt++
-        if (attempt >= PART_MAX_RETRIES) break
+        if (isNetworkError(err)) {
+          netFailures++
+          reporter.set(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'retrying')
+          await waitForConnectivity(abortController.signal)
+          if (abortController.signal.aborted) throw new Error('aborted')
+          await sleep(backoffDelayMs(Math.min(netFailures, 3)), abortController.signal)
+          continue
+        }
+        // Real HTTP rejection from R2 on this part (not expiry, not network).
+        httpFailures++
+        if (httpFailures >= PART_MAX_RETRIES) {
+          throw new Error(`part ${partNumber} was rejected ${PART_MAX_RETRIES} times: ${err?.message ?? 'unknown'}`)
+        }
         reporter.set('retrying')
-        await new Promise((r) => setTimeout(r, backoffDelayMs(attempt)))
+        await sleep(backoffDelayMs(httpFailures), abortController.signal)
       }
     }
-    throw new Error(`part ${partNumber} failed after ${PART_MAX_RETRIES} attempts: ${lastErr?.message ?? 'unknown'}`)
   }
 
   // Concurrency-limited fan-out. We pull from a shared cursor so the worker
@@ -348,32 +417,49 @@ async function uploadMultipart(args: {
   }
 
   // R2 assembles parts in partNumber order; sort just to be explicit/stable.
+  // Resilient: after every byte is uploaded, a flaky connection must not be
+  // able to kill the upload at the finish line — network failures here pause
+  // and retry. Only a genuine server rejection abandons the parts.
   completed.sort((a, b) => a.partNumber - b.partNumber)
-  await apiFetch('/api/project-files/multipart/complete', {
-    method: 'POST',
-    body: JSON.stringify({ key, uploadId, parts: completed }),
-  })
+  try {
+    await apiFetchResilient(apiFetch, '/api/project-files/multipart/complete', {
+      method: 'POST',
+      body: JSON.stringify({ key, uploadId, parts: completed }),
+    }, { onNetworkWait: () => reporter.set('offline') })
+  } catch (err) {
+    apiFetch('/api/project-files/multipart/abort', {
+      method: 'POST',
+      body: JSON.stringify({ key, uploadId }),
+    }).catch(() => {})
+    throw err
+  }
 
   onProgress?.(100)
   return key
 }
 
 /**
- * PUT a single part to its presigned URL. Resolves with the ETag from the
- * response headers — that ETag is later passed to CompleteMultipartUpload so
- * R2 can verify part integrity before assembling the final object.
+ * PUT a blob (a multipart part, or a whole small file) to its presigned URL,
+ * with an idle-progress watchdog instead of a wall-clock timeout.
+ *
+ * With `requireEtag` (multipart parts): resolves with the ETag from the
+ * response headers — later passed to CompleteMultipartUpload so R2 can verify
+ * part integrity before assembling the final object. Without it (single-file
+ * PUT): resolves with '' and sends `contentType` so R2 stores the real type.
  */
-function putPart(
+function putBlob(
   url: string,
   blob: Blob,
   size: number,
-  signal: AbortSignal,
+  signal: AbortSignal | undefined,
   onLoaded: (loaded: number) => void,
+  opts: { contentType?: string; requireEtag: boolean },
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    if (signal.aborted) { reject(new Error('aborted')); return }
+    if (signal?.aborted) { reject(new Error('aborted')); return }
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', url)
+    if (opts.contentType) xhr.setRequestHeader('Content-Type', opts.contentType)
 
     // Idle-progress watchdog: fires only when the upload has stopped moving
     // bytes for PART_IDLE_TIMEOUT_MS. Replaces xhr.timeout (which counts
@@ -393,19 +479,19 @@ function putPart(
     const onAbort = () => {
       try { xhr.abort() } catch {}
     }
-    signal.addEventListener('abort', onAbort, { once: true })
+    signal?.addEventListener('abort', onAbort, { once: true })
     let settled = false
     const cleanup = () => {
       if (settled) return
       settled = true
       disarmIdle()
-      signal.removeEventListener('abort', onAbort)
+      signal?.removeEventListener('abort', onAbort)
     }
     const finishResolve = (v: string) => { if (!settled) { cleanup(); resolve(v) } }
     const finishReject = (e: any) => { if (!settled) { cleanup(); reject(e) } }
 
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && !signal.aborted) {
+      if (e.lengthComputable && !signal?.aborted) {
         onLoaded(e.loaded)
         armIdle()
       }
@@ -414,6 +500,11 @@ function putPart(
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
+        if (!opts.requireEtag) {
+          onLoaded(size)
+          finishResolve('')
+          return
+        }
         // R2/S3 returns the part hash in the ETag header. CORS must expose it
         // (ExposeHeaders: ["ETag"]) — without that, getResponseHeader returns
         // null and we cannot complete the upload.
@@ -428,12 +519,14 @@ function putPart(
         finishResolve(etag.replace(/^"|"$/g, ''))
       } else if (xhr.status === 403) {
         // Stale presigned URL — caller treats this as a free retry with re-sign.
-        const err: any = new Error('part rejected (403) — URL expired')
+        const err: any = new Error('upload rejected (403) — URL expired')
         err.expired = true
         finishReject(err)
       } else {
         const msg = xhr.responseText?.match(/<Message>(.*?)<\/Message>/)?.[1]
-        finishReject(new Error(msg ?? `part upload failed (${xhr.status})`))
+        const err: any = new Error(msg ?? `upload failed (${xhr.status})`)
+        err.status = xhr.status
+        finishReject(err)
       }
     }
 
@@ -455,28 +548,22 @@ async function registerWithRetry(args: {
   file: File
 }): Promise<void> {
   const { apiFetch, projectId, fileType, key, file } = args
-  let registerErr: Error | null = null
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      await apiFetch('/api/project-files/register', {
-        method: 'POST',
-        body: JSON.stringify({
-          project_id: projectId,
-          file_type: fileType,
-          storage_key: key,
-          file_name: file.name,
-          file_size: file.size,
-          mime_type: file.type,
-        }),
-      })
-      registerErr = null
-      break
-    } catch (e: any) {
-      registerErr = e
-      if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 1000))
-    }
-  }
-  if (registerErr) {
-    throw new Error(`File uploaded but failed to register: ${registerErr.message ?? 'unknown error'}. Contact support.`)
+  try {
+    // Resilient: the file is already safe in R2 at this point — losing the
+    // registration to a network blip would orphan it, so network failures
+    // wait for connectivity and retry rather than giving up after 3 tries.
+    await apiFetchResilient(apiFetch, '/api/project-files/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        project_id: projectId,
+        file_type: fileType,
+        storage_key: key,
+        file_name: file.name,
+        file_size: file.size,
+        mime_type: file.type,
+      }),
+    })
+  } catch (e: any) {
+    throw new Error(`File uploaded but failed to register: ${e?.message ?? 'unknown error'}. Contact support.`)
   }
 }
