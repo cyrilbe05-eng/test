@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-15 — Gallery uploads join the resilient pipeline (`23f4890`)
+
+Operator's Vercel logs revealed the failing slow-connection upload was a **gallery** upload — a
+path that never got any resilience work: one whole-file XHR PUT with a **120 s wall-clock timeout**
+(≥ ~30–60 MB can literally never finish at 2–5 Mbit/s) and 3 restart-from-zero retries. Gallery now
+uses the same machinery as project files: multipart ≥16 MB (server: gallery targets on the
+multipart endpoints, owner/admin auth, storage-limit gate), shared `singlePutResilient` below,
+resilient registration. UI unchanged (progress/retrying driven by adapter states).
+
+---
+
 ## 2026-07-15 — "Forbidden" at end of big uploads (`7b1712f`)
 
 `authorizeKeyForUpload` (multipart sign/complete/abort) demanded an assignment row for team, but the
