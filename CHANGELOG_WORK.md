@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-07-15 — "Forbidden" at end of big uploads (`7b1712f`)
+
+`authorizeKeyForUpload` (multipart sign/complete/abort) demanded an assignment row for team, but the
+platform's model allows team on any project (register/list/signed-url all do; editors claim
+unassigned work). Unassigned editors uploaded 100% of chunks then got 403 on `/complete`; small
+single-PUT files skipped the check and worked. Team now passes, consistent with the rest of the API.
+
+---
+
 ## 2026-07-15 — Buffering overlay stuck over paused player (`cb44089`)
 
 Seeking a **paused** video (comment timestamp chips, range pins — i.e. the review workflow itself)
