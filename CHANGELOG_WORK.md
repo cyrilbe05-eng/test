@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-15 — Upload audit fixes; review-copy generation DISABLED (`1d2b1af`)
+
+Operator: uploads "break down at 10%" on slow wifi + compression pins CPU → full pipeline audit.
+Findings fixed: (1) **part starvation** — 3 concurrent parts on congested wifi starve one past the
+90 s idle watchdog, progress resets → concurrency 2, watchdog 180 s; (2) **unbounded 403 spin** —
+persistent (non-expiry) 403s re-signed forever → capped at 5 with explicit error; (3) generator
+could hang forever on "generating review copy…" if encoding never started (autoplay policy) →
+fail-loud + muted fallback. **Review-copy generation disabled** per operator (CPU): no auto-gen, no
+generate buttons; existing copies still serve (with fallback), Remove stays, buffering overlay stays.
+Dormant compressor kept in `videoCompress.ts` — revisit = server-side transcoding (paid) decision.
+
+---
+
 ## 2026-07-15 — HOTFIX 2: legacy-file playback timeout (`ea338f4`)
 
 Operator confirmed the breakage hit **pre-review-copy projects** — root cause there was the inline
