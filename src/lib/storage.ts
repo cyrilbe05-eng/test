@@ -143,6 +143,71 @@ async function apiFetchResilient<T>(
   }
 }
 
+/** Resilient whole-file PUT (files below MULTIPART_THRESHOLD). Shared by the
+ *  project-file and gallery paths: idle-progress watchdog, verified-
+ *  connectivity waits on transport failures (never kills the upload),
+ *  capped re-issue of expired URLs, small retry budget for real HTTP
+ *  rejections. Returns the storage key actually written. */
+async function singlePutResilient(args: {
+  file: File
+  requestUploadUrl: () => Promise<{ uploadUrl: string; key: string }>
+  reporter: { set: (state: UploadConnectionState) => void }
+  onProgress?: (percent: number) => void
+}): Promise<string> {
+  const { file, requestUploadUrl, reporter, onProgress } = args
+  let { uploadUrl, key } = await requestUploadUrl()
+  reporter.set('uploading')
+
+  let httpFailures = 0
+  let netFailures = 0
+  let expiredRefreshes = 0
+  for (;;) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      reporter.set('offline')
+      await waitForConnectivity()
+      reporter.set('uploading')
+    }
+    try {
+      await putBlob(uploadUrl, file, file.size, undefined, (loaded) => {
+        onProgress?.(Math.round((loaded / file.size) * 100))
+      }, { contentType: file.type || 'application/octet-stream', requireEtag: false })
+      onProgress?.(100)
+      reporter.set('uploading')
+      return key
+    } catch (err: any) {
+      if (err?.fatal) throw err
+      onProgress?.(0)
+      if (err?.expired) {
+        // Presigned PUT URL expired (long stall / long pause). Get a fresh
+        // one — this issues a new storage key, which is fine: the old key
+        // was never written. Capped: persistent 403s are not expiry.
+        expiredRefreshes++
+        if (expiredRefreshes > 5) {
+          throw new Error('storage keeps rejecting upload URLs (403) — this is not a connection problem, contact support')
+        }
+        ;({ uploadUrl, key } = await requestUploadUrl())
+        continue
+      }
+      if (isNetworkError(err)) {
+        netFailures++
+        reporter.set(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'retrying')
+        await waitForConnectivity()
+        // Probe verified the link — retry immediately; only pause when
+        // failures repeat back-to-back (see multipart path).
+        if (netFailures > 2) {
+          await sleep(Math.min(2000, 500 * (netFailures - 2)) + Math.random() * 300)
+        }
+        continue
+      }
+      // Real HTTP rejection from R2 (not expiry): retry a little, then surface.
+      httpFailures++
+      if (httpFailures >= 3) throw err
+      reporter.set('retrying')
+      await sleep(backoffDelayMs(httpFailures))
+    }
+  }
+}
+
 /**
  * Creates a storage adapter bound to an apiFetch instance.
  * Must be called inside a React component or hook (uses useApiFetch internally).
@@ -183,57 +248,7 @@ export function useStorageAdapter(): StorageAdapter {
           { onNetworkWait: () => reporter.set('offline') },
         )
 
-      let { uploadUrl, key } = await requestUploadUrl()
-      reporter.set('uploading')
-
-      let httpFailures = 0
-      let netFailures = 0
-      let expiredRefreshes = 0
-      for (;;) {
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          reporter.set('offline')
-          await waitForConnectivity()
-          reporter.set('uploading')
-        }
-        try {
-          await putBlob(uploadUrl, file, file.size, undefined, (loaded) => {
-            onProgress?.(Math.round((loaded / file.size) * 100))
-          }, { contentType: file.type || 'application/octet-stream', requireEtag: false })
-          onProgress?.(100)
-          reporter.set('uploading')
-          break
-        } catch (err: any) {
-          if (err?.fatal) throw err
-          onProgress?.(0)
-          if (err?.expired) {
-            // Presigned PUT URL expired (long stall / long pause). Get a fresh
-            // one — this issues a new storage key, which is fine: the old key
-            // was never written. Capped: persistent 403s are not expiry.
-            expiredRefreshes++
-            if (expiredRefreshes > 5) {
-              throw new Error('storage keeps rejecting upload URLs (403) — this is not a connection problem, contact support')
-            }
-            ;({ uploadUrl, key } = await requestUploadUrl())
-            continue
-          }
-          if (isNetworkError(err)) {
-            netFailures++
-            reporter.set(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'retrying')
-            await waitForConnectivity()
-            // Probe verified the link — retry immediately; only pause when
-            // failures repeat back-to-back (see multipart path).
-            if (netFailures > 2) {
-              await sleep(Math.min(2000, 500 * (netFailures - 2)) + Math.random() * 300)
-            }
-            continue
-          }
-          // Real HTTP rejection from R2 (not expiry): retry a little, then surface.
-          httpFailures++
-          if (httpFailures >= 3) throw err
-          reporter.set('retrying')
-          await sleep(backoffDelayMs(httpFailures))
-        }
-      }
+      const key = await singlePutResilient({ file, requestUploadUrl, reporter, onProgress })
 
       if (previewArtifact) return { key }
       const registered = await registerWithRetry({ apiFetch, projectId, fileType, key, file })
@@ -267,6 +282,59 @@ export async function getSignedUrlById(
   return signedUrl
 }
 
+/** Resilient upload to the GALLERY ("drive"). Same machinery as project
+ *  files: multipart with per-part retry/resume for anything ≥ the threshold,
+ *  watchdog + verified-connectivity single PUT below it. The gallery
+ *  previously did one bare 2-minute-timeout PUT of the whole file — large
+ *  files on a slow link could never finish. */
+export async function uploadGalleryFile(
+  apiFetch: ReturnType<typeof useApiFetch>,
+  args: {
+    file: File
+    /** Admin uploading on behalf of a client. */
+    ownerId?: string | null
+    onProgress?: (percent: number) => void
+    onConnectionState?: (state: UploadConnectionState) => void
+  },
+): Promise<{ storageKey: string }> {
+  const { file, ownerId, onProgress, onConnectionState } = args
+  if (file.size >= MULTIPART_THRESHOLD) {
+    const key = await uploadMultipart({
+      file,
+      onProgress,
+      onConnectionState,
+      apiFetch,
+      gallery: { ownerId: ownerId ?? null },
+    })
+    return { storageKey: key }
+  }
+  const reporter = createConnectionReporter(onConnectionState)
+  const requestUploadUrl = async () => {
+    const { uploadUrl, storageKey } = await apiFetchResilient<{ uploadUrl: string; storageKey: string }>(
+      apiFetch,
+      '/api/gallery/upload-url',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+          ownerId: ownerId ?? undefined,
+        }),
+      },
+      { onNetworkWait: () => reporter.set('offline') },
+    )
+    return { uploadUrl, key: storageKey }
+  }
+  const key = await singlePutResilient({ file, requestUploadUrl, reporter, onProgress })
+  return { storageKey: key }
+}
+
+/** Resilient API call for post-upload bookkeeping (e.g. gallery register):
+ *  the bytes are already safe in R2 — losing the DB row to a network blip
+ *  would orphan them. */
+export { apiFetchResilient }
+
 /** Playback source with quality info: clients may get the low-bitrate review
  *  copy ('preview'); pass forceOriginal to demand the original — the player's
  *  automatic fallback when a preview turns out to be unplayable. */
@@ -295,14 +363,16 @@ export async function getPlaybackSource(
 
 async function uploadMultipart(args: {
   file: File
-  projectId: string
-  fileType: FileType
+  projectId?: string
+  fileType?: FileType
   onProgress?: (percent: number) => void
   onConnectionState?: (state: UploadConnectionState) => void
   apiFetch: ReturnType<typeof useApiFetch>
   previewArtifact?: boolean
+  /** Gallery ("drive") target instead of a project. */
+  gallery?: { ownerId?: string | null }
 }): Promise<string> {
-  const { file, projectId, fileType, onProgress, onConnectionState, apiFetch, previewArtifact } = args
+  const { file, projectId, fileType, onProgress, onConnectionState, apiFetch, previewArtifact, gallery } = args
   const reporter = createConnectionReporter(onConnectionState)
 
   const partSize = computePartSize(file.size)
@@ -317,15 +387,24 @@ async function uploadMultipart(args: {
     partUrls: Array<{ partNumber: number; url: string }>
   }>(apiFetch, '/api/project-files/multipart/create', {
     method: 'POST',
-    body: JSON.stringify({
-      projectId,
-      fileType,
-      fileName: file.name,
-      mimeType: file.type,
-      fileSize: file.size,
-      partCount,
-      previewArtifact: previewArtifact ?? false,
-    }),
+    body: JSON.stringify(gallery
+      ? {
+          gallery: true,
+          ownerId: gallery.ownerId ?? undefined,
+          fileName: file.name,
+          mimeType: file.type,
+          fileSize: file.size,
+          partCount,
+        }
+      : {
+          projectId,
+          fileType,
+          fileName: file.name,
+          mimeType: file.type,
+          fileSize: file.size,
+          partCount,
+          previewArtifact: previewArtifact ?? false,
+        }),
   }, { onNetworkWait: () => reporter.set('offline') })
   reporter.set('uploading')
 

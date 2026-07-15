@@ -1171,6 +1171,13 @@ async function handleGetProjectFileUploadUrl(req: VercelRequest, res: VercelResp
  * supplying a key + uploadId they observed elsewhere.
  */
 async function authorizeKeyForUpload(profile: any, key: string): Promise<void> {
+  // Gallery keys: gallery/{ownerId}/{ts}-{name} — the owner (or an admin
+  // uploading on their behalf) may operate on the multipart upload.
+  const g = /^gallery\/([^/]+)\//.exec(key)
+  if (g) {
+    if (profile.role === 'admin' || g[1] === profile.id) return
+    const e: any = new Error('forbidden'); e.status = 403; throw e
+  }
   const m = /^projects\/([^/]+)\//.exec(key)
   if (!m) { const e: any = new Error('invalid key'); e.status = 400; throw e }
   const projectId = m[1]
@@ -1195,8 +1202,15 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     const { profile } = await requireAuth(req)
-    const { projectId, fileType, fileName, fileSize, partCount, mimeType, previewArtifact } = req.body
-    if (!projectId || !fileType || !fileName || !partCount) {
+    const { projectId, fileType, fileName, fileSize, partCount, mimeType, previewArtifact, gallery, ownerId } = req.body
+    // Two targets share the multipart machinery: project files and gallery
+    // ("drive") files. Gallery was previously single-PUT only with a 2-minute
+    // wall clock — large gallery videos could never finish on a slow link.
+    if (gallery) {
+      if (!fileName || !partCount) {
+        res.status(400).json({ error: 'fileName, partCount required' }); return
+      }
+    } else if (!projectId || !fileType || !fileName || !partCount) {
       res.status(400).json({ error: 'projectId, fileType, fileName, partCount required' }); return
     }
     if (typeof partCount !== 'number' || partCount < 1 || partCount > 10000) {
@@ -1205,22 +1219,27 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
 
     // See handleGetProjectFileUploadUrl: preview artifacts bypass the
     // deliverable cap (they attach to an existing row), not storage limits.
-    if (!previewArtifact) await enforceDeliverableCap(profile, projectId, fileType)
+    if (!gallery && !previewArtifact) await enforceDeliverableCap(profile, projectId, fileType)
 
-    // Same plan-storage gate as single-PUT path
+    // Same plan-storage gate as the single-PUT paths (project or gallery usage).
     if (profile.role === 'client' && profile.plan_id) {
       const [planRow] = await dbQuery<PlanRow>(
         'SELECT storage_limit_mb FROM plans WHERE id = ?',
         [profile.plan_id]
       )
       if (planRow && planRow.storage_limit_mb !== -1) {
-        const [usageRow] = await dbQuery<StorageRow>(
-          `SELECT COALESCE(SUM(pf.file_size), 0) / 1048576.0 AS used_mb
-           FROM project_files pf
-           JOIN projects p ON p.id = pf.project_id
-           WHERE p.client_id = ?`,
-          [profile.id]
-        )
+        const [usageRow] = gallery
+          ? await dbQuery<StorageRow>(
+              `SELECT COALESCE(SUM(file_size), 0) / 1048576.0 AS used_mb FROM gallery_files WHERE owner_id = ?`,
+              [profile.id]
+            )
+          : await dbQuery<StorageRow>(
+              `SELECT COALESCE(SUM(pf.file_size), 0) / 1048576.0 AS used_mb
+               FROM project_files pf
+               JOIN projects p ON p.id = pf.project_id
+               WHERE p.client_id = ?`,
+              [profile.id]
+            )
         const usedMb = usageRow?.used_mb ?? 0
         const incomingMb = fileSize ? fileSize / 1048576.0 : 0
         if (usedMb + incomingMb > planRow.storage_limit_mb) {
@@ -1229,7 +1248,10 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const key = `projects/${projectId}/${previewArtifact ? 'preview' : fileType}/${Date.now()}-${sanitizeFileName(fileName)}`
+    const galleryOwner = (profile.role === 'admin' && ownerId) ? ownerId : profile.id
+    const key = gallery
+      ? `gallery/${galleryOwner}/${Date.now()}-${sanitizeFileName(fileName)}`
+      : `projects/${projectId}/${previewArtifact ? 'preview' : fileType}/${Date.now()}-${sanitizeFileName(fileName)}`
     // Bake a playable Content-Type into the assembled object (server-side
     // call, no browser CORS involved) so playback never needs per-request
     // response-content-type overrides — iOS range-streams plain URLs best.

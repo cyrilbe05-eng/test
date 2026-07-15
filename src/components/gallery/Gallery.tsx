@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useApiFetch } from '@/lib/api'
+import { uploadGalleryFile, apiFetchResilient } from '@/lib/storage'
 import {
   useGalleryFiles,
   useGalleryFolders,
@@ -622,6 +623,10 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   }
 
   // ── Upload ──
+  // Same resilient pipeline as project files (multipart with per-part
+  // retry/resume ≥16 MB, watchdog + connectivity-verified single PUT below).
+  // The old inline XHR had a 2-minute wall clock on the WHOLE file — on a
+  // slow link, anything big could never finish and died retrying from zero.
   const uploadSingleFile = async (file: File) => {
     const mimeType = file.type || 'application/octet-stream'
     const setItem = (patch: Partial<{ progress: number; retrying: boolean; error: string | null }>) =>
@@ -629,37 +634,17 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
     const removeItem = () => setUploadItems((prev) => { const n = { ...prev }; delete n[file.name]; return n })
 
     setItem({ progress: 0 })
-    const MAX_RETRIES = 3
     try {
-      const { uploadUrl, storageKey } = await apiFetch<{ uploadUrl: string; storageKey: string }>(
-        '/api/gallery/upload-url',
-        { method: 'POST', body: JSON.stringify({ fileName: file.name, mimeType, fileSize: file.size, folderId: currentFolderId, ownerId }) }
-      )
+      const { storageKey } = await uploadGalleryFile(apiFetch, {
+        file,
+        ownerId,
+        onProgress: (pct) => setItem({ progress: pct }),
+        onConnectionState: (state) => setItem({ retrying: state !== 'uploading' }),
+      })
 
-      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-          await new Promise<void>((resolve, reject) => {
-            const xhr = new XMLHttpRequest()
-            xhr.open('PUT', uploadUrl)
-            xhr.setRequestHeader('Content-Type', mimeType)
-            xhr.timeout = 120_000
-            xhr.upload.onprogress = (e) => { if (e.lengthComputable) setItem({ progress: Math.round((e.loaded / e.total) * 100) }) }
-            xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? (setItem({ progress: 100 }), resolve()) : reject(new Error(xhr.responseText?.match(/<Message>(.*?)<\/Message>/)?.[1] ?? `Upload failed (${xhr.status})`))
-            xhr.onerror = () => reject(new Error('network'))
-            xhr.ontimeout = () => reject(new Error('network'))
-            xhr.onabort = () => reject(new Error('Upload was cancelled'))
-            xhr.send(file)
-          })
-          break
-        } catch (err: any) {
-          if (err.message !== 'network' || attempt === MAX_RETRIES) throw err.message === 'network' ? new Error(`Upload failed after ${MAX_RETRIES} attempts — check your connection`) : err
-          setItem({ progress: 0, retrying: true })
-          await new Promise((r) => setTimeout(r, attempt * 1500))
-          setItem({ retrying: false })
-        }
-      }
-
-      await apiFetch('/api/gallery/register', {
+      // Bytes are safe in R2 at this point — registration must survive a
+      // network blip too, or the upload is orphaned.
+      await apiFetchResilient(apiFetch, '/api/gallery/register', {
         method: 'POST',
         body: JSON.stringify({ fileName: file.name, mimeType, fileSize: file.size, storageKey, folderId: currentFolderId, ownerId }),
       })
