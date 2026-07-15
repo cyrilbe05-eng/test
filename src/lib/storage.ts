@@ -41,15 +41,18 @@ export interface StorageAdapter {
 // above MULTIPART_THRESHOLD go multipart so an interruption costs one part
 // instead of the whole file — that resume-not-restart property is worth the
 // extra round-trips on anything a flaky connection takes minutes to move.
-// 3, not 6: on a 2–5 Mbit/s uplink more parallel streams just congest each
-// other (slower per-part completion, more bytes at risk per drop). Three
-// streams still saturate links well beyond that.
-const PART_CONCURRENCY = 3
+// 2, not 6: on a 2–5 Mbit/s uplink parallel streams starve each other — a
+// part that gets no bandwidth for long enough trips the stall watchdog, its
+// progress resets, and the upload looks like it "breaks down at 10%". Two
+// streams keep the pipe full with far less mutual starvation.
+const PART_CONCURRENCY = 2
 const PART_MAX_RETRIES = 5
 // Idle-progress timeout: abort a part PUT only if no bytes move for this long.
 // Replaces the old total-time timeout, which would kill long-running parts
-// even when they were uploading fine — just slowly.
-const PART_IDLE_TIMEOUT_MS = 90_000 // 90s with zero progress = stalled
+// even when they were uploading fine — just slowly. Generous on purpose: on
+// congested Wi-Fi, progress events can genuinely pause for minutes while the
+// link recovers — killing the part then just re-sends bytes we'd have kept.
+const PART_IDLE_TIMEOUT_MS = 180_000 // 3 min with zero progress = stalled
 // Refresh a presigned URL that's been sitting around longer than this before
 // using it. Below the 24h server TTL with comfortable margin.
 const URL_PROACTIVE_REFRESH_MS = 18 * 60 * 60 * 1000 // 18 hours
@@ -185,6 +188,7 @@ export function useStorageAdapter(): StorageAdapter {
 
       let httpFailures = 0
       let netFailures = 0
+      let expiredRefreshes = 0
       for (;;) {
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           reporter.set('offline')
@@ -204,7 +208,11 @@ export function useStorageAdapter(): StorageAdapter {
           if (err?.expired) {
             // Presigned PUT URL expired (long stall / long pause). Get a fresh
             // one — this issues a new storage key, which is fine: the old key
-            // was never written.
+            // was never written. Capped: persistent 403s are not expiry.
+            expiredRefreshes++
+            if (expiredRefreshes > 5) {
+              throw new Error('storage keeps rejecting upload URLs (403) — this is not a connection problem, contact support')
+            }
             ;({ uploadUrl, key } = await requestUploadUrl())
             continue
           }
@@ -382,6 +390,7 @@ async function uploadMultipart(args: {
     let httpFailures = 0
     let netFailures = 0
     let serverFailures = 0
+    let expiredRefreshes = 0
     for (;;) {
       if (abortController.signal.aborted) throw new Error('aborted')
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -407,9 +416,14 @@ async function uploadMultipart(args: {
         if (err?.fatal) throw err
         bytesByPart[partNumber - 1] = 0
         reportProgress()
-        // 403 = stale presigned URL: free retry, no backoff, no budget cost.
-        // The URL was definitely the problem — refresh and immediately retry.
+        // 403 = stale presigned URL: free retry, no backoff, no budget cost —
+        // but CAPPED. A 403 that persists across fresh URLs is not expiry
+        // (credentials/CORS/clock), and refreshing forever spins the upload.
         if (err?.expired) {
+          expiredRefreshes++
+          if (expiredRefreshes > 5) {
+            throw new Error('storage keeps rejecting upload URLs (403) — this is not a connection problem, contact support')
+          }
           await refreshUrl(partNumber)
           continue
         }

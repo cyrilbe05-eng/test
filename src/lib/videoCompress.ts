@@ -196,11 +196,26 @@ export async function compressVideoInBrowser(
     try {
       await video.play()
     } catch {
-      throw new Error('The browser blocked automatic playback — click again, or upload a pre-compressed file')
+      // Autoplay policy: unmuted playback needs a fresh user gesture, and the
+      // automatic post-upload run happens minutes after the click. Retry
+      // muted — the copy encodes with silent audio, which is still perfectly
+      // reviewable footage. (A manual click on "Generate review copy" always
+      // produces a full copy with audio.)
+      try {
+        video.muted = true
+        await video.play()
+      } catch {
+        throw new Error('the browser blocked background playback — use "Generate review copy" under the deliverable (a direct click is allowed)')
+      }
     }
     await new Promise<void>((resolve) => { video.onended = () => resolve() })
     ctx.drawImage(video, 0, 0, w, h) // make sure the final frame lands
-    if (recorder.state !== 'inactive') recorder.stop()
+    if (!recordingStarted) {
+      // recorder.start() only happens on the 'playing' event; if it never
+      // fired, recorded would never settle — fail loudly instead of hanging.
+      throw new Error('encoding never started — the video could not be played back')
+    }
+    recorder.stop()
     const blob = await recorded
 
     if (blob.size === 0) throw new Error('Compression produced an empty file')

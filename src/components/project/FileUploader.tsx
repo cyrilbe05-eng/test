@@ -1,21 +1,16 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { useApiFetch } from '@/lib/api'
 import { useStorageAdapter, type UploadConnectionState } from '@/lib/storage'
-import { canCompressInBrowser, compressVideoInBrowser } from '@/lib/videoCompress'
 import { cn } from '@/lib/utils'
 import type { FileType } from '@/types'
 
 const CONCURRENCY = 2
 
-// Deliverable videos above this size automatically get a low-bitrate review
-// copy generated in the uploader's browser right after the upload — clients
-// stream that copy, so slow connections play smoothly with zero manual steps.
-const AUTO_PREVIEW_OVER_BYTES = 25 * 1024 * 1024
-
-function isVideoFile(file: File): boolean {
-  return file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|mkv|avi)$/i.test(file.name)
-}
+// NOTE: automatic review-copy generation (in-browser compression after
+// deliverable uploads) is DISABLED per operator decision 2026-07-15 — the
+// real-time encode pinned CPUs. Existing review copies still stream to
+// clients (with automatic fallback to the original). See ReviewCopyControl
+// and src/lib/videoCompress.ts for the dormant machinery.
 
 interface Props {
   projectId: string
@@ -43,7 +38,6 @@ function nextId() { return ++_id }
 
 export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, onUploaded, disabled }: Props) {
   const storageAdapter = useStorageAdapter()
-  const apiFetch = useApiFetch()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [items, setItems] = useState<FileItem[]>([])
@@ -82,61 +76,23 @@ export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, o
       runNext()
       return
     }
-    let uploaded: { key: string; fileId?: string }
     try {
-      uploaded = await storageAdapter.upload({
+      await storageAdapter.upload({
         file,
         projectId,
         fileType,
         onProgress: (pct) => patch(item.id, { progress: pct }),
         onConnectionState: (state) => patch(item.id, { conn: state }),
       })
+      patch(item.id, { status: 'done', progress: 100, conn: undefined })
       onUploaded?.()
     } catch (err: any) {
       patch(item.id, { status: 'error', conn: undefined, error: err?.message ?? 'Upload failed' })
       toast.error(`${file.name}: ${err?.message ?? 'Upload failed'}`)
+    } finally {
       activeRef.current--
       runNext()
-      return
     }
-    // Upload finished — free the network slot for the next queued file. The
-    // review-copy encode below is local CPU work and shouldn't block uploads.
-    activeRef.current--
-    runNext()
-
-    // Automatic review copy: heavy deliverable videos get a ≤720p/~3 Mbit/s
-    // copy generated right here (we still hold the original file locally —
-    // the cheapest moment to do it). Failure is non-fatal: clients then
-    // stream the original, and a copy can be generated later from the
-    // deliverable list.
-    if (
-      fileType === 'deliverable' &&
-      uploaded.fileId &&
-      file.size > AUTO_PREVIEW_OVER_BYTES &&
-      isVideoFile(file) &&
-      canCompressInBrowser()
-    ) {
-      patch(item.id, { status: 'processing', progress: 0, conn: undefined })
-      try {
-        const small = await compressVideoInBrowser(file, (pct) => patch(item.id, { progress: pct }))
-        patch(item.id, { status: 'processing', progress: 0 })
-        const { key } = await storageAdapter.upload({
-          file: small,
-          projectId,
-          fileType: 'deliverable',
-          previewArtifact: true,
-          onProgress: (pct) => patch(item.id, { progress: pct }),
-        })
-        await apiFetch(`/api/project-files/${uploaded.fileId}/preview`, {
-          method: 'POST',
-          body: JSON.stringify({ storage_key: key, file_size: small.size }),
-        })
-        onUploaded?.()
-      } catch (e: any) {
-        toast.info(`${file.name}: review copy not generated (${e?.message ?? 'unknown error'}) — clients will stream the original. You can generate one from the deliverable list.`)
-      }
-    }
-    patch(item.id, { status: 'done', progress: 100, conn: undefined })
   }
 
   const retryItem = (id: number) => {
