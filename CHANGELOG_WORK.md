@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-07-15 — Buffering overlay stuck over paused player (`cb44089`)
+
+Seeking a **paused** video (comment timestamp chips, range pins — i.e. the review workflow itself)
+fired `waiting` with no `playing`/`pause` to follow → the buffering overlay stayed stuck over the
+player. Overlay now arms only during actual playback; `seeked`/`canplay` also clear it.
+
+---
+
 ## 2026-07-15 — Upload audit fixes; review-copy generation DISABLED (`1d2b1af`)
 
 Operator: uploads "break down at 10%" on slow wifi + compression pins CPU → full pipeline audit.
