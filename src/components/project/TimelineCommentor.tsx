@@ -203,6 +203,11 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     player.on('waiting', () => {
       if (bufferingTimer) clearTimeout(bufferingTimer)
       bufferingTimer = setTimeout(() => {
+        // Only meaningful while actually trying to PLAY. Seeking a paused
+        // video also fires `waiting` — but 'playing'/'pause' never follow on
+        // a paused seek, which left the overlay stuck over the player during
+        // normal review actions (click a timestamp chip while paused).
+        if (video.paused || video.ended) return
         const buf = video.buffered
         const ahead = buf.length ? buf.end(buf.length - 1) - video.currentTime : 0
         logPlayback('buffering — playback starved for data', {
@@ -215,6 +220,8 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     })
     player.on('playing', clearBuffering)
     player.on('pause', clearBuffering)
+    player.on('seeked', clearBuffering)
+    player.on('canplay', clearBuffering)
     player.on('error', () => {
       // A failing REVIEW COPY falls back to the original immediately — a bad
       // preview must never block review (the original always exists).
