@@ -1181,13 +1181,13 @@ async function authorizeKeyForUpload(profile: any, key: string): Promise<void> {
   if (!project) { const e: any = new Error('project not found'); e.status = 404; throw e }
   if (profile.role === 'admin') return
   if (profile.role === 'client' && project.client_id === profile.id) return
-  if (profile.role === 'team') {
-    const [assignment] = await dbQuery<{ id: string }>(
-      'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
-      [projectId, profile.id],
-    )
-    if (assignment) return
-  }
+  // Team members can upload to ANY project — this matches the platform's
+  // permission model everywhere else (register, file list, signed URLs all
+  // allow team on any project; editors browse unassigned projects to claim
+  // work). Requiring an assignment row here made big uploads by unassigned
+  // editors fail with "forbidden" at the very last step (complete), while
+  // small single-PUT files — which never hit this check — went through.
+  if (profile.role === 'team') return
   const e: any = new Error('forbidden'); e.status = 403; throw e
 }
 
