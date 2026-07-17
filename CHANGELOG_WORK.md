@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-07-16 — Download links live 5 h (`84ee074`)
+
+Mumbai POP degradation incident: an India-based editor's 400 MB download crawled (~10 KB/s → 11 h
+projected) — network-side, not code (downloads are direct browser→R2). But it exposed that 1 h
+signed URLs kill any multi-hour download on pause/resume. Download-mode URLs now last **5 h**
+(`DOWNLOAD_URL_TTL_SECONDS`, all three issuers); streaming URLs stay 1 h (player refreshes on
+demand).
+
+---
+
 ## 2026-07-15 — Gallery uploads join the resilient pipeline (`23f4890`)
 
 Operator's Vercel logs revealed the failing slow-connection upload was a **gallery** upload — a
