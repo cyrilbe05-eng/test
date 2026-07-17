@@ -19,6 +19,13 @@ import { sanitizeFileName } from '../src/lib/utils.js'
 import { sendEmailNotifications, sendEmailNotification, projectUrl } from './_helpers/email.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
+// Signed-URL lifetimes. Downloads get 5 h: on slow routes (e.g. the Mumbai
+// POP degradation incident, ~10 KB/s) a big file takes hours, and a browser
+// pause/resume after the old 1 h expiry killed the download with a 403.
+// Streaming (inline player) URLs stay short — they are refreshed on demand.
+const DOWNLOAD_URL_TTL_SECONDS = 5 * 3600
+const STREAM_URL_TTL_SECONDS = 3600
+
 // ─────────────────────────────────────────────────────────────────────────────
 // USERS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1559,10 +1566,10 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
       if (!head || head.size === 0) previewKey = null
     }
     const signedUrl = wantDownload
-      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
+      ? await getPresignedDownloadUrl(file.storage_key, DOWNLOAD_URL_TTL_SECONDS, file.file_name, inferMimeType(file.file_name, file.mime_type))
       : previewKey
-        ? await getPresignedDownloadUrl(previewKey, 3600, undefined, await ensurePlayableObject(previewKey, previewKey.split('/').pop() ?? file.file_name, null))
-        : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
+        ? await getPresignedDownloadUrl(previewKey, STREAM_URL_TTL_SECONDS, undefined, await ensurePlayableObject(previewKey, previewKey.split('/').pop() ?? file.file_name, null))
+        : await getPresignedDownloadUrl(file.storage_key, STREAM_URL_TTL_SECONDS, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
     const servedQuality: 'preview' | 'original' = previewKey ? 'preview' : 'original'
 
     // Trigger: team member downloading a source file moves project pending_assignment → in_progress
@@ -2318,8 +2325,8 @@ async function handleGetGallerySignedUrl(req: VercelRequest, res: VercelResponse
 
     const wantDownload = String((req.query as any).download ?? '') === '1'
     const url = wantDownload
-      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
+      ? await getPresignedDownloadUrl(file.storage_key, DOWNLOAD_URL_TTL_SECONDS, file.file_name, inferMimeType(file.file_name, file.mime_type))
+      : await getPresignedDownloadUrl(file.storage_key, STREAM_URL_TTL_SECONDS, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
     res.json({ url })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -3641,8 +3648,8 @@ async function handleDownload(req: VercelRequest, res: VercelResponse) {
     // sniffs the bytes — which misclassifies binary as text on mobile.
     const wantDownload = String((req.query as any).download ?? '') === '1'
     const signedUrl = wantDownload
-      ? await getPresignedDownloadUrl(file.storage_key, 3600, file.file_name, inferMimeType(file.file_name, file.mime_type))
-      : await getPresignedDownloadUrl(file.storage_key, 3600, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
+      ? await getPresignedDownloadUrl(file.storage_key, DOWNLOAD_URL_TTL_SECONDS, file.file_name, inferMimeType(file.file_name, file.mime_type))
+      : await getPresignedDownloadUrl(file.storage_key, STREAM_URL_TTL_SECONDS, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
     res.json({ signedUrl })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
