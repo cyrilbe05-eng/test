@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-07-19 — Live upload progress during project creation (`08fc50e`)
+
+Creating a project with files froze the form with zero feedback while post-submit uploads ran.
+Both flows (client New Project, admin Create modal) now show a per-file panel — waiting/uploading/
+done, %, resilient-uploader connection states, progress bars, keep-page-open hint — and the submit
+button counts "Uploading X of N…". New shared `UploadProgressList` component.
+
+---
+
 ## 2026-07-16 — Download links live 5 h (`84ee074`)
 
 Mumbai POP degradation incident: an India-based editor's 400 MB download crawled (~10 KB/s → 11 h
