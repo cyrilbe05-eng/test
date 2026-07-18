@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useApiFetch } from '@/lib/api'
 import { useStorageAdapter } from '@/lib/storage'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
+import { UploadProgressList, type UploadProgressItem } from '@/components/project/UploadProgressList'
 import { useGalleryFiles } from '@/hooks/useGallery'
 import { cn } from '@/lib/utils'
 import type { GalleryFile } from '@/types'
@@ -244,6 +245,9 @@ export default function ClientNewProject() {
   const [submitting, setSubmitting] = useState(false)
   const [dragTarget, setDragTarget] = useState<'source' | 'attachment' | null>(null)
   const [attachTab, setAttachTab] = useState<'upload' | 'gallery'>('upload')
+  // Live per-file progress while the post-submit uploads run — without it the
+  // form appears frozen for however long hundreds of MB take to move.
+  const [uploadItems, setUploadItems] = useState<UploadProgressItem[]>([])
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -264,14 +268,26 @@ export default function ClientNewProject() {
         }),
       })
 
-      // 2. Upload source files
-      for (const file of sourceFiles) {
-        await storageAdapter.upload({ file, projectId: project!.id, fileType: 'source_video' })
-      }
+      // 2+3. Upload source files then attachments, with visible progress.
+      const toUpload = [
+        ...sourceFiles.map((file) => ({ file, fileType: 'source_video' as const })),
+        ...attachments.map((file) => ({ file, fileType: 'attachment' as const })),
+      ]
+      setUploadItems(toUpload.map(({ file }) => ({ name: file.name, status: 'pending', progress: 0 })))
+      const patchItem = (idx: number, update: Partial<UploadProgressItem>) =>
+        setUploadItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...update } : it)))
 
-      // 3. Upload new attachment files
-      for (const file of attachments) {
-        await storageAdapter.upload({ file, projectId: project!.id, fileType: 'attachment' })
+      for (let i = 0; i < toUpload.length; i++) {
+        const { file, fileType } = toUpload[i]
+        patchItem(i, { status: 'uploading' })
+        await storageAdapter.upload({
+          file,
+          projectId: project!.id,
+          fileType,
+          onProgress: (pct) => patchItem(i, { progress: pct }),
+          onConnectionState: (conn) => patchItem(i, { conn }),
+        })
+        patchItem(i, { status: 'done', progress: 100, conn: undefined })
       }
 
       // 4. Link gallery files as attachments (already in R2, just register)
@@ -418,12 +434,18 @@ export default function ClientNewProject() {
             )}
           </div>
 
+          {submitting && <UploadProgressList title="Uploading your files" items={uploadItems} />}
+
           <button
             type="submit"
             disabled={submitting}
             className="w-full py-3 bg-primary rounded-xl text-white font-semibold text-sm shadow-clay hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
           >
-            {submitting ? 'Creating project…' : 'Submit Project'}
+            {submitting
+              ? uploadItems.length > 0
+                ? `Uploading ${Math.min(uploadItems.filter((i) => i.status === 'done').length + 1, uploadItems.length)} of ${uploadItems.length}…`
+                : 'Creating project…'
+              : 'Submit Project'}
           </button>
         </form>
       </main>
