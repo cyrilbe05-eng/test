@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-19 — Editor batch: variations, self-assign, checklist, drag cues (`ad12270`)
+
+- **Deliverable variations:** `max_deliverables` no longer blocks team uploads (client-role only
+  now); team uploader always visible while uploads are open; counter stays as guidance.
+- **Self-assign:** `POST /api/projects/:id/claim` (assignment + next-day deadline + admin
+  notifications); Assigned Team card with "Assign myself" on team project page; assigned names on
+  team dashboard cards + table (list returns `assigned_team_names`).
+- **Checklist for editors:** resolve API always allowed team — the team page just never rendered
+  it; its comments card now has the admin-style checkboxes + open counter.
+- **Drag cues:** all dropzones switch to "Release to upload here" while dragging.
+
+---
+
 ## 2026-07-19 — Gallery files appear as soon as each upload lands (`2da40b1`)
 
 Grid refetched only after the whole batch — long uploads looked like they required a page refresh.
