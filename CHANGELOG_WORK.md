@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-07-19 — Gallery batch queue for 20+ file drops (`e548b43`)
+
+Large batches previously started every file simultaneously (bandwidth/connection stampede). Now a
+2-at-a-time queue: all files listed immediately ("Waiting…"), duplicates in one batch don't collide
+(batch-index keys). Mobile multi-select verified — all pickers already have `multiple`; use the
+picker's Select mode on iOS/Android.
+
+---
+
 ## 2026-07-19 — Adaptive upload speed, gallery DnD, mobile wake lock (`5c8c1d3`)
 
 Vercel now on **Pro** (memory + vercel.json updated; maxDuration 60→300 s; single catch-all kept by
