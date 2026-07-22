@@ -452,8 +452,9 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
   const [moveModalFileId, setMoveModalFileId] = useState<string | null>(null)
 
-  // Upload state
-  const [uploadItems, setUploadItems] = useState<Record<string, { progress: number; retrying: boolean; error: string | null }>>({})
+  // Upload state — keys are `${batchIndex}:${fileName}` so a batch may
+  // contain duplicate names; `waiting` marks queued files not yet started.
+  const [uploadItems, setUploadItems] = useState<Record<string, { progress: number; retrying: boolean; waiting?: boolean; error: string | null }>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploading = Object.values(uploadItems).some((u) => u.error === null && u.progress < 100)
 
@@ -631,13 +632,13 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   // retry/resume ≥16 MB, watchdog + connectivity-verified single PUT below).
   // The old inline XHR had a 2-minute wall clock on the WHOLE file — on a
   // slow link, anything big could never finish and died retrying from zero.
-  const uploadSingleFile = async (file: File) => {
+  const uploadSingleFile = async (file: File, itemKey: string = `0:${file.name}`) => {
     const mimeType = file.type || 'application/octet-stream'
-    const setItem = (patch: Partial<{ progress: number; retrying: boolean; error: string | null }>) =>
-      setUploadItems((prev) => ({ ...prev, [file.name]: { ...{ progress: 0, retrying: false, error: null }, ...prev[file.name], ...patch } }))
-    const removeItem = () => setUploadItems((prev) => { const n = { ...prev }; delete n[file.name]; return n })
+    const setItem = (patch: Partial<{ progress: number; retrying: boolean; waiting?: boolean; error: string | null }>) =>
+      setUploadItems((prev) => ({ ...prev, [itemKey]: { ...{ progress: 0, retrying: false, error: null }, ...prev[itemKey], ...patch } }))
+    const removeItem = () => setUploadItems((prev) => { const n = { ...prev }; delete n[itemKey]; return n })
 
-    setItem({ progress: 0 })
+    setItem({ progress: 0, waiting: false })
     try {
       const { storageKey } = await uploadGalleryFile(apiFetch, {
         file,
@@ -662,9 +663,28 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
     }
   }
 
+  // Batch uploads run through a small queue: 2 files at a time, the rest
+  // shown as "Waiting…". Any batch size works (20+, whatever the picker or a
+  // drop delivers) — starting them ALL at once made every file fight every
+  // other file for bandwidth and connections.
+  const UPLOAD_QUEUE_CONCURRENCY = 2
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return
-    await Promise.all(Array.from(files).map(uploadSingleFile))
+    const entries = Array.from(files).map((file, i) => ({ file, key: `${i}:${file.name}` }))
+    // Show every file immediately so a 20-file drop is visibly accounted for.
+    setUploadItems((prev) => {
+      const next = { ...prev }
+      for (const { key } of entries) next[key] = { progress: 0, retrying: false, waiting: true, error: null }
+      return next
+    })
+    let cursor = 0
+    const workers = Array.from({ length: Math.min(UPLOAD_QUEUE_CONCURRENCY, entries.length) }, async () => {
+      while (cursor < entries.length) {
+        const { file, key } = entries[cursor++]
+        await uploadSingleFile(file, key)
+      }
+    })
+    await Promise.all(workers)
     qc.refetchQueries({ queryKey: ['gallery_files', ownerId] })
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -839,11 +859,11 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
       {/* Upload progress toasts */}
       {Object.keys(uploadItems).length > 0 && (
         <div className="px-3 sm:px-6 py-2 border-b border-border bg-card/30 space-y-1.5">
-          {Object.entries(uploadItems).map(([name, item]) => (
-            <div key={name} className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">{name}</p>
+          {Object.entries(uploadItems).map(([key, item]) => (
+            <div key={key} className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">{key.replace(/^\d+:/, '')}</p>
               <span className="text-xs flex-shrink-0">
-                {item.error ? <span className="text-destructive">✗ Failed</span> : item.retrying ? <span className="text-amber-500">Retrying…</span> : item.progress === 100 ? <span className="text-green-600">✓</span> : `${item.progress}%`}
+                {item.error ? <span className="text-destructive">✗ Failed</span> : item.waiting ? <span className="text-muted-foreground">Waiting…</span> : item.retrying ? <span className="text-amber-500">Retrying…</span> : item.progress === 100 ? <span className="text-green-600">✓</span> : `${item.progress}%`}
               </span>
               <div className="w-20 h-1 bg-muted rounded-full overflow-hidden flex-shrink-0">
                 <div
