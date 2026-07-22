@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-07-19 — Completed gallery uploads stay listed (`60c0e78`)
+
+Per operator: finished files vanished mid-batch (looked like lost uploads). Rows now keep a green ✓
+during the batch; one summary toast; completed rows sweep 5 s after the whole batch settles;
+failures stay.
+
+---
+
 ## 2026-07-19 — Gallery batch queue for 20+ file drops (`e548b43`)
 
 Large batches previously started every file simultaneously (bandwidth/connection stampede). Now a
