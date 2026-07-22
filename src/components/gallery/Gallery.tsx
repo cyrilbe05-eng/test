@@ -443,6 +443,10 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   // Drag state
   const [draggingFileId, setDraggingFileId] = useState<string | null>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
+  // OS-file drag (drop-from-desktop upload) — distinct from the internal
+  // file-move drag above; detected via dataTransfer.types includes 'Files'.
+  const [fileDragOver, setFileDragOver] = useState(false)
+  const fileDragDepth = useRef(0)
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
@@ -665,9 +669,45 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  // ── OS-file drag & drop (upload from desktop) ──
+  const isOsFileDrag = (e: React.DragEvent) => !readOnly && e.dataTransfer.types.includes('Files')
+  const onOsDragEnter = (e: React.DragEvent) => {
+    if (!isOsFileDrag(e)) return
+    fileDragDepth.current++
+    setFileDragOver(true)
+  }
+  const onOsDragOver = (e: React.DragEvent) => {
+    if (isOsFileDrag(e)) e.preventDefault()
+  }
+  const onOsDragLeave = () => {
+    if (fileDragDepth.current > 0) fileDragDepth.current--
+    if (fileDragDepth.current === 0) setFileDragOver(false)
+  }
+  const onOsDrop = (e: React.DragEvent) => {
+    if (!isOsFileDrag(e)) return
+    e.preventDefault()
+    fileDragDepth.current = 0
+    setFileDragOver(false)
+    if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files)
+  }
+
   // ── Render ──
   return (
-    <div className="flex flex-col h-full" onClick={() => setContextMenu(null)}>
+    <div
+      className="flex flex-col h-full relative"
+      onClick={() => setContextMenu(null)}
+      onDragEnter={onOsDragEnter}
+      onDragOver={onOsDragOver}
+      onDragLeave={onOsDragLeave}
+      onDrop={onOsDrop}
+    >
+      {fileDragOver && (
+        <div className="absolute inset-2 z-40 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center pointer-events-none">
+          <p className="text-sm font-semibold text-primary">
+            Drop files to upload{folderPath.length > 0 ? ` to “${folderPath[folderPath.length - 1].name}”` : ''}
+          </p>
+        </div>
+      )}
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 sm:px-6 py-2.5 border-b border-border bg-card/50 gap-2">
         {/* Breadcrumb */}

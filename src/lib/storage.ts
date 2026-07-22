@@ -41,11 +41,13 @@ export interface StorageAdapter {
 // above MULTIPART_THRESHOLD go multipart so an interruption costs one part
 // instead of the whole file — that resume-not-restart property is worth the
 // extra round-trips on anything a flaky connection takes minutes to move.
-// 2, not 6: on a 2–5 Mbit/s uplink parallel streams starve each other — a
-// part that gets no bandwidth for long enough trips the stall watchdog, its
-// progress resets, and the upload looks like it "breaks down at 10%". Two
-// streams keep the pipe full with far less mutual starvation.
-const PART_CONCURRENCY = 2
+// Adaptive fan-out bounds. Start gentle: on a 2–5 Mbit/s uplink parallel
+// streams starve each other (a starved part trips the stall watchdog and
+// resets its progress). But a clean, faster link deserves more streams —
+// the uploader scales itself up while parts keep completing without any
+// network trouble, and collapses back the moment trouble appears.
+const MIN_PART_CONCURRENCY = 2
+const MAX_PART_CONCURRENCY = 6
 const PART_MAX_RETRIES = 5
 // Idle-progress timeout: abort a part PUT only if no bytes move for this long.
 // Replaces the old total-time timeout, which would kill long-running parts
@@ -143,6 +145,31 @@ async function apiFetchResilient<T>(
   }
 }
 
+/** Keep the screen awake while an upload runs — on phones, screen-off
+ *  freezes the page and kills the transfer mid-flight. Best-effort: silently
+ *  a no-op where the Wake Lock API is unsupported. Returns a release fn. */
+async function acquireWakeLock(): Promise<() => void> {
+  try {
+    const anyNav = typeof navigator !== 'undefined' ? (navigator as any) : null
+    if (!anyNav?.wakeLock?.request) return () => {}
+    let lock: any = await anyNav.wakeLock.request('screen')
+    // The lock auto-releases when the tab is hidden; re-acquire when the
+    // user comes back so the rest of the upload stays protected.
+    const reacquire = async () => {
+      if (document.visibilityState === 'visible') {
+        try { lock = await anyNav.wakeLock.request('screen') } catch { /* best-effort */ }
+      }
+    }
+    document.addEventListener('visibilitychange', reacquire)
+    return () => {
+      document.removeEventListener('visibilitychange', reacquire)
+      try { lock?.release?.() } catch { /* best-effort */ }
+    }
+  } catch {
+    return () => {}
+  }
+}
+
 /** Resilient whole-file PUT (files below MULTIPART_THRESHOLD). Shared by the
  *  project-file and gallery paths: idle-progress watchdog, verified-
  *  connectivity waits on transport failures (never kills the upload),
@@ -217,6 +244,14 @@ export function useStorageAdapter(): StorageAdapter {
 
   return {
     async upload({ file, projectId, fileType, onProgress, onConnectionState, previewArtifact }) {
+      const releaseWakeLock = await acquireWakeLock()
+      try {
+        return await doUpload()
+      } finally {
+        releaseWakeLock()
+      }
+
+      async function doUpload(): Promise<{ key: string; fileId?: string }> {
       if (file.size >= MULTIPART_THRESHOLD) {
         const key = await uploadMultipart({ file, projectId, fileType, onProgress, onConnectionState, apiFetch, previewArtifact })
         if (previewArtifact) return { key }
@@ -253,6 +288,7 @@ export function useStorageAdapter(): StorageAdapter {
       if (previewArtifact) return { key }
       const registered = await registerWithRetry({ apiFetch, projectId, fileType, key, file })
       return { key, fileId: registered?.id }
+      }
     },
 
     async getSignedUrl(_key, _expiresInSeconds = 3600) {
@@ -298,36 +334,41 @@ export async function uploadGalleryFile(
   },
 ): Promise<{ storageKey: string }> {
   const { file, ownerId, onProgress, onConnectionState } = args
-  if (file.size >= MULTIPART_THRESHOLD) {
-    const key = await uploadMultipart({
-      file,
-      onProgress,
-      onConnectionState,
-      apiFetch,
-      gallery: { ownerId: ownerId ?? null },
-    })
+  const releaseWakeLock = await acquireWakeLock()
+  try {
+    if (file.size >= MULTIPART_THRESHOLD) {
+      const key = await uploadMultipart({
+        file,
+        onProgress,
+        onConnectionState,
+        apiFetch,
+        gallery: { ownerId: ownerId ?? null },
+      })
+      return { storageKey: key }
+    }
+    const reporter = createConnectionReporter(onConnectionState)
+    const requestUploadUrl = async () => {
+      const { uploadUrl, storageKey } = await apiFetchResilient<{ uploadUrl: string; storageKey: string }>(
+        apiFetch,
+        '/api/gallery/upload-url',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            fileName: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            fileSize: file.size,
+            ownerId: ownerId ?? undefined,
+          }),
+        },
+        { onNetworkWait: () => reporter.set('offline') },
+      )
+      return { uploadUrl, key: storageKey }
+    }
+    const key = await singlePutResilient({ file, requestUploadUrl, reporter, onProgress })
     return { storageKey: key }
+  } finally {
+    releaseWakeLock()
   }
-  const reporter = createConnectionReporter(onConnectionState)
-  const requestUploadUrl = async () => {
-    const { uploadUrl, storageKey } = await apiFetchResilient<{ uploadUrl: string; storageKey: string }>(
-      apiFetch,
-      '/api/gallery/upload-url',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          fileName: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          fileSize: file.size,
-          ownerId: ownerId ?? undefined,
-        }),
-      },
-      { onNetworkWait: () => reporter.set('offline') },
-    )
-    return { uploadUrl, key: storageKey }
-  }
-  const key = await singlePutResilient({ file, requestUploadUrl, reporter, onProgress })
-  return { storageKey: key }
 }
 
 /** Resilient API call for post-upload bookkeeping (e.g. gallery register):
@@ -431,6 +472,17 @@ async function uploadMultipart(args: {
   // abort, wasting bandwidth and racing the /abort cleanup call.
   const abortController = new AbortController()
 
+  // Adaptive concurrency state. cleanStreak counts consecutive part
+  // completions since the last network incident anywhere in this upload;
+  // uploadOnePart calls noteNetworkTrouble() on transport failures so the
+  // fan-out collapses to the safe minimum immediately.
+  let targetConcurrency = MIN_PART_CONCURRENCY
+  let cleanStreak = 0
+  const noteNetworkTrouble = () => {
+    cleanStreak = 0
+    targetConcurrency = MIN_PART_CONCURRENCY
+  }
+
   const refreshUrl = async (partNumber: number): Promise<string> => {
     // Resilient: a dropped connection during re-sign pauses and retries
     // instead of throwing out of the part loop and killing the whole upload.
@@ -508,6 +560,7 @@ async function uploadMultipart(args: {
         }
         if (isNetworkError(err)) {
           netFailures++
+          noteNetworkTrouble()
           reporter.set(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'retrying')
           await waitForConnectivity(abortController.signal)
           if (abortController.signal.aborted) throw new Error('aborted')
@@ -525,6 +578,7 @@ async function uploadMultipart(args: {
         // (capped backoff, cancellable) instead of dying.
         if (typeof err?.status === 'number' && err.status >= 500) {
           serverFailures++
+          noteNetworkTrouble()
           reporter.set('retrying')
           await sleep(backoffDelayMs(Math.min(serverFailures, 4)), abortController.signal)
           continue
@@ -540,19 +594,63 @@ async function uploadMultipart(args: {
     }
   }
 
-  // Concurrency-limited fan-out. We pull from a shared cursor so the worker
-  // count stays at PART_CONCURRENCY regardless of which parts finish first.
+  // Adaptive fan-out. Workers pull from a shared cursor; the pool grows from
+  // MIN to MAX concurrency while parts keep completing cleanly (2 clean → 4
+  // workers, 8 clean → 6), and shrinks back the moment noteNetworkTrouble()
+  // fires — excess workers exit at their next loop check.
   let cursor = 1
-  const workers = Array.from({ length: Math.min(PART_CONCURRENCY, partCount) }, async () => {
-    while (cursor <= partCount && !abortController.signal.aborted) {
-      const n = cursor++
-      const result = await uploadOnePart(n)
-      completed.push(result)
+  let activeWorkers = 0
+  let settled = false
+  let resolveAll!: () => void
+  let rejectAll!: (e: unknown) => void
+  const allDone = new Promise<void>((res, rej) => { resolveAll = res; rejectAll = rej })
+
+  const spawnWorkers = () => {
+    while (activeWorkers < targetConcurrency && cursor <= partCount && !abortController.signal.aborted && !settled) {
+      void runWorker()
     }
-  })
+  }
+
+  const notePartSuccess = () => {
+    cleanStreak++
+    const before = targetConcurrency
+    if (cleanStreak >= 8) targetConcurrency = MAX_PART_CONCURRENCY
+    else if (cleanStreak >= 2) targetConcurrency = Math.max(targetConcurrency, 4)
+    if (targetConcurrency > before) spawnWorkers()
+  }
+
+  const runWorker = async () => {
+    activeWorkers++
+    try {
+      while (!abortController.signal.aborted && activeWorkers <= targetConcurrency && cursor <= partCount) {
+        const n = cursor++
+        const result = await uploadOnePart(n)
+        completed.push(result)
+        notePartSuccess()
+      }
+    } catch (e) {
+      if (!settled) { settled = true; rejectAll(e) }
+    } finally {
+      activeWorkers--
+      if (!settled && activeWorkers === 0) {
+        if (completed.length === partCount) {
+          settled = true
+          resolveAll()
+        } else if (!abortController.signal.aborted && cursor <= partCount) {
+          // Everyone exited on a shrink race but parts remain — restart.
+          spawnWorkers()
+        } else if (!abortController.signal.aborted) {
+          settled = true
+          rejectAll(new Error('upload workers exited before all parts completed'))
+        }
+      }
+    }
+  }
+
+  spawnWorkers()
 
   try {
-    await Promise.all(workers)
+    await allDone
   } catch (err) {
     abortController.abort()
     // Best-effort cleanup so abandoned parts don't accrue R2 storage cost.
