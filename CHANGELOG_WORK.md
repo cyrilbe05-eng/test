@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-19 — Adaptive upload speed, gallery DnD, mobile wake lock (`5c8c1d3`)
+
+Vercel now on **Pro** (memory + vercel.json updated; maxDuration 60→300 s; single catch-all kept by
+choice). Upload speed: fixed 2-stream fan-out made good links slow — now **adaptive 2→4→6 streams**
+(scales up on clean part streaks, collapses to 2 on any network trouble; slow links keep today's
+exact behavior). Gallery gets **drag & drop from desktop** (multi-file, drop overlay, current
+folder; internal move-drags unaffected). Mobile: **screen wake lock** during uploads — screen-off
+was freezing the page and killing transfers; that was the main mobile-vs-desktop upload difference.
+
+---
+
 ## 2026-07-19 — Live upload progress during project creation (`08fc50e`)
 
 Creating a project with files froze the form with zero feedback while post-submit uploads ran.
