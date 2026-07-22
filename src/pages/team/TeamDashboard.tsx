@@ -76,6 +76,11 @@ function TeamKanban({ projects }: { projects: (Project & { is_assigned?: boolean
                         {(p as any).profiles.full_name}
                       </p>
                     )}
+                    <p className="text-[10px] text-muted-foreground/70 mt-1 truncate">
+                      {(p as any).assigned_team_names
+                        ? <>👤 {(p as any).assigned_team_names}</>
+                        : <span className="text-amber-600/80">Unassigned</span>}
+                    </p>
                     <p className="text-[10px] text-muted-foreground/70 mt-1">
                       {projectTimeLabel(p)}
                     </p>
@@ -162,7 +167,7 @@ export default function TeamDashboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left bg-muted/20">
-                  {['Client', 'Title', 'Status', 'Updated', ''].map((h) => (
+                  {['Client', 'Title', 'Status', 'Assigned to', 'Updated', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -178,6 +183,9 @@ export default function TeamDashboard() {
                       <Link to={`/team/projects/${p.id}`} className="text-primary hover:underline font-medium">{p.title}</Link>
                     </td>
                     <td className="px-4 py-3"><ProjectStatusBadge status={p.status} /></td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">
+                      {(p as any).assigned_team_names ?? <span className="text-amber-600/80">Unassigned</span>}
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
                       {projectTimeLabel(p)}
                     </td>

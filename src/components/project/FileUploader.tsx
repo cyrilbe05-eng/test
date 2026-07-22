@@ -140,15 +140,19 @@ export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, o
           onChange={(e) => handleFiles(e.target.files)}
         />
         <div className="space-y-2">
-          <div className="mx-auto w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+          <div className={cn('mx-auto w-10 h-10 rounded-lg flex items-center justify-center transition-colors', dragging ? 'bg-primary/25' : 'bg-primary/10')}>
             <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
           </div>
-          <p className="text-sm text-foreground font-medium">
-            Drop files here or <span className="text-primary">click to browse</span>
-          </p>
-          {maxSizeMb && <p className="text-xs text-muted-foreground">Max {maxSizeMb} MB per file</p>}
+          {dragging ? (
+            <p className="text-sm text-primary font-semibold">Release to upload here</p>
+          ) : (
+            <p className="text-sm text-foreground font-medium">
+              Drop files here or <span className="text-primary">click to browse</span>
+            </p>
+          )}
+          {maxSizeMb && !dragging && <p className="text-xs text-muted-foreground">Max {maxSizeMb} MB per file</p>}
         </div>
       </div>
 

@@ -411,15 +411,21 @@ async function handleGetProjects(req: VercelRequest, res: VercelResponse) {
         [clerkUserId]
       )
     } else {
+      // Team list also carries WHO is assigned (assigned_team_names) so
+      // editors can see ownership and self-assign accordingly.
       rows = await dbQuery<ProjectWithProfile>(
         `SELECT pr.*,
           p.full_name  AS profile_full_name,
           p.email      AS profile_email,
           p.avatar_url AS profile_avatar_url,
-          CASE WHEN pa.project_id IS NOT NULL THEN 1 ELSE 0 END AS is_assigned
+          MAX(CASE WHEN pa.team_member_id IS NOT NULL THEN 1 ELSE 0 END) AS is_assigned,
+          GROUP_CONCAT(tm.full_name, ', ') AS assigned_team_names
          FROM projects pr
          LEFT JOIN profiles p ON pr.client_id = p.id
          LEFT JOIN project_assignments pa ON pa.project_id = pr.id AND pa.team_member_id = ?
+         LEFT JOIN project_assignments pa2 ON pa2.project_id = pr.id
+         LEFT JOIN profiles tm ON tm.id = pa2.team_member_id
+         GROUP BY pr.id
          ORDER BY pr.created_at DESC`,
         [clerkUserId]
       )
@@ -629,6 +635,59 @@ async function handleAssignProject(req: VercelRequest, res: VercelResponse) {
     }
 
     res.json({ ok: true })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
+/** Team self-assign ("claim"). Mirrors handleAssignProject's side effects
+ *  (assignment row, next-day deadline) but is callable by the team member
+ *  themselves; admins get notified instead of the assignee. */
+async function handleClaimProject(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { clerkUserId, profile } = await requireAuth(req)
+    requireRole(profile, 'team')
+
+    const projectId = req.query.id as string
+    const [project] = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [projectId])
+    if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+
+    const now = nowIso()
+    const assignmentId = newId()
+    const result = await dbExecute(
+      `INSERT OR IGNORE INTO project_assignments (id, project_id, team_member_id, assigned_by, assigned_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [assignmentId, projectId, clerkUserId, clerkUserId, now]
+    )
+
+    if (result.changes > 0) {
+      // Same deadline policy as an admin assignment: end of next calendar day.
+      const tomorrow = new Date(now)
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+      tomorrow.setUTCHours(23, 59, 0, 0)
+      await dbExecute(
+        `INSERT OR IGNORE INTO deadlines (id, project_id, team_member_id, assignment_id, due_at, status, created_at)
+         VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+        [newId(), projectId, clerkUserId, assignmentId, tomorrow.toISOString(), now]
+      )
+
+      const msg = `${profile.full_name} assigned themselves to "${project.title}"`
+      const admins = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
+      await Promise.all(admins.map((a) =>
+        dbExecute(
+          'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
+          [newId(), a.id, projectId, 'team_assigned', msg, now]
+        )
+      ))
+      await sendEmailNotifications(admins.map((a) => ({
+        recipientId: a.id,
+        subject: msg,
+        text: `${msg}\n\nView it here: ${projectUrl(projectId, 'admin')}`,
+      })))
+    }
+
+    res.json({ ok: true, alreadyAssigned: result.changes === 0 })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
@@ -1096,12 +1155,14 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
 interface StorageRow { used_mb: number }
 interface PlanRow { storage_limit_mb: number }
 
-/** Server-side deliverable cap: throws 403 when a non-admin tries to start a
- *  deliverable upload past the project's max_deliverables snapshot. The UI
- *  gates this too, but limits must hold at the API (AGENTS.md §3). Runs at
- *  presigned-URL issuance so no bytes move before the check. */
+/** Deliverable cap — RELAXED per operator decision 2026-07-19: editors need
+ *  to upload multiple VARIATIONS of a deliverable, so team uploads are no
+ *  longer blocked by the plan's max_deliverables snapshot (the counter in
+ *  the UI stays as guidance, and what a client ultimately receives is still
+ *  controlled by admin approval + download gating). The check now only stops
+ *  CLIENT-role deliverable uploads, which the UI never offers anyway. */
 async function enforceDeliverableCap(profile: { role: string }, projectId: string, fileType: string): Promise<void> {
-  if (fileType !== 'deliverable' || profile.role === 'admin') return
+  if (fileType !== 'deliverable' || profile.role === 'admin' || profile.role === 'team') return
   const [proj] = await dbQuery<{ max_deliverables: number }>(
     'SELECT max_deliverables FROM projects WHERE id = ?',
     [projectId]
@@ -3920,6 +3981,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug.length === 2) {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleGetProject(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'claim') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleClaimProject(req, res)
     }
     if (slug.length === 3 && slug[2] === 'assign') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }

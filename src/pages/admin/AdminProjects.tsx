@@ -74,7 +74,9 @@ function DropZone({ label, files, onFiles, onRemove, accept, dragging, onDragCha
           input.click()
         }}
       >
-        <p className="text-sm text-muted-foreground">{label} or <span className="text-primary font-medium">browse</span></p>
+        <p className={dragging ? 'text-sm text-primary font-semibold' : 'text-sm text-muted-foreground'}>
+          {dragging ? 'Release to upload here' : <>{label} or <span className="text-primary font-medium">browse</span></>}
+        </p>
       </div>
       {files.length > 0 && (
         <ul className="mt-2 space-y-1.5">

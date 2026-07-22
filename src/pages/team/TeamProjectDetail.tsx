@@ -5,7 +5,8 @@ import { getSignedUrlById } from '@/lib/storage'
 import { useApiFetch } from '@/lib/api'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
-import { useProject, useProjectFiles, useTimelineComments, useUpdateProjectStatus } from '@/hooks/useProjects'
+import { useProject, useProjectFiles, useProjectAssignments, useTimelineComments, useUpdateProjectStatus } from '@/hooks/useProjects'
+import { useAuth } from '@/hooks/useAuth'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
 import { FileUploader } from '@/components/project/FileUploader'
@@ -155,10 +156,42 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
 export default function TeamProjectDetail() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
+  const apiFetch = useApiFetch()
+  const { profile } = useAuth()
   const { data: project } = useProject(id)
   const { data: files, refetch: refetchFiles } = useProjectFiles(id)
-  const { data: comments } = useTimelineComments(id)
+  const { data: comments, refetch: refetchComments } = useTimelineComments(id)
+  const { data: assignments, refetch: refetchAssignments } = useProjectAssignments(id)
   const updateStatus = useUpdateProjectStatus()
+  const [claiming, setClaiming] = useState(false)
+  const isAssignedToMe = (assignments ?? []).some((a: any) => a.team_member_id === profile?.id)
+
+  const handleClaim = async () => {
+    if (!id) return
+    setClaiming(true)
+    try {
+      await apiFetch(`/api/projects/${id}/claim`, { method: 'POST' })
+      toast.success('You are now assigned to this project')
+      refetchAssignments()
+      qc.invalidateQueries({ queryKey: ['projects'] })
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to assign yourself')
+    } finally {
+      setClaiming(false)
+    }
+  }
+
+  const toggleResolved = async (comment: { id: string; resolved?: boolean | number | null }) => {
+    try {
+      await apiFetch(`/api/timeline-comments/${comment.id}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify({ resolved: !comment.resolved }),
+      })
+      refetchComments()
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to update')
+    }
+  }
 
   const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable')
   const sourceFiles = (files ?? []).filter((f) => f.file_type !== 'deliverable')
@@ -272,12 +305,34 @@ export default function TeamProjectDetail() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                   <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Revision Comments</h3>
-                  <span className="ml-auto text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{comments.length}</span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {comments.some((c) => !c.resolved) ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600">
+                        {comments.filter((c) => !c.resolved).length} open
+                      </span>
+                    ) : (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-600">All addressed</span>
+                    )}
+                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{comments.length}</span>
+                  </div>
                 </div>
                 <div className="divide-y divide-border/40">
                   {comments.map((c) => (
-                    <div key={c.id} className="px-4 py-3">
+                    <div key={c.id} className={cn('px-4 py-3', c.resolved && 'opacity-60')}>
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        {/* Revision checklist — same control the admin player has */}
+                        <button
+                          onClick={() => toggleResolved(c)}
+                          title={c.resolved ? 'Mark as outstanding' : 'Mark as addressed'}
+                          className={cn(
+                            'w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors',
+                            c.resolved ? 'bg-green-500 border-green-500 text-white' : 'border-muted-foreground/50 hover:border-green-500',
+                          )}
+                        >
+                          {c.resolved ? (
+                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                          ) : null}
+                        </button>
                         <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground flex-shrink-0">
                           {c.profiles?.full_name?.charAt(0) ?? '?'}
                         </span>
@@ -286,11 +341,12 @@ export default function TeamProjectDetail() {
                         {c.timestamp_sec !== null && (
                           <span className="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
                             {formatTimestamp(c.timestamp_sec)}
+                            {c.timestamp_end_sec != null && `–${formatTimestamp(c.timestamp_end_sec)}`}
                           </span>
                         )}
                         <span className="ml-auto text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</span>
                       </div>
-                      <p className="text-sm text-foreground/80 leading-relaxed pl-7">{c.comment_text}</p>
+                      <p className={cn('text-sm text-foreground/80 leading-relaxed pl-7', c.resolved && 'line-through')}>{c.comment_text}</p>
                     </div>
                   ))}
                 </div>
@@ -331,7 +387,10 @@ export default function TeamProjectDetail() {
                   </div>
                 ))}
               </div>
-              {canUpload && (deliverables.length < project.max_deliverables || project.max_deliverables === -1) && (
+              {/* Editors can always add more VARIATIONS while uploads are open —
+                  the plan's deliverable count is guidance (counter above), not a
+                  hard wall. What the client receives stays admin-controlled. */}
+              {canUpload && (
                 <div className="px-3 pb-3">
                   <FileUploader
                     projectId={project.id}
@@ -340,11 +399,6 @@ export default function TeamProjectDetail() {
                     onUploaded={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
                   />
                 </div>
-              )}
-              {canUpload && deliverables.length >= project.max_deliverables && project.max_deliverables !== -1 && (
-                <p className="px-4 pb-3 text-xs text-muted-foreground">
-                  Deliverable limit reached — delete the existing file to replace it.
-                </p>
               )}
               {!canUpload && (
                 <p className="px-4 pb-3 text-xs text-muted-foreground">
@@ -356,6 +410,34 @@ export default function TeamProjectDetail() {
                     ? 'Project complete'
                     : 'Uploads not available in this status'}
                 </p>
+              )}
+            </div>
+
+            {/* Assigned team — visible to editors, with self-assign */}
+            <div className="clay-card p-4 space-y-2.5">
+              <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Assigned Team</h3>
+              {(assignments ?? []).length === 0 && (
+                <p className="text-xs text-muted-foreground">Nobody assigned yet.</p>
+              )}
+              {(assignments ?? []).map((a: any) => (
+                <div key={a.id} className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground flex-shrink-0">
+                    {a.profiles?.full_name?.charAt(0) ?? '?'}
+                  </span>
+                  <span className="text-sm">{a.profiles?.full_name ?? 'Unknown'}</span>
+                  {a.team_member_id === profile?.id && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">You</span>
+                  )}
+                </div>
+              ))}
+              {!isAssignedToMe && (
+                <button
+                  onClick={handleClaim}
+                  disabled={claiming}
+                  className="w-full mt-1 py-2 rounded-xl border border-primary/40 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors disabled:opacity-50"
+                >
+                  {claiming ? 'Assigning…' : 'Assign myself to this project'}
+                </button>
               )}
             </div>
 
