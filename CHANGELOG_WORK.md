@@ -5,6 +5,13 @@
 
 ---
 
+## 2026-07-19 — Gallery files appear as soon as each upload lands (`2da40b1`)
+
+Grid refetched only after the whole batch — long uploads looked like they required a page refresh.
+Now refetches after each file's registration (batch-end refetch kept as backstop).
+
+---
+
 ## 2026-07-19 — Completed gallery uploads stay listed (`60c0e78`)
 
 Per operator: finished files vanished mid-batch (looked like lost uploads). Rows now keep a green ✓
