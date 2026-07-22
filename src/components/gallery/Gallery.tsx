@@ -652,6 +652,9 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
         method: 'POST',
         body: JSON.stringify({ fileName: file.name, mimeType, fileSize: file.size, storageKey, folderId: currentFolderId, ownerId }),
       })
+      // Surface the file in the grid NOW — waiting for the whole batch made
+      // long uploads look like nothing arrived until a page refresh.
+      qc.refetchQueries({ queryKey: ['gallery_files', ownerId] })
       // Row stays visible with a ✓ — completed files disappearing mid-batch
       // made it look like uploads were getting lost. handleUpload sweeps
       // finished rows away a few seconds after the WHOLE batch settles.
