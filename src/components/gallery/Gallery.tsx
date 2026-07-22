@@ -636,7 +636,6 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
     const mimeType = file.type || 'application/octet-stream'
     const setItem = (patch: Partial<{ progress: number; retrying: boolean; waiting?: boolean; error: string | null }>) =>
       setUploadItems((prev) => ({ ...prev, [itemKey]: { ...{ progress: 0, retrying: false, error: null }, ...prev[itemKey], ...patch } }))
-    const removeItem = () => setUploadItems((prev) => { const n = { ...prev }; delete n[itemKey]; return n })
 
     setItem({ progress: 0, waiting: false })
     try {
@@ -653,8 +652,10 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
         method: 'POST',
         body: JSON.stringify({ fileName: file.name, mimeType, fileSize: file.size, storageKey, folderId: currentFolderId, ownerId }),
       })
-      toast.success(`${file.name} uploaded`)
-      setTimeout(removeItem, 1200)
+      // Row stays visible with a ✓ — completed files disappearing mid-batch
+      // made it look like uploads were getting lost. handleUpload sweeps
+      // finished rows away a few seconds after the WHOLE batch settles.
+      setItem({ progress: 100, retrying: false })
       return true
     } catch (err) {
       setItem({ error: (err as Error).message ?? 'Upload failed', progress: 0 })
@@ -678,15 +679,28 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
       return next
     })
     let cursor = 0
+    let okCount = 0
     const workers = Array.from({ length: Math.min(UPLOAD_QUEUE_CONCURRENCY, entries.length) }, async () => {
       while (cursor < entries.length) {
         const { file, key } = entries[cursor++]
-        await uploadSingleFile(file, key)
+        if (await uploadSingleFile(file, key)) okCount++
       }
     })
     await Promise.all(workers)
     qc.refetchQueries({ queryKey: ['gallery_files', ownerId] })
     if (fileInputRef.current) fileInputRef.current.value = ''
+    if (okCount > 0) toast.success(`${okCount} file${okCount > 1 ? 's' : ''} uploaded`)
+    // Sweep completed rows a moment after the batch settles; keep failures
+    // (and anything a newer overlapping batch still has in flight).
+    setTimeout(() => {
+      setUploadItems((prev) => {
+        const next: typeof prev = {}
+        for (const [k, v] of Object.entries(prev)) {
+          if (v.error || v.waiting || v.progress < 100) next[k] = v
+        }
+        return next
+      })
+    }, 5000)
   }
 
   // ── OS-file drag & drop (upload from desktop) ──
