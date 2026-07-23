@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-07-23 — Stage more uploads mid-batch (`8499c8a`)
+
+Gallery Upload button was disabled while a batch ran (and a mid-batch drop would have spawned a
+second batch competing with the first). Now ONE persistent 2-at-a-time queue: picks/drops at any
+moment simply append ("Add more" button, never disabled), staged files show as Waiting… instantly,
+the completion toast counts everything since the queue last drained, keys are batch-independent.
+
+---
+
 ## 2026-07-19 — Editor batch: variations, self-assign, checklist, drag cues (`ad12270`)
 
 - **Deliverable variations:** `max_deliverables` no longer blocks team uploads (client-role only
