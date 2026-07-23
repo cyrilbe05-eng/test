@@ -667,43 +667,63 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
     }
   }
 
-  // Batch uploads run through a small queue: 2 files at a time, the rest
-  // shown as "Waiting…". Any batch size works (20+, whatever the picker or a
-  // drop delivers) — starting them ALL at once made every file fight every
-  // other file for bandwidth and connections.
+  // One PERSISTENT upload queue, 2 files at a time. More files can be staged
+  // at any moment — mid-upload drops/picks just append to the queue instead
+  // of requiring the current batch to finish (or spawning a parallel batch
+  // that fights the running one for bandwidth).
   const UPLOAD_QUEUE_CONCURRENCY = 2
-  const handleUpload = async (files: FileList | null) => {
+  const pendingUploadsRef = useRef<{ file: File; key: string }[]>([])
+  const activeUploadWorkersRef = useRef(0)
+  const uploadSeqRef = useRef(0)
+  const okSinceDrainRef = useRef(0)
+
+  const drainUploadQueue = async () => {
+    activeUploadWorkersRef.current++
+    try {
+      for (;;) {
+        const next = pendingUploadsRef.current.shift()
+        if (!next) break
+        if (await uploadSingleFile(next.file, next.key)) okSinceDrainRef.current++
+      }
+    } finally {
+      activeUploadWorkersRef.current--
+      if (activeUploadWorkersRef.current === 0) {
+        // Queue fully drained (including anything staged mid-flight).
+        qc.refetchQueries({ queryKey: ['gallery_files', ownerId] })
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        const ok = okSinceDrainRef.current
+        okSinceDrainRef.current = 0
+        if (ok > 0) toast.success(`${ok} file${ok > 1 ? 's' : ''} uploaded`)
+        // Sweep completed rows shortly after; keep failures and anything a
+        // brand-new stage has already queued.
+        setTimeout(() => {
+          setUploadItems((prev) => {
+            const next: typeof prev = {}
+            for (const [k, v] of Object.entries(prev)) {
+              if (v.error || v.waiting || v.progress < 100) next[k] = v
+            }
+            return next
+          })
+        }, 5000)
+      }
+    }
+  }
+
+  const handleUpload = (files: FileList | null) => {
     if (!files || files.length === 0) return
-    const entries = Array.from(files).map((file, i) => ({ file, key: `${i}:${file.name}` }))
-    // Show every file immediately so a 20-file drop is visibly accounted for.
+    const entries = Array.from(files).map((file) => ({ file, key: `${uploadSeqRef.current++}:${file.name}` }))
+    // Show every staged file immediately so nothing feels lost.
     setUploadItems((prev) => {
       const next = { ...prev }
       for (const { key } of entries) next[key] = { progress: 0, retrying: false, waiting: true, error: null }
       return next
     })
-    let cursor = 0
-    let okCount = 0
-    const workers = Array.from({ length: Math.min(UPLOAD_QUEUE_CONCURRENCY, entries.length) }, async () => {
-      while (cursor < entries.length) {
-        const { file, key } = entries[cursor++]
-        if (await uploadSingleFile(file, key)) okCount++
-      }
-    })
-    await Promise.all(workers)
-    qc.refetchQueries({ queryKey: ['gallery_files', ownerId] })
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    if (okCount > 0) toast.success(`${okCount} file${okCount > 1 ? 's' : ''} uploaded`)
-    // Sweep completed rows a moment after the batch settles; keep failures
-    // (and anything a newer overlapping batch still has in flight).
-    setTimeout(() => {
-      setUploadItems((prev) => {
-        const next: typeof prev = {}
-        for (const [k, v] of Object.entries(prev)) {
-          if (v.error || v.waiting || v.progress < 100) next[k] = v
-        }
-        return next
-      })
-    }, 5000)
+    pendingUploadsRef.current.push(...entries)
+    const toSpawn = Math.min(
+      UPLOAD_QUEUE_CONCURRENCY - activeUploadWorkersRef.current,
+      pendingUploadsRef.current.length,
+    )
+    for (let i = 0; i < toSpawn; i++) void drainUploadQueue()
   }
 
   // ── OS-file drag & drop (upload from desktop) ──
@@ -856,8 +876,8 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-sm bg-primary text-white font-medium shadow-clay hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-60"
+                title={uploading ? 'Uploads in progress — new files join the queue' : 'Upload files'}
+                className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-sm bg-primary text-white font-medium shadow-clay hover:brightness-110 transition-all active:scale-[0.98]"
               >
                 {uploading ? (
                   <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin flex-shrink-0" />
@@ -866,7 +886,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
                 )}
-                <span className="hidden sm:inline">{uploading ? 'Uploading…' : 'Upload'}</span>
+                <span className="hidden sm:inline">{uploading ? 'Add more' : 'Upload'}</span>
               </button>
             </>
           )}
