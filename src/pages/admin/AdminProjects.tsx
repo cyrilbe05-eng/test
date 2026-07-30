@@ -9,11 +9,11 @@ import { toast } from 'sonner'
 import { useProjects } from '@/hooks/useProjects'
 import { KanbanBoard } from '@/components/admin/KanbanBoard'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
-import { UploadProgressList, type UploadProgressItem } from '@/components/project/UploadProgressList'
+import { useUploadManager } from '@/lib/uploadManager'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { useApiFetch } from '@/lib/api'
 import { useStorageAdapter } from '@/lib/storage'
-import { cn, projectTimeLabel } from '@/lib/utils'
+import { cn, projectTimeLabel, sortByRecentActivity } from '@/lib/utils'
 import type { Profile } from '@/types'
 
 function IconLayout() {
@@ -102,8 +102,7 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
   const [attachments, setAttachments] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [dragTarget, setDragTarget] = useState<'source' | 'attachment' | null>(null)
-  // Live per-file progress for the post-submit uploads (see UploadProgressList).
-  const [uploadItems, setUploadItems] = useState<UploadProgressItem[]>([])
+  const { enqueue } = useUploadManager()
 
   const { data: users = [] } = useQuery<Profile[]>({
     queryKey: ['users'],
@@ -129,26 +128,19 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
         }),
       })
 
-      const toUpload = [
+      // Background queue — the modal closes immediately and the dock carries
+      // the transfers (see UploadManagerProvider).
+      const projectId = project!.id
+      enqueue([
         ...sourceFiles.map((file) => ({ file, fileType: 'source_video' as const })),
         ...attachments.map((file) => ({ file, fileType: 'attachment' as const })),
-      ]
-      setUploadItems(toUpload.map(({ file }) => ({ name: file.name, status: 'pending', progress: 0 })))
-      const patchItem = (idx: number, update: Partial<UploadProgressItem>) =>
-        setUploadItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...update } : it)))
-
-      for (let i = 0; i < toUpload.length; i++) {
-        const { file, fileType } = toUpload[i]
-        patchItem(i, { status: 'uploading' })
-        await storageAdapter.upload({
-          file,
-          projectId: project!.id,
-          fileType,
-          onProgress: (pct) => patchItem(i, { progress: pct }),
-          onConnectionState: (conn) => patchItem(i, { conn }),
-        })
-        patchItem(i, { status: 'done', progress: 100, conn: undefined })
-      }
+      ].map(({ file, fileType }) => ({
+        file,
+        label: `${fileType === 'source_video' ? 'Source video' : 'Supporting file'} · ${data.title}`,
+        invalidate: [['project_files', projectId], ['projects']],
+        run: ({ onProgress, onConnectionState }) =>
+          storageAdapter.upload({ file, projectId, fileType, onProgress, onConnectionState }).then(() => undefined),
+      })))
 
       await queryClient.invalidateQueries({ queryKey: ['projects'] })
       toast.success('Project created.')
@@ -219,8 +211,6 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
-          {submitting && <UploadProgressList title="Uploading files" items={uploadItems} />}
-
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-all">
               Cancel
@@ -230,11 +220,7 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
               disabled={submitting}
               className="flex-1 py-2.5 bg-primary rounded-xl text-white font-semibold text-sm shadow-clay hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              {submitting
-                ? uploadItems.length > 0
-                  ? `Uploading ${Math.min(uploadItems.filter((i) => i.status === 'done').length + 1, uploadItems.length)} of ${uploadItems.length}…`
-                  : 'Creating…'
-                : 'Create Project'}
+              {submitting ? 'Creating…' : 'Create Project'}
             </button>
           </div>
         </form>
@@ -302,7 +288,7 @@ export default function AdminProjects() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {(projects ?? []).map((p) => (
+                {sortByRecentActivity(projects ?? []).map((p) => (
                   <tr key={p.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3 text-muted-foreground">{(p as any).profiles?.full_name ?? '—'}</td>
                     <td className="px-4 py-3">

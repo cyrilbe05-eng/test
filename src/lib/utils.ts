@@ -32,6 +32,15 @@ export function sanitizeFileName(name: string): string {
   return name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '')
 }
 
+/** Order projects by their last activity — newest first. For completed
+ *  projects `updated_at` IS the completion moment, so the Completed dates in
+ *  list views read in proper date order instead of creation order. */
+export function sortByRecentActivity<T extends { updated_at: string }>(projects: T[]): T[] {
+  return [...projects].sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+  )
+}
+
 /** Dashboard time label for a project: completed projects show the completion
  *  date (client_approved is terminal, so updated_at IS the completion moment);
  *  everything else shows relative time. */

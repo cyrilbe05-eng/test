@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useApiFetch } from '@/lib/api'
+import { useUploadManager } from '@/lib/uploadManager'
 import { uploadGalleryFile, apiFetchResilient } from '@/lib/storage'
 import {
   useGalleryFiles,
@@ -429,7 +430,6 @@ function FolderCard({
 
 export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb = -1, readOnly = false, canDownload = true }: GalleryProps) {
   const apiFetch = useApiFetch()
-  const qc = useQueryClient()
 
   // Navigation state
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
@@ -452,11 +452,9 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
   const [moveModalFileId, setMoveModalFileId] = useState<string | null>(null)
 
-  // Upload state — keys are `${batchIndex}:${fileName}` so a batch may
-  // contain duplicate names; `waiting` marks queued files not yet started.
-  const [uploadItems, setUploadItems] = useState<Record<string, { progress: number; retrying: boolean; waiting?: boolean; error: string | null }>>({})
+  // Upload state lives in the app-level manager (progress shown in the dock).
+  const { enqueue } = useUploadManager()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const uploading = Object.values(uploadItems).some((u) => u.error === null && u.progress < 100)
 
   // Data
   const { data: allFiles = [], isLoading: filesLoading } = useGalleryFiles(ownerId)
@@ -628,102 +626,46 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   }
 
   // ── Upload ──
-  // Same resilient pipeline as project files (multipart with per-part
-  // retry/resume ≥16 MB, watchdog + connectivity-verified single PUT below).
-  // The old inline XHR had a 2-minute wall clock on the WHOLE file — on a
-  // slow link, anything big could never finish and died retrying from zero.
-  const uploadSingleFile = async (file: File, itemKey: string = `0:${file.name}`) => {
-    const mimeType = file.type || 'application/octet-stream'
-    const setItem = (patch: Partial<{ progress: number; retrying: boolean; waiting?: boolean; error: string | null }>) =>
-      setUploadItems((prev) => ({ ...prev, [itemKey]: { ...{ progress: 0, retrying: false, error: null }, ...prev[itemKey], ...patch } }))
-
-    setItem({ progress: 0, waiting: false })
-    try {
-      const { storageKey } = await uploadGalleryFile(apiFetch, {
-        file,
-        ownerId,
-        onProgress: (pct) => setItem({ progress: pct }),
-        onConnectionState: (state) => setItem({ retrying: state !== 'uploading' }),
-      })
-
-      // Bytes are safe in R2 at this point — registration must survive a
-      // network blip too, or the upload is orphaned.
-      await apiFetchResilient(apiFetch, '/api/gallery/register', {
-        method: 'POST',
-        body: JSON.stringify({ fileName: file.name, mimeType, fileSize: file.size, storageKey, folderId: currentFolderId, ownerId }),
-      })
-      // Surface the file in the grid NOW — waiting for the whole batch made
-      // long uploads look like nothing arrived until a page refresh.
-      qc.refetchQueries({ queryKey: ['gallery_files', ownerId] })
-      // Row stays visible with a ✓ — completed files disappearing mid-batch
-      // made it look like uploads were getting lost. handleUpload sweeps
-      // finished rows away a few seconds after the WHOLE batch settles.
-      setItem({ progress: 100, retrying: false })
-      return true
-    } catch (err) {
-      setItem({ error: (err as Error).message ?? 'Upload failed', progress: 0 })
-      toast.error(`Failed to upload ${file.name}`)
-      return false
-    }
-  }
-
-  // One PERSISTENT upload queue, 2 files at a time. More files can be staged
-  // at any moment — mid-upload drops/picks just append to the queue instead
-  // of requiring the current batch to finish (or spawning a parallel batch
-  // that fights the running one for bandwidth).
-  const UPLOAD_QUEUE_CONCURRENCY = 2
-  const pendingUploadsRef = useRef<{ file: File; key: string }[]>([])
-  const activeUploadWorkersRef = useRef(0)
-  const uploadSeqRef = useRef(0)
-  const okSinceDrainRef = useRef(0)
-
-  const drainUploadQueue = async () => {
-    activeUploadWorkersRef.current++
-    try {
-      for (;;) {
-        const next = pendingUploadsRef.current.shift()
-        if (!next) break
-        if (await uploadSingleFile(next.file, next.key)) okSinceDrainRef.current++
-      }
-    } finally {
-      activeUploadWorkersRef.current--
-      if (activeUploadWorkersRef.current === 0) {
-        // Queue fully drained (including anything staged mid-flight).
-        qc.refetchQueries({ queryKey: ['gallery_files', ownerId] })
-        if (fileInputRef.current) fileInputRef.current.value = ''
-        const ok = okSinceDrainRef.current
-        okSinceDrainRef.current = 0
-        if (ok > 0) toast.success(`${ok} file${ok > 1 ? 's' : ''} uploaded`)
-        // Sweep completed rows shortly after; keep failures and anything a
-        // brand-new stage has already queued.
-        setTimeout(() => {
-          setUploadItems((prev) => {
-            const next: typeof prev = {}
-            for (const [k, v] of Object.entries(prev)) {
-              if (v.error || v.waiting || v.progress < 100) next[k] = v
-            }
-            return next
-          })
-        }, 5000)
-      }
-    }
-  }
-
+  // Handed to the app-level queue: uploads survive navigation and their
+  // progress lives in the floating UploadDock. The resilient pipeline
+  // (multipart ≥16 MB with per-part retry/resume, watchdog + connectivity-
+  // verified single PUT below) is unchanged.
   const handleUpload = (files: FileList | null) => {
     if (!files || files.length === 0) return
-    const entries = Array.from(files).map((file) => ({ file, key: `${uploadSeqRef.current++}:${file.name}` }))
-    // Show every staged file immediately so nothing feels lost.
-    setUploadItems((prev) => {
-      const next = { ...prev }
-      for (const { key } of entries) next[key] = { progress: 0, retrying: false, waiting: true, error: null }
-      return next
-    })
-    pendingUploadsRef.current.push(...entries)
-    const toSpawn = Math.min(
-      UPLOAD_QUEUE_CONCURRENCY - activeUploadWorkersRef.current,
-      pendingUploadsRef.current.length,
-    )
-    for (let i = 0; i < toSpawn; i++) void drainUploadQueue()
+    const picked = Array.from(files)
+    // Folder is captured at stage time, so files land where they were dropped
+    // even if the user navigates elsewhere while they upload.
+    const folderId = currentFolderId
+    const folderName = folderPath.length > 0 ? folderPath[folderPath.length - 1].name : null
+
+    enqueue(picked.map((file) => ({
+      file,
+      label: folderName ? `Gallery · ${folderName}` : 'Gallery',
+      invalidate: [['gallery_files', ownerId]],
+      run: async ({ onProgress, onConnectionState }) => {
+        const { storageKey } = await uploadGalleryFile(apiFetch, {
+          file,
+          ownerId,
+          onProgress,
+          onConnectionState,
+        })
+        // Bytes are safe in R2 at this point — registration must survive a
+        // network blip too, or the upload is orphaned.
+        await apiFetchResilient(apiFetch, '/api/gallery/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            fileName: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            fileSize: file.size,
+            storageKey,
+            folderId,
+            ownerId,
+          }),
+        })
+      },
+    })))
+    toast.success(picked.length > 1 ? `${picked.length} files added to the upload queue` : `${picked[0].name} added to the upload queue`)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   // ── OS-file drag & drop (upload from desktop) ──
@@ -876,42 +818,20 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                title={uploading ? 'Uploads in progress — new files join the queue' : 'Upload files'}
+                title="Upload files — they continue in the background while you work"
                 className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-sm bg-primary text-white font-medium shadow-clay hover:brightness-110 transition-all active:scale-[0.98]"
               >
-                {uploading ? (
-                  <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin flex-shrink-0" />
-                ) : (
-                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                )}
-                <span className="hidden sm:inline">{uploading ? 'Add more' : 'Upload'}</span>
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span className="hidden sm:inline">Upload</span>
               </button>
             </>
           )}
         </div>
       </div>
 
-      {/* Upload progress toasts */}
-      {Object.keys(uploadItems).length > 0 && (
-        <div className="px-3 sm:px-6 py-2 border-b border-border bg-card/30 space-y-1.5">
-          {Object.entries(uploadItems).map(([key, item]) => (
-            <div key={key} className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">{key.replace(/^\d+:/, '')}</p>
-              <span className="text-xs flex-shrink-0">
-                {item.error ? <span className="text-destructive">✗ Failed</span> : item.waiting ? <span className="text-muted-foreground">Waiting…</span> : item.retrying ? <span className="text-amber-500">Retrying…</span> : item.progress === 100 ? <span className="text-green-600">✓</span> : `${item.progress}%`}
-              </span>
-              <div className="w-20 h-1 bg-muted rounded-full overflow-hidden flex-shrink-0">
-                <div
-                  className={cn('h-full rounded-full transition-all', item.error ? 'bg-destructive' : item.retrying ? 'bg-amber-400 animate-pulse' : item.progress === 100 ? 'bg-green-500' : 'bg-primary')}
-                  style={{ width: `${item.progress}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Upload progress now lives in the floating UploadDock (app-level). */}
 
       {/* New folder inline input */}
       {creatingFolder && (

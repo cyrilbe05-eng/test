@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { TeamLayout } from '@/components/workspace/TeamLayout'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
-import { cn, projectTimeLabel } from '@/lib/utils'
+import { cn, projectTimeLabel, sortByRecentActivity } from '@/lib/utils'
 import type { Project, ProjectStatus } from '@/types'
 
 // ── Kanban columns ────────────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ export default function TeamDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {allProjects.map((p, i) => (
+                {sortByRecentActivity(allProjects).map((p, i) => (
                   <tr
                     key={p.id}
                     className={cn('transition-colors hover:bg-muted/20 animate-slide-up', `stagger-${Math.min(i + 1, 7)}`)}

@@ -28,6 +28,8 @@ import DemoClientAnalytics from '@/demo/pages/DemoClientAnalytics'
 
 // ─── Production imports ───────────────────────────────────────────────────────
 import { useVersionCheck } from '@/hooks/useVersionCheck'
+import { UploadManagerProvider } from '@/lib/uploadManager'
+import { UploadDock } from '@/components/upload/UploadDock'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import Login from '@/pages/Login'
 import ChangePassword from '@/pages/ChangePassword'
@@ -125,7 +127,10 @@ function DemoApp() {
 function ProductionApp() {
   useVersionCheck()
   return (
+    // Uploads live above the router so navigating away never kills a transfer.
+    <UploadManagerProvider>
     <BrowserRouter>
+        <UploadDock />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
@@ -159,6 +164,7 @@ function ProductionApp() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     </BrowserRouter>
+    </UploadManagerProvider>
   )
 }
 

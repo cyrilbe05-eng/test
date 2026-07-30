@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useProject, useProjectFiles, useTimelineComments } from '@/hooks/useProjects'
@@ -71,14 +72,30 @@ function StorageTab({ files, approvedDeliverables, projectId, onDownload, onUplo
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{f.file_name}</p>
-                  <p className="text-xs text-muted-foreground">Approved deliverable</p>
+                  {/* Download receipt (migration 005) — confirms the handoff
+                      actually landed, so the client knows they're done. */}
+                  {f.downloaded_at ? (
+                    <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Downloaded {format(new Date(f.downloaded_at), 'd MMM yyyy')}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Approved deliverable — ready to download</p>
+                  )}
                 </div>
                 <button
                   onClick={() => onDownload(f)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors text-xs font-medium"
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors text-xs font-medium',
+                    f.downloaded_at
+                      ? 'border-border text-muted-foreground hover:bg-muted'
+                      : 'border-primary/40 text-primary hover:bg-primary/10',
+                  )}
                 >
                   <IconDownload />
-                  Download
+                  {f.downloaded_at ? 'Download again' : 'Download'}
                 </button>
               </div>
             ))}
@@ -202,6 +219,9 @@ export default function ClientProjectDetail() {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
+      // The server stamps downloaded_at on this call — refresh so the
+      // "Downloaded ✓" confirmation appears straight away.
+      refetchFiles()
     } catch (err) {
       toast.error((err as Error).message)
     }

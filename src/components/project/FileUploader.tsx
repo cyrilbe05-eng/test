@@ -1,16 +1,15 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { useStorageAdapter, type UploadConnectionState } from '@/lib/storage'
+import { useStorageAdapter } from '@/lib/storage'
+import { useUploadManager } from '@/lib/uploadManager'
 import { cn } from '@/lib/utils'
 import type { FileType } from '@/types'
 
-const CONCURRENCY = 2
-
-// NOTE: automatic review-copy generation (in-browser compression after
-// deliverable uploads) is DISABLED per operator decision 2026-07-15 — the
-// real-time encode pinned CPUs. Existing review copies still stream to
-// clients (with automatic fallback to the original). See ReviewCopyControl
-// and src/lib/videoCompress.ts for the dormant machinery.
+const FILE_TYPE_LABEL: Record<FileType, string> = {
+  source_video: 'Source video',
+  deliverable: 'Deliverable',
+  attachment: 'Supporting file',
+}
 
 interface Props {
   projectId: string
@@ -19,211 +18,84 @@ interface Props {
   maxSizeMb?: number
   onUploaded?: () => void
   disabled?: boolean
+  /** Overrides the dropzone copy (defaults to a generic prompt). */
+  label?: string
+  /** Context line shown in the upload dock, e.g. the project title. */
+  context?: string
 }
 
-type FileStatus = 'queued' | 'uploading' | 'processing' | 'done' | 'error'
-
-interface FileItem {
-  id: number
-  file: File
-  status: FileStatus
-  progress: number
-  /** Connection substate while uploading (retrying / offline). */
-  conn?: UploadConnectionState
-  error?: string
-}
-
-let _id = 0
-function nextId() { return ++_id }
-
-export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, onUploaded, disabled }: Props) {
+/** Dropzone that hands files to the app-level upload queue.
+ *
+ *  Progress is NOT rendered here: uploads keep running when the user leaves
+ *  the page, so the floating UploadDock owns all progress UI. This component
+ *  is purely the drop target + file picker. */
+export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, onUploaded, disabled, label, context }: Props) {
   const storageAdapter = useStorageAdapter()
+  const { enqueue } = useUploadManager()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
-  const [items, setItems] = useState<FileItem[]>([])
-  // track how many uploads are active right now
-  const activeRef = useRef(0)
-  // queue of item ids waiting to start
-  const queueRef = useRef<number[]>([])
-
-  const patch = (id: number, update: Partial<FileItem>) =>
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...update } : it)))
-
-  const runNext = () => {
-    if (activeRef.current >= CONCURRENCY) return
-    const nextId = queueRef.current.shift()
-    if (nextId == null) return
-    activeRef.current++
-    runUpload(nextId)
-  }
-
-  const runUpload = async (id: number) => {
-    // grab the file from state snapshot via closure — use a ref-based lookup instead
-    setItems((prev) => {
-      const item = prev.find((it) => it.id === id)
-      if (!item) return prev
-      // kick off upload outside setState
-      doUpload(item)
-      return prev.map((it) => (it.id === id ? { ...it, status: 'uploading' as FileStatus } : it))
-    })
-  }
-
-  const doUpload = async (item: FileItem) => {
-    const { file } = item
-    if (file.size > maxSizeMb * 1024 * 1024) {
-      patch(item.id, { status: 'error', error: `Exceeds ${maxSizeMb} MB limit` })
-      activeRef.current--
-      runNext()
-      return
-    }
-    try {
-      await storageAdapter.upload({
-        file,
-        projectId,
-        fileType,
-        onProgress: (pct) => patch(item.id, { progress: pct }),
-        onConnectionState: (state) => patch(item.id, { conn: state }),
-      })
-      patch(item.id, { status: 'done', progress: 100, conn: undefined })
-      onUploaded?.()
-    } catch (err: any) {
-      patch(item.id, { status: 'error', conn: undefined, error: err?.message ?? 'Upload failed' })
-      toast.error(`${file.name}: ${err?.message ?? 'Upload failed'}`)
-    } finally {
-      activeRef.current--
-      runNext()
-    }
-  }
-
-  const retryItem = (id: number) => {
-    patch(id, { status: 'queued', progress: 0, conn: undefined, error: undefined })
-    queueRef.current.push(id)
-    runNext()
-  }
 
   const handleFiles = (files: FileList | null) => {
     if (!files?.length) return
-    const newItems: FileItem[] = Array.from(files).map((file) => ({
-      id: nextId(),
+    const picked = Array.from(files)
+    const tooBig = picked.filter((f) => f.size > maxSizeMb * 1024 * 1024)
+    tooBig.forEach((f) => toast.error(`${f.name} exceeds the ${maxSizeMb} MB limit`))
+    const accepted = picked.filter((f) => f.size <= maxSizeMb * 1024 * 1024)
+    if (accepted.length === 0) return
+
+    enqueue(accepted.map((file) => ({
       file,
-      status: 'queued',
-      progress: 0,
-    }))
-    setItems((prev) => [...prev, ...newItems])
-    newItems.forEach((it) => queueRef.current.push(it.id))
-    // drain up to CONCURRENCY slots
-    for (let i = 0; i < CONCURRENCY; i++) runNext()
+      label: context ? `${FILE_TYPE_LABEL[fileType]} · ${context}` : FILE_TYPE_LABEL[fileType],
+      invalidate: [['project_files', projectId], ['projects']],
+      run: async ({ onProgress, onConnectionState }) => {
+        await storageAdapter.upload({ file, projectId, fileType, onProgress, onConnectionState })
+        // Local refresh for the page that started it (no-op once unmounted —
+        // the manager's invalidate keys cover the general case).
+        try { onUploaded?.() } catch { /* page gone */ }
+      },
+    })))
+    toast.success(accepted.length > 1 ? `${accepted.length} files added to the upload queue` : `${accepted[0].name} added to the upload queue`)
   }
 
-  const activeItems = items.filter((it) => it.status !== 'done')
-  const hasActivity = items.length > 0
-
   return (
-    <div className="space-y-3">
-      <div
-        className={cn(
-          'relative border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer',
-          dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50',
-          disabled && 'opacity-50 pointer-events-none',
-        )}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
-        onClick={() => inputRef.current?.click()}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          accept={accept}
-          multiple
-          className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-        <div className="space-y-2">
-          <div className={cn('mx-auto w-10 h-10 rounded-lg flex items-center justify-center transition-colors', dragging ? 'bg-primary/25' : 'bg-primary/10')}>
-            <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-          </div>
-          {dragging ? (
-            <p className="text-sm text-primary font-semibold">Release to upload here</p>
-          ) : (
-            <p className="text-sm text-foreground font-medium">
-              Drop files here or <span className="text-primary">click to browse</span>
-            </p>
-          )}
-          {maxSizeMb && !dragging && <p className="text-xs text-muted-foreground">Max {maxSizeMb} MB per file</p>}
-        </div>
-      </div>
-
-      {hasActivity && (
-        <div className="space-y-2">
-          {items.map((it) => (
-            <div key={it.id} className="clay-card px-3 py-2.5">
-              <div className="flex items-center gap-2 mb-1.5">
-                {it.status === 'done' && (
-                  <svg className="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-                {it.status === 'error' && (
-                  <svg className="w-3.5 h-3.5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                )}
-                {(it.status === 'uploading' || it.status === 'queued' || it.status === 'processing') && (
-                  <div className={cn(
-                    'w-3.5 h-3.5 rounded-full border-2 border-t-transparent flex-shrink-0',
-                    it.status === 'queued' && 'border-muted-foreground',
-                    it.status === 'processing' && 'border-secondary animate-spin',
-                    it.status === 'uploading' && (it.conn === 'retrying' || it.conn === 'offline' ? 'border-amber-500 animate-spin' : 'border-primary animate-spin'),
-                  )} />
-                )}
-                <p className="text-xs font-medium truncate flex-1">{it.file.name}</p>
-                <span className={cn('text-[10px] flex-shrink-0', it.conn === 'retrying' || it.conn === 'offline' ? 'text-amber-500' : 'text-muted-foreground')}>
-                  {it.status === 'queued' && 'Queued'}
-                  {it.status === 'uploading' && (
-                    it.conn === 'offline' ? 'Connection lost — will resume automatically'
-                    : it.conn === 'retrying' ? `Connection unstable — retrying… ${it.progress}%`
-                    : `${it.progress}%`
-                  )}
-                  {it.status === 'processing' && `Uploaded ✓ — generating review copy… ${it.progress}%`}
-                  {it.status === 'done' && 'Done'}
-                  {it.status === 'error' && 'Failed'}
-                </span>
-                {it.status === 'error' && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); retryItem(it.id) }}
-                    className="text-[10px] font-semibold text-primary hover:underline flex-shrink-0"
-                  >
-                    Retry
-                  </button>
-                )}
-              </div>
-              {(it.status === 'uploading' || it.status === 'processing') && (
-                <div className="h-1 bg-muted rounded-full overflow-hidden">
-                  <div className={cn(
-                    'h-full transition-all duration-200',
-                    it.conn === 'retrying' || it.conn === 'offline' ? 'bg-amber-500' : 'bg-gradient-to-r from-primary to-secondary',
-                  )} style={{ width: `${it.progress}%` }} />
-                </div>
-              )}
-              {it.status === 'error' && it.error && (
-                <p className="text-[10px] text-red-500 mt-0.5">{it.error}</p>
-              )}
-            </div>
-          ))}
-
-          {activeItems.length === 0 && (
-            <button
-              onClick={() => setItems([])}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-center py-1"
-            >
-              Clear
-            </button>
-          )}
-        </div>
+    <div
+      className={cn(
+        'relative border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer',
+        dragging ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50',
+        disabled && 'opacity-50 pointer-events-none',
       )}
+      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
+      onClick={() => inputRef.current?.click()}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        multiple
+        className="hidden"
+        onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }}
+      />
+      <div className="space-y-1.5">
+        <div className={cn('mx-auto w-10 h-10 rounded-lg flex items-center justify-center transition-colors', dragging ? 'bg-primary/25' : 'bg-primary/10')}>
+          <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+        </div>
+        {dragging ? (
+          <p className="text-sm text-primary font-semibold">Release to upload here</p>
+        ) : (
+          <p className="text-sm text-foreground font-medium">
+            {label ?? 'Drop files here'} or <span className="text-primary">click to browse</span>
+          </p>
+        )}
+        {!dragging && (
+          <p className="text-xs text-muted-foreground">
+            Several files at once is fine — they upload in the background.
+          </p>
+        )}
+      </div>
     </div>
   )
 }

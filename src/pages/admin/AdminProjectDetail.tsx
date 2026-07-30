@@ -9,6 +9,7 @@ import { TimelineCommentor } from '@/components/project/TimelineCommentor'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
 import { ReviewCopyControl } from '@/components/project/ReviewCopyControl'
+import { FileUploader } from '@/components/project/FileUploader'
 import { useAuth } from '@/hooks/useAuth'
 import { useApiFetch } from '@/lib/api'
 import { formatDistanceToNow } from 'date-fns'
@@ -302,6 +303,17 @@ export default function AdminProjectDetail() {
             {sourceFiles.length === 0
               ? <p className="text-xs text-muted-foreground">None uploaded</p>
               : sourceFiles.map((f) => <FileRow key={f.id} name={f.file_name} size={f.file_size} fileId={f.id} />)}
+            {/* Supporting files can now be added after creation, not only in
+                the create-project form. */}
+            <div className="mt-3">
+              <FileUploader
+                projectId={project.id}
+                fileType="attachment"
+                label="Add supporting files"
+                context={project.title}
+                onUploaded={() => qc.invalidateQueries({ queryKey: ['project_files', id] })}
+              />
+            </div>
           </Section>
 
           {/* Deliverables */}

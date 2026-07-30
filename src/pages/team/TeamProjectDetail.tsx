@@ -295,6 +295,17 @@ export default function TeamProjectDetail() {
                   ))
                 )}
               </div>
+              {/* Supporting files could previously only be added while creating
+                  the project — editors had no way to add references later. */}
+              <div className="px-3 pb-3">
+                <FileUploader
+                  projectId={project.id}
+                  fileType="attachment"
+                  label="Add supporting files (references, b-roll, notes)"
+                  context={project.title}
+                  onUploaded={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
+                />
+              </div>
             </div>
 
             {/* Revision comments */}

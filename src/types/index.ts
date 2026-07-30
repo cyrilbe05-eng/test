@@ -100,6 +100,8 @@ export interface ProjectFile {
    *  instead of the full-quality original when present. */
   preview_storage_key?: string | null
   preview_file_size?: number | null
+  /** First time the client downloaded this deliverable (migration 005). */
+  downloaded_at?: string | null
 }
 
 export interface ProjectAssignment {

@@ -3711,6 +3711,17 @@ async function handleDownload(req: VercelRequest, res: VercelResponse) {
     const signedUrl = wantDownload
       ? await getPresignedDownloadUrl(file.storage_key, DOWNLOAD_URL_TTL_SECONDS, file.file_name, inferMimeType(file.file_name, file.mime_type))
       : await getPresignedDownloadUrl(file.storage_key, STREAM_URL_TTL_SECONDS, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
+
+    // Download receipt (migration 005): stamp the first real download so the
+    // client sees a "Downloaded ✓" confirmation and the team knows the
+    // handoff landed. Only for actual downloads, not inline streaming, and
+    // best-effort — never fail the download because the stamp failed.
+    if (wantDownload && !(file as any).downloaded_at) {
+      try {
+        await dbExecute('UPDATE project_files SET downloaded_at = ? WHERE id = ?', [nowIso(), fileId])
+      } catch { /* pre-migration or transient — download still proceeds */ }
+    }
+
     res.json({ signedUrl })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
