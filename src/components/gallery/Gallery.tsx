@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -154,6 +154,34 @@ function PreviewModal({ file, signedUrl, onClose }: { file: GalleryFile; signedU
   )
 }
 
+/** True once the element has come near the viewport (and stays true).
+ *
+ *  Thumbnails used to load for EVERY file in a gallery at mount: a client with
+ *  318 files fired 318 signed-URL calls plus 318 <video> metadata fetches at
+ *  once, the browser queued them 6-at-a-time, retries piled up and the grid
+ *  never populated — which is why large galleries looked empty. Loading only
+ *  what's on screen keeps that flat regardless of gallery size. */
+function useNearViewport<T extends HTMLElement>(): [React.RefObject<T>, boolean] {
+  const ref = useRef<T>(null)
+  const [near, setNear] = useState(false)
+  useEffect(() => {
+    if (near) return
+    const el = ref.current
+    if (!el) return
+    if (typeof IntersectionObserver === 'undefined') { setNear(true); return }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) { setNear(true); io.disconnect() }
+      },
+      // Preload a screenful ahead so scrolling feels instant.
+      { rootMargin: '400px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [near])
+  return [ref, near]
+}
+
 // ─── File Card ────────────────────────────────────────────────────────────────
 
 function FileCard({
@@ -184,13 +212,15 @@ function FileCard({
   const isImage = file.mime_type.startsWith('image/')
   const isVideo = file.mime_type.startsWith('video/')
 
-  // We use a lazy signed URL query only when needed via thumbnail
+  // Signed URL is fetched only once the card approaches the viewport — see
+  // useNearViewport for why (large galleries used to self-DDoS on mount).
+  const [cardRef, near] = useNearViewport<HTMLDivElement>()
   const apiFetch = useApiFetch()
   const { data: signedUrl } = useQuery({
     queryKey: ['gallery_signed_url', file.id],
     queryFn: () => apiFetch<{ url: string }>(`/api/gallery/${file.id}/signed-url`),
     staleTime: 1000 * 60 * 4,
-    enabled: isImage || isVideo,
+    enabled: near && (isImage || isVideo),
   })
 
   const [playing, setPlaying] = useState(false)
@@ -211,6 +241,7 @@ function FileCard({
   if (viewMode === 'list') {
     return (
       <div
+        ref={cardRef}
         draggable
         onDragStart={() => onDragStart(file.id)}
         onDragEnd={onDragEnd}
@@ -263,6 +294,7 @@ function FileCard({
 
   return (
     <div
+      ref={cardRef}
       draggable
       onDragStart={() => onDragStart(file.id)}
       onDragEnd={onDragEnd}
