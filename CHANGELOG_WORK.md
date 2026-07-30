@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-07-26 — Background upload dock + supporting files + download receipts (`1dc2622`)
+
+> **⚠️ ACTION REQUIRED (one-time):** run migration 005 in the D1 console (ppingu):
+> `ALTER TABLE project_files ADD COLUMN downloaded_at TEXT;`
+> Deploy-safe pre-migration (stamp is best-effort); down script included.
+
+- **Background uploads (Google-Drive style):** `UploadManagerProvider` mounted **above the router**
+  so navigation no longer kills transfers, plus a floating `UploadDock` (collapsible, per-file
+  progress + connection states + retry, beforeunload guard). Every upload path feeds it —
+  deliverables, supporting files, gallery, and both create-project flows (which now navigate/close
+  immediately). `FileUploader` is a pure dropzone again; inline `UploadProgressList` deleted.
+- **Supporting files (#5 "broken"):** root cause — attachments could ONLY be added while *creating*
+  a project; no uploader existed afterwards. Added to team, admin and client project pages.
+- **List ordering:** admin + team tables sort by last activity (`sortByRecentActivity`), so
+  "Completed <date>" reads in date order.
+- **Download receipt (migration 005):** client download stamps `downloaded_at`; workspace shows
+  "Downloaded <date>" ✓ and the button becomes "Download again".
+- *Open:* editor can't see one client's gallery videos — no code path found (team gallery access is
+  role-agnostic); needs a D1 data check (`SELECT COUNT(*) FROM gallery_files WHERE owner_id = …`).
+
+---
+
 ## 2026-07-23 — Stage more uploads mid-batch (`8499c8a`)
 
 Gallery Upload button was disabled while a batch ran (and a mid-batch drop would have spawned a
