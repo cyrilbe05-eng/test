@@ -22,8 +22,14 @@
   "Completed <date>" reads in date order.
 - **Download receipt (migration 005):** client download stamps `downloaded_at`; workspace shows
   "Downloaded <date>" ✓ and the button becomes "Download again".
-- *Open:* editor can't see one client's gallery videos — no code path found (team gallery access is
-  role-agnostic); needs a D1 data check (`SELECT COUNT(*) FROM gallery_files WHERE owner_id = …`).
+- **Large galleries appeared empty (`e3ca374`):** the "editor can't see Max's videos" report was a
+  request storm, not access or data — that client has the most files of anyone (318). Every
+  `FileCard` fetched its signed URL on mount **and** mounted a `<video preload="metadata">`, so
+  opening the gallery fired 318 signed-url calls + 318 media fetches at once; the browser
+  serialises ~6, React Query retried the rest, grid never populated (matches the simultaneous
+  `/signed-url` bursts in the Vercel logs). Smaller galleries survived → looked client-specific.
+  Fixed with `useNearViewport`: thumbnails load only within 400px of the viewport, so in-flight
+  requests scale with the screen, not the gallery.
 
 ---
 
