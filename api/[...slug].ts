@@ -30,6 +30,17 @@ const STREAM_URL_TTL_SECONDS = 3600
 // USERS
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Team sub-types (migration 006). A team member is an editor unless marked
+ *  otherwise; copywriters get the same access plus client assignment on
+ *  calendar entries. NULL (legacy rows) reads as 'editor'. */
+const TEAM_ROLES = ['editor', 'copywriter'] as const
+
+/** May this profile attach clients to a calendar entry? Admins always; team
+ *  members only when they are copywriters. */
+function canAssignCalendarClients(profile: { role: string; team_role?: string | null }): boolean {
+  return profile.role === 'admin' || (profile.role === 'team' && profile.team_role === 'copywriter')
+}
+
 interface UserRow extends Profile {
   plan_name: string | null
   storage_limit_mb: number | null
@@ -131,7 +142,7 @@ async function handleCreateUser(req: VercelRequest, res: VercelResponse) {
     const { profile: callerProfile } = await requireAuth(req)
     requireRole(callerProfile, 'admin')
 
-    const { full_name, email, phone, role, plan_id, client_id_label } = req.body
+    const { full_name, email, phone, role, plan_id, client_id_label, team_role } = req.body
 
     if (!full_name || !email || !role) {
       res.status(400).json({ error: 'Missing required fields' }); return
@@ -142,6 +153,10 @@ async function handleCreateUser(req: VercelRequest, res: VercelResponse) {
     if (role === 'client' && !plan_id) {
       res.status(400).json({ error: 'plan_id required for client role' }); return
     }
+    // Team sub-type (migration 006). NULL/absent = editor.
+    if (team_role !== undefined && team_role !== null && !TEAM_ROLES.includes(team_role)) {
+      res.status(400).json({ error: `team_role must be one of ${TEAM_ROLES.join(', ')}` }); return
+    }
 
     const userId = newId()
     const now = nowIso()
@@ -150,13 +165,14 @@ async function handleCreateUser(req: VercelRequest, res: VercelResponse) {
 
     await dbExecute(
       `INSERT INTO profiles
-         (id, role, full_name, email, phone, plan_id, client_id_label, password_hash, password_changed, disabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
+         (id, role, full_name, email, phone, plan_id, client_id_label, team_role, password_hash, password_changed, disabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
       [
         userId, role, full_name, email,
         phone ?? null,
         plan_id ?? null,
         role === 'client' ? (client_id_label ?? null) : null,
+        role === 'team' ? (team_role ?? 'editor') : null,
         tempHash,
         now, now,
       ]
@@ -247,12 +263,17 @@ async function handleUpdateUser(req: VercelRequest, res: VercelResponse) {
     const [target] = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [targetId])
     if (!target) { res.status(404).json({ error: 'User not found' }); return }
 
-    const { full_name, phone, plan_id, client_id_label, time_saved_hours } = req.body
+    const { full_name, phone, plan_id, client_id_label, time_saved_hours, team_role } = req.body
 
     const updates: string[] = []
     const params: unknown[] = []
 
     if (full_name !== undefined) { updates.push('full_name = ?'); params.push(String(full_name)) }
+    if (team_role !== undefined) {
+      if (target.role !== 'team') { res.status(400).json({ error: 'team_role can only be set for team accounts' }); return }
+      if (!TEAM_ROLES.includes(team_role)) { res.status(400).json({ error: `team_role must be one of ${TEAM_ROLES.join(', ')}` }); return }
+      updates.push('team_role = ?'); params.push(team_role)
+    }
     if (phone !== undefined) { updates.push('phone = ?'); params.push(phone ?? null) }
     if (plan_id !== undefined) {
       if (target.role !== 'client') { res.status(400).json({ error: 'plan_id can only be set for client accounts' }); return }
@@ -2725,8 +2746,13 @@ async function handleCalendarEvents(req: VercelRequest, res: VercelResponse) {
       if (content_type && !VALID_CONTENT_TYPES.includes(content_type)) return err(res, 'Invalid content_type', 400)
       if (content_status && !VALID_CONTENT_STATUSES.includes(content_status)) return err(res, 'Invalid content_status', 400)
 
-      const [profile] = await dbQuery<{ role: string }>('SELECT role FROM profiles WHERE id = ?', [clerkUserId])
-      const isAdmin = profile?.role === 'admin'
+      const [profile] = await dbQuery<{ role: string; team_role?: string | null }>(
+        'SELECT role, team_role FROM profiles WHERE id = ?',
+        [clerkUserId]
+      )
+      // Copywriters assign clients too (migration 006) — that is the whole
+      // point of the sub-type; editors keep personal-only calendar entries.
+      const canAssign = !!profile && canAssignCalendarClients(profile)
 
       const id = newId()
       const now = nowIso()
@@ -2738,7 +2764,7 @@ async function handleCalendarEvents(req: VercelRequest, res: VercelResponse) {
         [id, clerkUserId, title, date, eventColor, content_type ?? null, content_status ?? null, comments ?? null, double_down ? 1 : 0, inspiration_url ?? null, script ?? null, caption ?? null, now, now]
       )
 
-      if (isAdmin) {
+      if (canAssign) {
         for (const profileId of (assigned_client_ids ?? [])) {
           await dbExecute(
             'INSERT OR IGNORE INTO calendar_event_participants (event_id, profile_id, role) VALUES (?, ?, ?)',
@@ -2836,7 +2862,9 @@ async function handleCalendarEvent(req: VercelRequest, res: VercelResponse) {
       }
 
       if (assigned_client_ids !== undefined || assigned_team_ids !== undefined) {
-        if (profile.role === 'admin') {
+        // Admins, and copywriters on their own entries (ownership is already
+        // enforced above), may change who an entry is for.
+        if (canAssignCalendarClients(profile)) {
           if (assigned_client_ids !== undefined) {
             await dbExecute('DELETE FROM calendar_event_participants WHERE event_id = ? AND role = ?', [id, 'client'])
             for (const profileId of assigned_client_ids) {

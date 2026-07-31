@@ -13,6 +13,9 @@ const schema = z.object({
   phone: z.string().optional(),
   role: z.enum(['client', 'team']),
   plan_id: z.string().optional(),
+  // Team sub-type (migration 006) — same access, copywriters can additionally
+  // assign clients to calendar entries.
+  team_role: z.enum(['editor', 'copywriter']).optional(),
 }).refine((d) => d.role !== 'client' || !!d.plan_id, { message: 'Plan required for clients', path: ['plan_id'] })
 
 type FormData = z.infer<typeof schema>
@@ -39,7 +42,7 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { role: 'client' },
+    defaultValues: { role: 'client', team_role: 'editor' },
   })
   const role = watch('role')
 
@@ -48,6 +51,7 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
     try {
       const payload = { ...data }
       if (payload.role !== 'client') delete payload.plan_id
+      if (payload.role !== 'team') delete payload.team_role
       const result = await apiFetch<{ id: string; email: string; temporary_password: string }>('/api/users/create', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -140,6 +144,25 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
             <Field label="Phone (optional)" error={errors.phone?.message}>
               <input {...register('phone')} className={inputCls} placeholder="+33612345678" />
             </Field>
+
+            {role === 'team' && (
+              <Field label="Team role" error={errors.team_role?.message}>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: 'editor', title: 'Editor', sub: 'Edits and delivers videos' },
+                    { value: 'copywriter', title: 'Copywriter', sub: 'Can also plan content per client' },
+                  ] as const).map((opt) => (
+                    <label key={opt.value} className="relative">
+                      <input type="radio" value={opt.value} {...register('team_role')} className="sr-only peer" />
+                      <div className="border border-border peer-checked:border-primary peer-checked:bg-primary/10 rounded-xl p-3 cursor-pointer transition-all h-full">
+                        <span className="text-sm font-medium block">{opt.title}</span>
+                        <span className="text-[11px] text-muted-foreground leading-tight block mt-0.5">{opt.sub}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </Field>
+            )}
 
             {role === 'client' && (
               <Field label="Plan" error={errors.plan_id?.message}>

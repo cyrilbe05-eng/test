@@ -63,6 +63,8 @@ export interface Profile {
   plan_id: string | null
   client_id_label: string | null
   time_saved_hours: number | null
+  /** Team sub-type; null/absent means editor. Only meaningful when role='team'. */
+  team_role?: TeamRole | null
   password_changed: boolean
   disabled: boolean
   created_at: string
@@ -84,6 +86,10 @@ export interface Project {
   created_at: string
   updated_at: string
 }
+
+/** Team sub-type (migration 006): copywriters are team members who can also
+ *  assign clients to calendar entries. Absent/null on legacy rows = editor. */
+export type TeamRole = 'editor' | 'copywriter'
 
 export interface ProjectFile {
   id: string

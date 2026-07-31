@@ -152,6 +152,34 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
             })}>
               {user.role}
             </span>
+            {/* Team sub-type (migration 006) — click to switch editor ⇄ copywriter */}
+            {isTeam && (
+              <button
+                onClick={async () => {
+                  const next = user.team_role === 'copywriter' ? 'editor' : 'copywriter'
+                  if (!confirm(`Change ${user.full_name} to ${next}?`)) return
+                  try {
+                    await apiFetch(`/api/users/${user.id}/update`, {
+                      method: 'PATCH',
+                      body: JSON.stringify({ team_role: next }),
+                    })
+                    toast.success(`Now a ${next}`)
+                    qc.invalidateQueries({ queryKey: ['users'] })
+                  } catch (e: any) {
+                    toast.error(e?.message ?? 'Failed to change team role')
+                  }
+                }}
+                title="Copywriters can also assign clients to calendar entries"
+                className={cn(
+                  'text-xs font-semibold px-2.5 py-1 rounded-full capitalize border transition-colors',
+                  user.team_role === 'copywriter'
+                    ? 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100'
+                    : 'bg-muted text-muted-foreground border-border hover:bg-muted/70',
+                )}
+              >
+                {user.team_role === 'copywriter' ? 'Copywriter' : 'Editor'}
+              </button>
+            )}
             {user.disabled
               ? <span className="text-xs bg-red-50 border border-red-200 text-red-700 px-2.5 py-1 rounded-full font-semibold">Disabled</span>
               : <span className="text-xs bg-green-50 border border-green-200 text-green-700 px-2.5 py-1 rounded-full font-semibold">Active</span>}

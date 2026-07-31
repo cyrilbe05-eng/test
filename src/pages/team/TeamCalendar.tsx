@@ -14,7 +14,9 @@ import {
   parseISO,
 } from 'date-fns'
 import { toast } from 'sonner'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
+import { useApiFetch } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import {
   useCalendarEvents,
@@ -23,7 +25,7 @@ import {
   useDeleteCalendarEvent,
 } from '@/hooks/useCalendar'
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
-import type { CalendarEvent, ContentType, ContentStatus } from '@/types'
+import type { CalendarEvent, ContentType, ContentStatus, Profile } from '@/types'
 
 const EVENT_COLORS = [
   { label: 'Indigo', value: 'bg-indigo-500' },
@@ -65,7 +67,7 @@ function PropRow({ label, children }: { label: string; children: React.ReactNode
 }
 
 // ─── Create event modal ───────────────────────────────────────────────────────
-function CreateEventModal({ defaultDate, onClose }: { defaultDate: Date; onClose: () => void }) {
+function CreateEventModal({ defaultDate, onClose, clients }: { defaultDate: Date; onClose: () => void; clients: Profile[] }) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(format(defaultDate, 'yyyy-MM-dd'))
   const [color, setColor] = useState(EVENT_COLORS[0].value)
@@ -76,6 +78,9 @@ function CreateEventModal({ defaultDate, onClose }: { defaultDate: Date; onClose
   const [inspirationUrl, setInspirationUrl] = useState('')
   const [script, setScript] = useState('')
   const [caption, setCaption] = useState('')
+  // Copywriters only (clients is empty for editors) — assigning a client also
+  // makes the entry show up in that client's own calendar.
+  const [assignedClientIds, setAssignedClientIds] = useState<string[]>([])
   const createEvent = useCreateCalendarEvent()
 
   const handleCreate = () => {
@@ -92,6 +97,7 @@ function CreateEventModal({ defaultDate, onClose }: { defaultDate: Date; onClose
         inspiration_url: inspirationUrl.trim() || null,
         script: script.trim() || null,
         caption: caption.trim() || null,
+        ...(clients.length > 0 ? { assigned_client_ids: assignedClientIds } : {}),
       },
       {
         onSuccess: () => { toast.success('Event created'); onClose() },
@@ -113,6 +119,31 @@ function CreateEventModal({ defaultDate, onClose }: { defaultDate: Date; onClose
             <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Date</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
           </div>
+          {clients.length > 0 && (
+            <div>
+              <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                For client <span className="normal-case tracking-normal text-muted-foreground/70">(they'll see it in their calendar)</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {clients.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setAssignedClientIds((prev) => prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id])}
+                    className={cn(
+                      'flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
+                      assignedClientIds.includes(c.id)
+                        ? 'bg-teal-500 text-white border-teal-500'
+                        : 'bg-muted text-muted-foreground border-border hover:border-teal-400 hover:text-teal-600',
+                    )}
+                  >
+                    {assignedClientIds.includes(c.id) && <span className="text-[9px]">✓</span>}
+                    {c.full_name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Content type</label>
@@ -389,6 +420,15 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function TeamCalendar() {
   const { profile } = useAuth()
+  const apiFetch = useApiFetch()
+  // Copywriters can plan content for specific clients; editors get the plain
+  // personal calendar (empty list hides the picker entirely).
+  const isCopywriter = profile?.team_role === 'copywriter'
+  const { data: assignableClients = [] } = useQuery<Profile[]>({
+    queryKey: ['users', 'clients'],
+    queryFn: () => apiFetch<Profile[]>('/api/users/clients'),
+    enabled: isCopywriter,
+  })
   const [viewDate, setViewDate] = useState(new Date())
   const [createDay, setCreateDay] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -482,7 +522,7 @@ export default function TeamCalendar() {
         </div>
       </main>
 
-      {createDay && <CreateEventModal defaultDate={createDay} onClose={() => setCreateDay(null)} />}
+      {createDay && <CreateEventModal defaultDate={createDay} onClose={() => setCreateDay(null)} clients={assignableClients} />}
       {selectedEvent && profile && (
         <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} currentUserId={profile.id} />
       )}
