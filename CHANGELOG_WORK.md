@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-07-31 — Copywriter team sub-type (`8fca1c6`)
+
+> **⚠️ ACTION REQUIRED (one-time):** run migration 006 in the D1 console (ppingu):
+> `ALTER TABLE profiles ADD COLUMN team_role TEXT;`
+> Additive; down script included. Pre-migration, everyone stays an editor.
+
+New team sub-type **copywriter** — same access as editors, plus the ability to assign clients to
+calendar entries. Implemented as `profiles.team_role` ('editor' | 'copywriter', NULL = editor)
+rather than a new `profiles.role` value, so **every existing `role = 'team'` check keeps working
+untouched** (zero blast radius). The calendar already supported `assigned_client_ids` via
+`calendar_event_participants`; it was admin-gated on POST **and** PATCH — both now use
+`canAssignCalendarClients()`. Assigning a client surfaces the entry in that client's own calendar
+through the existing participant join. Admin UI: picker in create-user modal + clickable badge to
+switch an existing member; team calendar shows a "For client" chip picker to copywriters only.
+
+---
+
 ## 2026-07-26 — Background upload dock + supporting files + download receipts (`1dc2622`)
 
 > **⚠️ ACTION REQUIRED (one-time):** run migration 005 in the D1 console (ppingu):
