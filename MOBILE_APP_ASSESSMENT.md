@@ -1,8 +1,10 @@
 # MOBILE_APP_ASSESSMENT.md — taking Pingu Studio to iOS / Android
 
 > Assessment only — **no code was changed to produce this**. Written 2026-08-03 against `main`.
-> Effort figures assume **one developer already familiar with this codebase**, and include testing
-> but not App Store review latency.
+>
+> **Two effort columns throughout.** "Solo dev" is the conventional baseline: one developer already
+> familiar with this codebase. "With Claude" is this project's actual working mode — see §6 for what
+> that does and does not compress. Neither figure includes App Store review latency.
 
 ---
 
@@ -10,12 +12,18 @@
 
 The platform is in **unusually good shape** for a mobile move, for one reason: the backend is a
 clean REST + JWT API that knows nothing about the browser, and it would need **zero changes**. The
-question is therefore only ever about the *front end*. If "mobile app" means *an icon on the home
-screen that opens the platform and feels app-like*, that is **~1–2 weeks** of work and no rewrite.
-If it means *a real App Store / Play Store listing with true background uploads and push
-notifications*, that is **~4–6 weeks** by wrapping the existing UI. A full React Native rewrite —
-the only route to a "100% native feel" — is **3–5 months** and, in my judgement, is not justified
-by what this platform actually does.
+question is therefore only ever about the *front end*.
+
+| Route | Solo dev | **With Claude** |
+|---|---|---|
+| A · Installable home-screen app (PWA) | 1–2 weeks | **1–2 days** |
+| B · Store-listed app w/ background uploads (Capacitor) | 4–6 weeks | **2–4 weeks** (mostly store gates, not coding) |
+| C · React Native rewrite | 3–5 months | **4–8 weeks** — but still doubles maintenance forever |
+| D · Twin native apps | 6–12 months | Not recommended at any speed |
+
+The headline shifts: with an AI pair the *code* stops being the constraint, so the decision moves
+almost entirely to **your testing time, App/Play Store gates, and long-term maintenance cost** —
+none of which I can compress much. That reshapes the recommendation in §7, but doesn't reverse it.
 
 ---
 
@@ -90,7 +98,8 @@ This is the question that should drive the decision, more than any technical det
 ## 5. The four routes, with effort
 
 ### Option A — Progressive Web App (installable web app)
-**Effort: 2–3 days minimum · 1–2 weeks with a mobile UI polish pass**
+**Solo dev: 2–3 days minimum, 1–2 weeks polished · With Claude: ~1–2 days elapsed**
+(manifest + service worker + icons in a single session; the rest is your phone-testing time)
 
 Add `manifest.json`, icons, splash screens, a service worker (offline shell + update flow, which
 must coexist with the existing `useVersionCheck`), then tidy the layouts flagged in §3.
@@ -103,7 +112,8 @@ must coexist with the existing `useVersionCheck`), then tidy the layouts flagged
 - ❌ Users must be told to "Add to Home Screen" (no store discovery)
 
 ### Option B — Capacitor wrapper (recommended if you want stores)
-**Effort: 4–6 weeks for a solid v1**
+**Solo dev: 4–6 weeks · With Claude: 2–4 weeks, of which only ~3–5 days is coding**
+(the remainder is device testing, certificates, store assets and review cycles — see §6)
 
 Wraps the *existing* React UI in a native iOS/Android shell. Roughly: setup 1–2 d · secure token
 storage 1 d · native file picker + share-to-app 2–3 d · **background upload 1–2 weeks (the risky
@@ -118,7 +128,8 @@ UI polish 3–5 d.
 - ⚠️ Adds app review cycles to your release process (currently: instant Vercel deploys)
 
 ### Option C — React Native / Expo rewrite
-**Effort: 3–5 months for parity · 6–10 weeks for one focused surface**
+**Solo dev: 3–5 months for parity · With Claude: 4–8 weeks for parity, ~2 weeks for one surface**
+(I can produce the ~11,900 lines of UI quickly; verifying 24 screens on real devices is the cost)
 
 Reuses the API, types and most data hooks (~2,300 lines), and **rewrites all 11,900 lines of UI**.
 The video reviewer, gallery grid, kanban, calendar and upload engine all need native replacements.
@@ -135,24 +146,67 @@ else on the web.
 
 ---
 
-## 6. Recommendation
+## 6. What working with Claude actually changes
 
-1. **Do Option A now.** For a couple of days' work everyone gets a home-screen app, and you learn
-   what people actually complain about on phones before committing to anything expensive.
-2. **Then answer the §4 question:** do editors need to upload from phones with the app closed?
-   - **No** → stop at the PWA. Add the UI polish (tables → cards, touch-friendly kanban) and you're
-     done. This is the likely outcome given editors work at desks.
-   - **Yes** → Option B (Capacitor). Budget 4–6 weeks and expect the background-upload plugin to be
-     the hard part.
-3. **Only consider Option C** if the app becomes a client-facing product with real store presence
-   ambitions. For an internal agency tool it would be over-engineering.
+Writing code stops being the bottleneck. Everything else becomes it. Being specific about which is
+which is the difference between a realistic plan and an optimistic one.
 
-**Rough ordering of value per day spent:** PWA manifest + icons ≫ mobile layout polish ≫ push
-notifications ≫ Capacitor shell ≫ background upload plugin ≫ native rewrite.
+### Compresses dramatically (roughly 5–10×)
+- Boilerplate with a known shape: manifest, service worker, Capacitor config, icon sets.
+- **Bulk UI porting** — the 11,900-line rewrite in Option C is the single biggest beneficiary;
+  screens can be converted methodically, one after another.
+- Mechanical mobile polish: tables → card layouts, touch-friendly kanban, spacing passes.
+- Wiring native plugins, push payloads, deep-link routing.
+
+### Compresses somewhat (~2×)
+- Genuinely novel logic: a background-upload plugin, a native timeline-comment player. I can write
+  a strong first version, but these are *iterative* — they get fixed by watching them fail on a real
+  device, which is a loop, not a one-shot.
+
+### Does not compress at all
+- **Your testing time.** Every mobile change needs a build → install → tap-through on a real phone.
+- **App Store review** — days per submission, and rejections are real (guideline 4.2 for wrapper
+  apps is the specific risk).
+- **Play Console gates** — a *new* personal developer account must run a closed test with 12+
+  testers for 14 continuous days before production access. Worth checking your account's status
+  early: if it applies, it sets the calendar floor regardless of how fast we build.
+- **Apple Developer enrolment** ($99/yr, identity verification) and certificate/provisioning setup.
+- **A Mac for iOS builds** — or cloud builds (EAS / Codemagic) if you don't have one.
+- **Long-term maintenance.** In Option C, every future feature gets built twice, forever. Fast
+  building doesn't undo that; it just makes the doubling cheaper each time.
+
+### The honest lesson from this codebase
+The last few weeks are the evidence: code I wrote landed quickly, but several real bugs — mobile
+playback, the gallery request storm, the migration-ordering breakage — only surfaced when **you**
+used it for real. On the web that loop is fast (push → Vercel → refresh). On mobile it is
+build → install → test, and behind a store it is build → submit → wait. **Plan around the
+verification loop, not the typing.**
 
 ---
 
-## 7. Things that would need attention on any route
+## 7. Recommendation
+
+1. **Do Option A this week.** It's now a 1–2 day item, and it's the cheapest way to learn what
+   people actually complain about on phones before committing to anything expensive. Nothing else
+   on this page should be decided before that data exists.
+2. **Then answer the §4 question:** do editors need to upload from phones with the app closed?
+   - **No** → stop at the PWA + mobile polish. Likely outcome, since editors work at desks.
+   - **Yes** → Option B (Capacitor). ~3–5 days of building, then store gates dominate the calendar.
+3. **Option C stays hard to justify — but for a different reason now.** The old argument was "3–5
+   months is too expensive". At 4–8 weeks that argument weakens; the *maintenance* argument doesn't.
+   Two front-ends means every future request — every fix in this changelog — gets built twice,
+   forever. Only take it if the mobile experience becomes a product in its own right rather than a
+   companion to the web app.
+
+**Value per day spent (revised):** PWA manifest + icons ≫ mobile layout polish ≫ Capacitor shell ≫
+push notifications ≫ background upload plugin ≫ native rewrite.
+
+**What I'd want from you at each step:** a phone to test on, a decision on §4, and — before Option B
+— confirmation of your Apple/Play developer account status, since those gates set the calendar.
+
+---
+
+## 8. Things that would need attention on any route
 
 | Item | Why it matters |
 |---|---|
@@ -167,11 +221,15 @@ notifications ≫ Capacitor shell ≫ background upload plugin ≫ native rewrit
 
 ---
 
-## 8. Bottom line
+## 9. Bottom line
 
 - **Backend: already mobile-ready. Nothing to do.** That is the expensive part of most mobile
   projects, and it's done.
-- **A home-screen app is days away.** A store-listed app with background uploads is about a month.
-  A native rewrite is a quarter or more and would leave you maintaining two front-ends.
-- **The deciding question isn't technical:** it's whether editors must upload from phones with the
-  app closed. Everything else the platform does already works acceptably in a mobile browser today.
+- **A home-screen app is 1–2 days away.** A store-listed app with background uploads is 2–4 weeks,
+  most of it waiting on Apple and Google rather than on code. A native rewrite is 4–8 weeks and
+  leaves you maintaining two front-ends forever.
+- **Because code is no longer the constraint, the decision is now about testing time, store gates
+  and maintenance** — not about how long something takes to build.
+- **The deciding question is still not technical:** whether editors must upload from phones with
+  the app closed. Everything else the platform does already works acceptably in a mobile browser
+  today.
