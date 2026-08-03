@@ -163,20 +163,33 @@ async function handleCreateUser(req: VercelRequest, res: VercelResponse) {
     const tempPassword = generatePassword(16)
     const tempHash = await hashPassword(tempPassword)
 
+    // Insert WITHOUT team_role first, then stamp it separately: writing a
+    // migration-006 column inline made every account creation (clients
+    // included) fail with "no column named team_role" on any database where
+    // the migration hadn't been applied yet. New columns must never be able
+    // to take an existing flow down.
     await dbExecute(
       `INSERT INTO profiles
-         (id, role, full_name, email, phone, plan_id, client_id_label, team_role, password_hash, password_changed, disabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
+         (id, role, full_name, email, phone, plan_id, client_id_label, password_hash, password_changed, disabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
       [
         userId, role, full_name, email,
         phone ?? null,
         plan_id ?? null,
         role === 'client' ? (client_id_label ?? null) : null,
-        role === 'team' ? (team_role ?? 'editor') : null,
         tempHash,
         now, now,
       ]
     )
+
+    if (role === 'team') {
+      try {
+        await dbExecute('UPDATE profiles SET team_role = ? WHERE id = ?', [team_role ?? 'editor', userId])
+      } catch {
+        // Pre-migration: the account is created and works; it simply reads as
+        // an editor until migration 006 is applied.
+      }
+    }
 
     res.status(201).json({ id: userId, email, temporary_password: tempPassword })
   } catch (e: any) {
@@ -294,7 +307,16 @@ async function handleUpdateUser(req: VercelRequest, res: VercelResponse) {
     params.push(nowIso())
     params.push(targetId)
 
-    await dbExecute(`UPDATE profiles SET ${updates.join(', ')} WHERE id = ?`, params)
+    try {
+      await dbExecute(`UPDATE profiles SET ${updates.join(', ')} WHERE id = ?`, params)
+    } catch (e: any) {
+      // Pre-migration-006 safety: a team_role write must not take the rest of
+      // the profile edit down with it.
+      if (team_role !== undefined && /team_role/.test(String(e?.message))) {
+        res.status(400).json({ error: 'Editor/Copywriter needs database migration 006 — run db/migrations/006_team_role.sql' }); return
+      }
+      throw e
+    }
 
     const [updated] = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [targetId])
     res.json({ ...updated, password_changed: Boolean(updated.password_changed), disabled: Boolean(updated.disabled) })
