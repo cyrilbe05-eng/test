@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-08-05 — Calendar → project, and busy-day entries reachable (`31b31c4`)
+
+- **Create project from a calendar entry:** client entries get a "Create project" button that opens
+  the new-project form pre-filled — title, inspiration URL and script map across; notes + caption
+  (labelled) become the instructions. Banner names the source entry; everything stays editable.
+  Passed via router state, not query params (scripts are too long for a URL).
+- **Busy days were broken:** month cells show 3 entries and `+N more` was **plain text**, so the 4th
+  entry onward was unreachable. Now a button opening a day list (shared `DayEventsModal`). Fixed on
+  **all three** calendars — client, team, admin — all had the same dead label.
+
+---
+
 ## 2026-07-31 — Copywriter team sub-type (`8fca1c6`)
 
 > **⚠️ ACTION REQUIRED (one-time):** run migration 006 in the D1 console (ppingu):
