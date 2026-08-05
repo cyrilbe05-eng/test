@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
 import {
   format,
@@ -23,6 +24,7 @@ import {
   useDeleteCalendarEvent,
 } from '@/hooks/useCalendar'
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
+import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus } from '@/types'
 
 const EVENT_COLORS = [
@@ -170,6 +172,7 @@ function CreateEventModal({ defaultDate, onClose }: { defaultDate: Date; onClose
 
 // ─── Event detail/edit modal ──────────────────────────────────────────────────
 function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; onClose: () => void; currentUserId: string }) {
+  const navigate = useNavigate()
   const [title, setTitle] = useState(event.title)
   const [date, setDate] = useState(event.date)
   const [color, setColor] = useState(event.color ?? EVENT_COLORS[0].value)
@@ -224,6 +227,26 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
         onError: () => toast.error('Failed to update event'),
       }
     )
+  }
+
+  /** Hand the entry's brief to the new-project form. Sent via router state
+   *  rather than query params: scripts are long and would blow up the URL. */
+  const handleCreateProject = () => {
+    navigate('/workspace/new', {
+      state: {
+        prefill: {
+          title: title.trim(),
+          inspiration_url: inspirationUrl.trim(),
+          video_script: script.trim(),
+          // The client's notes and caption are both useful context for the
+          // editor; caption is labelled so it isn't mistaken for direction.
+          instructions: [comments.trim(), caption.trim() ? `Caption:\n${caption.trim()}` : '']
+            .filter(Boolean)
+            .join('\n\n'),
+          fromEventTitle: event.title,
+        },
+      },
+    })
   }
 
   const handleDiscard = () => {
@@ -371,13 +394,27 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
               <button onClick={handleSave} disabled={updateEvent.isPending} className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl shadow-clay hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-40">Save changes</button>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div>
                 {canEdit && (
                   <button onClick={handleDelete} disabled={deleteEvent.isPending} className="px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-xl transition-colors disabled:opacity-40">Delete</button>
                 )}
               </div>
-              <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors">Close</button>
+              <div className="flex items-center gap-2">
+                {/* Turn a planned calendar entry straight into a project —
+                    the brief (title, inspiration, script, notes) is already
+                    written here, so it carries over pre-filled. */}
+                {isManual && (
+                  <button
+                    onClick={handleCreateProject}
+                    title="Start a project pre-filled with this entry's details"
+                    className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl shadow-clay hover:brightness-110 transition-all active:scale-[0.98]"
+                  >
+                    Create project
+                  </button>
+                )}
+                <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors">Close</button>
+              </div>
             </div>
           )}
         </div>
@@ -392,6 +429,8 @@ export default function ClientCalendar() {
   const [viewDate, setViewDate] = useState(new Date())
   const [createDay, setCreateDay] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  // Day whose full entry list is open (the "+N more" overflow view).
+  const [dayDetail, setDayDetail] = useState<Date | null>(null)
   const [filterType, setFilterType] = useState<ContentType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<ContentStatus | 'all'>('all')
 
@@ -468,7 +507,14 @@ export default function ClientCalendar() {
                         <span className="text-white text-[10px] font-medium truncate leading-tight">{event.title}</span>
                       </button>
                     ))}
-                    {overflow > 0 && <p className="text-[10px] text-muted-foreground px-1">+{overflow} more</p>}
+                    {overflow > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDayDetail(day) }}
+                        className="text-[10px] text-muted-foreground hover:text-foreground font-medium px-1 hover:underline"
+                      >
+                        +{overflow} more
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -485,6 +531,14 @@ export default function ClientCalendar() {
       </main>
 
       {createDay && <CreateEventModal defaultDate={createDay} onClose={() => setCreateDay(null)} />}
+      {dayDetail && (
+        <DayEventsModal
+          day={dayDetail}
+          events={eventsForDay(dayDetail)}
+          onSelect={(event) => { setDayDetail(null); setSelectedEvent(event) }}
+          onClose={() => setDayDetail(null)}
+        />
+      )}
       {selectedEvent && profile && (
         <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} currentUserId={profile.id} />
       )}

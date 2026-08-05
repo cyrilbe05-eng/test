@@ -25,6 +25,7 @@ import {
   useDeleteCalendarEvent,
 } from '@/hooks/useCalendar'
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
+import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus, Profile } from '@/types'
 
 const EVENT_COLORS = [
@@ -432,6 +433,8 @@ export default function TeamCalendar() {
   const [viewDate, setViewDate] = useState(new Date())
   const [createDay, setCreateDay] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  // Day whose full entry list is open (the "+N more" overflow view).
+  const [dayDetail, setDayDetail] = useState<Date | null>(null)
   const [filterType, setFilterType] = useState<ContentType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<ContentStatus | 'all'>('all')
 
@@ -506,7 +509,14 @@ export default function TeamCalendar() {
                         <span className="text-white text-[10px] font-medium truncate leading-tight">{event.title}</span>
                       </button>
                     ))}
-                    {overflow > 0 && <p className="text-[10px] text-muted-foreground px-1">+{overflow} more</p>}
+                    {overflow > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDayDetail(day) }}
+                        className="text-[10px] text-muted-foreground hover:text-foreground font-medium px-1 hover:underline"
+                      >
+                        +{overflow} more
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -523,6 +533,14 @@ export default function TeamCalendar() {
       </main>
 
       {createDay && <CreateEventModal defaultDate={createDay} onClose={() => setCreateDay(null)} clients={assignableClients} />}
+      {dayDetail && (
+        <DayEventsModal
+          day={dayDetail}
+          events={eventsForDay(dayDetail)}
+          onSelect={(event) => { setDayDetail(null); setSelectedEvent(event) }}
+          onClose={() => setDayDetail(null)}
+        />
+      )}
       {selectedEvent && profile && (
         <EventModal event={selectedEvent} onClose={() => setSelectedEvent(null)} currentUserId={profile.id} />
       )}

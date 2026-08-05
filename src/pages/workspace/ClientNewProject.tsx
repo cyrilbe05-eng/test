@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -247,8 +247,19 @@ export default function ClientNewProject() {
   const [attachTab, setAttachTab] = useState<'upload' | 'gallery'>('upload')
   const { enqueue } = useUploadManager()
 
+  // Arriving from a calendar entry's "Create project" button: the brief is
+  // already written there, so it lands pre-filled (see ClientCalendar).
+  const location = useLocation()
+  const prefill = (location.state as { prefill?: Partial<FormData> & { fromEventTitle?: string } } | null)?.prefill
+
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: {
+      title: prefill?.title ?? '',
+      inspiration_url: prefill?.inspiration_url ?? '',
+      video_script: prefill?.video_script ?? '',
+      instructions: prefill?.instructions ?? '',
+    },
   })
 
   const onSubmit = async (data: FormData) => {
@@ -324,7 +335,18 @@ export default function ClientNewProject() {
     <ClientLayout>
       <main className="max-w-3xl mx-auto px-6 py-10 animate-slide-up">
         <h1 className="text-2xl font-heading font-semibold tracking-tight mb-1.5">New Project</h1>
-        <p className="text-muted-foreground mb-8 text-sm">Tell us what you need and upload your source material.</p>
+        <p className="text-muted-foreground mb-4 text-sm">Tell us what you need and upload your source material.</p>
+
+        {prefill?.fromEventTitle && (
+          <div className="mb-6 px-4 py-3 rounded-xl bg-primary/10 border border-primary/20 text-sm text-primary flex items-start gap-2">
+            <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>
+              Pre-filled from your calendar entry <strong>“{prefill.fromEventTitle}”</strong> — edit anything before submitting.
+            </span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="clay-card p-6 space-y-4">
