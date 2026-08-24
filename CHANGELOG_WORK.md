@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-08-06 — Calendar entries change colour with project progress (`9e65d0c`)
+
+> **⚠️ ACTION REQUIRED:** run `db/migrations/007_preview_matches.sql` FIRST (read-only — shows which
+> entries would link to which projects), then `007_calendar_project_link.sql`. Down script included.
+
+Violet = planned / nothing delivered · blue = deliverable uploaded · green = client approved.
+- **Automatic project entries:** fixed-blue "Created" + separate green "Approved" entry replaced by
+  **one** entry whose colour + suffix track the project. Retroactive for all past projects with no
+  data change (computed live from status).
+- **Manual entries:** migration 007 adds `calendar_events.project_id`; linked entries take the
+  lifecycle colour, unlinked keep the author's colour. "Create project" now passes its entry id.
+- **Backfill:** exact title match for the same client, two passes (owner, then participant).
+- "Uploaded" = a deliverable file actually exists, not a status guess (status moves for other
+  reasons, e.g. team assignment). Pre-migration safe: link write guarded, unlinked entries unchanged.
+
+---
+
 ## 2026-08-05 — Calendar → project, and busy-day entries reachable (`31b31c4`)
 
 - **Create project from a calendar entry:** client entries get a "Create project" button that opens
