@@ -499,7 +499,7 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
       res.status(403).json({ error: 'Forbidden' }); return
     }
 
-    const { title, description, inspiration_url, video_script, instructions, client_id: bodyClientId } = req.body
+    const { title, description, inspiration_url, video_script, instructions, client_id: bodyClientId, calendar_event_id } = req.body
     if (!title) { res.status(400).json({ error: 'title required' }); return }
 
     // Admins can specify a client_id override; otherwise use their own id
@@ -556,6 +556,18 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
         now, now,
       ]
     )
+
+    // Started from a calendar entry ("Create project" button): link them so the
+    // entry's colour follows this project's progress (migration 007). Guarded —
+    // a missing column or a stale id must never fail project creation.
+    if (calendar_event_id) {
+      try {
+        await dbExecute(
+          'UPDATE calendar_events SET project_id = ? WHERE id = ? AND (owner_id = ? OR ? = 1)',
+          [id, calendar_event_id, clerkUserId, isAdmin ? 1 : 0],
+        )
+      } catch { /* pre-migration or not the owner — project is created regardless */ }
+    }
 
     const rows = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [id])
 
@@ -2540,6 +2552,32 @@ interface CalendarProjectRow {
   client_id: string
 }
 
+// Calendar lifecycle colours (migration 007). One entry, three states, so a
+// month view reads as progress at a glance rather than a wall of one colour.
+const CAL_COLOR_PLANNED  = 'bg-violet-500' // created, nothing delivered yet
+const CAL_COLOR_DELIVERED = 'bg-blue-500'  // a deliverable has been uploaded
+const CAL_COLOR_APPROVED = 'bg-green-500'  // client approved — done
+
+/** Colour for a project's calendar presence. "Something uploaded" is measured
+ *  as an actual deliverable file existing, not a status guess, because status
+ *  can move for other reasons (e.g. admin assigning a team member). */
+function projectLifecycleColor(status: string, hasDeliverable: boolean): string {
+  if (status === 'client_approved') return CAL_COLOR_APPROVED
+  if (hasDeliverable) return CAL_COLOR_DELIVERED
+  return CAL_COLOR_PLANNED
+}
+
+/** Which of these project ids have at least one deliverable uploaded. */
+async function projectsWithDeliverables(projectIds: string[]): Promise<Set<string>> {
+  if (projectIds.length === 0) return new Set()
+  const rows = await dbQuery<{ project_id: string }>(
+    `SELECT DISTINCT project_id FROM project_files
+     WHERE file_type = 'deliverable' AND project_id IN (${projectIds.map(() => '?').join(',')})`,
+    projectIds,
+  )
+  return new Set(rows.map((r) => r.project_id))
+}
+
 async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
@@ -2568,28 +2606,35 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
 
     const events: CalendarEvent[] = []
 
+    // Lifecycle state for every project the caller can see. Used both for the
+    // automatic project entries below and for manual entries linked to one.
+    const deliveredSet = await projectsWithDeliverables(projects.map((p) => p.id))
+    const lifecycleById = new Map<string, { status: string; color: string }>()
     for (const p of projects) {
+      lifecycleById.set(p.id, {
+        status: p.status,
+        color: projectLifecycleColor(p.status, deliveredSet.has(p.id)),
+      })
+    }
+
+    for (const p of projects) {
+      // ONE entry per project that changes colour as it progresses
+      // (violet → blue → green), replacing the old fixed-blue "Created" entry
+      // plus a separate green "Approved" entry on a different day.
+      const lifecycle = lifecycleById.get(p.id)!
+      const stateLabel =
+        lifecycle.color === CAL_COLOR_APPROVED ? 'Approved ✓'
+        : lifecycle.color === CAL_COLOR_DELIVERED ? 'In review'
+        : 'Created'
       events.push({
         id: `ce-created-${p.id}`,
         project_id: p.id,
         type: 'project_created',
-        title: `${p.title} — Created`,
+        title: `${p.title} — ${stateLabel}`,
         date: p.created_at.slice(0, 10),
-        color: 'bg-blue-500',
+        color: lifecycle.color,
         created_at: p.created_at,
       })
-
-      if (p.status === 'client_approved') {
-        events.push({
-          id: `ce-approved-${p.id}`,
-          project_id: p.id,
-          type: 'project_approved',
-          title: `${p.title} — Approved ✓`,
-          date: p.updated_at.slice(0, 10),
-          color: 'bg-green-500',
-          created_at: p.updated_at,
-        })
-      }
     }
 
     if (profile.role !== 'client') {
@@ -2644,6 +2689,7 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
       id: string; owner_id: string; title: string; date: string; color: string
       content_type: string | null; content_status: string | null; comments: string | null
       double_down: number; inspiration_url: string | null; script: string | null; caption: string | null
+      project_id: string | null
       created_at: string
     }>(
       `SELECT DISTINCT e.*
@@ -2662,14 +2708,37 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         )
       : []
 
+    // A manual entry may link to a project the caller can't otherwise see in
+    // this feed (e.g. a team member not assigned to it) — fetch those too so
+    // the colour is still right.
+    const linkedIds = [...new Set(manualRows.map((m) => m.project_id).filter((id): id is string => !!id))]
+    const missingIds = linkedIds.filter((id) => !lifecycleById.has(id))
+    if (missingIds.length > 0) {
+      const extra = await dbQuery<{ id: string; status: string }>(
+        `SELECT id, status FROM projects WHERE id IN (${missingIds.map(() => '?').join(',')})`,
+        missingIds,
+      )
+      const extraDelivered = await projectsWithDeliverables(extra.map((p) => p.id))
+      for (const p of extra) {
+        lifecycleById.set(p.id, {
+          status: p.status,
+          color: projectLifecycleColor(p.status, extraDelivered.has(p.id)),
+        })
+      }
+    }
+
     for (const m of manualRows) {
+      // Linked entries show project progress; unlinked ones keep the colour
+      // their author picked.
+      const linked = m.project_id ? lifecycleById.get(m.project_id) : undefined
       events.push({
         id: m.id,
         type: 'manual',
         owner_id: m.owner_id,
+        project_id: m.project_id ?? undefined,
         title: m.title,
         date: m.date,
-        color: m.color,
+        color: linked?.color ?? m.color,
         content_type: m.content_type as any ?? null,
         content_status: m.content_status as any ?? null,
         comments: m.comments ?? null,

@@ -250,7 +250,9 @@ export default function ClientNewProject() {
   // Arriving from a calendar entry's "Create project" button: the brief is
   // already written there, so it lands pre-filled (see ClientCalendar).
   const location = useLocation()
-  const prefill = (location.state as { prefill?: Partial<FormData> & { fromEventTitle?: string } } | null)?.prefill
+  const prefill = (location.state as {
+    prefill?: Partial<FormData> & { fromEventTitle?: string; fromEventId?: string }
+  } | null)?.prefill
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -274,6 +276,9 @@ export default function ClientNewProject() {
           inspiration_url: data.inspiration_url || null,
           video_script: data.video_script || null,
           instructions: data.instructions,
+          // Set when started from a calendar entry — links the two so the
+          // entry's colour follows this project's progress.
+          calendar_event_id: prefill?.fromEventId ?? null,
         }),
       })
 

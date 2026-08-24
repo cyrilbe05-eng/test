@@ -244,6 +244,8 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
             .filter(Boolean)
             .join('\n\n'),
           fromEventTitle: event.title,
+          // Links entry → project so this entry's colour tracks progress.
+          fromEventId: event.id,
         },
       },
     })
