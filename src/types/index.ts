@@ -189,6 +189,9 @@ export interface CalendarEvent {
   inspiration_url?: string | null
   script?: string | null
   caption?: string | null
+  /** Client marked this piece as published (migration 008) — terminal state,
+   *  shows light grey on the calendar. */
+  posted?: boolean
   assigned_client_ids?: string[]
   assigned_team_ids?: string[]
   created_at: string

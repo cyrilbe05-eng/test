@@ -44,6 +44,7 @@ export function DayEventsModal({
               className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-muted transition-colors text-left"
             >
               <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', event.color ?? 'bg-slate-500')} />
+              {event.posted && <span className="text-[10px] leading-none flex-shrink-0 text-muted-foreground" title="Posted">✓</span>}
               {event.double_down && <span className="text-[10px] leading-none flex-shrink-0">🔥</span>}
               <span className="text-sm font-medium truncate flex-1">{event.title}</span>
               {event.content_type && (

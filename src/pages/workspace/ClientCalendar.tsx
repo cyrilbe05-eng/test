@@ -205,6 +205,23 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
   }, [title, date, color, contentType, contentStatus, comments, doubleDown, inspirationUrl, script, caption, event])
 
   const canEdit = isManual && isOwner
+  // "Posted" is the client's own signal that the piece went live. It saves on
+  // click rather than joining the dirty/Save flow, and an assigned client may
+  // set it even when they don't own the entry (copywriters create entries FOR
+  // clients) — the API allows exactly that one field for them.
+  const [posted, setPosted] = useState(event.posted ?? false)
+  const canMarkPosted = isManual && (isOwner || (event.assigned_client_ids ?? []).includes(currentUserId))
+  const togglePosted = () => {
+    const next = !posted
+    setPosted(next)
+    updateEvent.mutate(
+      { id: event.id, posted: next },
+      {
+        onSuccess: () => toast.success(next ? 'Marked as posted' : 'Posted mark removed'),
+        onError: () => { setPosted(!next); toast.error('Could not update') },
+      },
+    )
+  }
 
   const handleSave = () => {
     if (!title.trim()) { toast.error('Enter a title'); return }
@@ -327,6 +344,26 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
                 <span className="text-xs text-muted-foreground">{format(parseISO(event.date), 'MMMM d, yyyy')}</span>
               )}
             </PropRow>
+            {(canMarkPosted || posted) && (
+              <PropRow label="Posted">
+                {canMarkPosted ? (
+                  <button
+                    onClick={togglePosted}
+                    title="Mark once this piece is actually published"
+                    className={cn(
+                      'flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all',
+                      posted
+                        ? 'bg-gray-400 text-white border-gray-400'
+                        : 'bg-muted text-muted-foreground border-border hover:border-gray-400 hover:text-foreground',
+                    )}
+                  >
+                    {posted ? '✓ Posted' : 'Mark as posted'}
+                  </button>
+                ) : (
+                  <span className="text-xs text-muted-foreground">✓ Posted</span>
+                )}
+              </PropRow>
+            )}
             <PropRow label="Double Down">
               {canEdit ? (
                 <button onClick={() => setDoubleDown(!doubleDown)} className={cn('flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all', doubleDown ? 'bg-orange-500 text-white border-orange-500' : 'bg-muted text-muted-foreground border-border hover:border-orange-400 hover:text-orange-500')}>
@@ -504,6 +541,7 @@ export default function ClientCalendar() {
                   <div className="space-y-0.5">
                     {visible.map((event) => (
                       <button key={event.id} onClick={(e) => { e.stopPropagation(); setSelectedEvent(event) }} className={cn('w-full flex items-center gap-1 px-1.5 py-0.5 rounded text-left hover:opacity-80 transition-opacity', event.color ?? 'bg-slate-500')}>
+                        {event.posted && <span className="text-white/90 text-[9px] leading-none flex-shrink-0" title="Posted">✓</span>}
                         {event.double_down && <span className="text-[9px] leading-none">🔥</span>}
                         {event.content_type && <span className="text-white/70 text-[9px] leading-none font-bold uppercase tracking-tight flex-shrink-0">{event.content_type.slice(0, 1)}</span>}
                         <span className="text-white text-[10px] font-medium truncate leading-tight">{event.title}</span>

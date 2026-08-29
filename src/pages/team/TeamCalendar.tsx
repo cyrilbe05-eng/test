@@ -504,6 +504,7 @@ export default function TeamCalendar() {
                   <div className="space-y-0.5">
                     {visible.map((event) => (
                       <button key={event.id} onClick={(e) => { e.stopPropagation(); setSelectedEvent(event) }} className={cn('w-full flex items-center gap-1 px-1.5 py-0.5 rounded text-left hover:opacity-80 transition-opacity', event.color ?? 'bg-slate-500')}>
+                        {event.posted && <span className="text-white/90 text-[9px] leading-none flex-shrink-0" title="Posted">✓</span>}
                         {event.double_down && <span className="text-[9px] leading-none">🔥</span>}
                         {event.content_type && <span className="text-white/70 text-[9px] leading-none font-bold uppercase tracking-tight flex-shrink-0">{event.content_type.slice(0, 1)}</span>}
                         <span className="text-white text-[10px] font-medium truncate leading-tight">{event.title}</span>

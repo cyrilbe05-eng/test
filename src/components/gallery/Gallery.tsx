@@ -62,6 +62,52 @@ interface ContextMenu {
   fileId: string
 }
 
+/** Touch long-press → the same menu right-click opens on desktop.
+ *
+ *  Phones have no right-click, so rename/move/delete were unreachable on
+ *  mobile entirely. Press-and-hold for LONG_PRESS_MS opens the menu at the
+ *  finger; moving more than a few pixels (i.e. a scroll) cancels it, and the
+ *  click that would normally follow the release is swallowed so the file
+ *  doesn't also open. */
+const LONG_PRESS_MS = 450
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10
+
+function useLongPress(onLongPress: (x: number, y: number) => void) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const origin = useRef<{ x: number; y: number } | null>(null)
+  const fired = useRef(false)
+
+  const clear = () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    origin.current = null
+  }
+
+  return {
+    // Suppresses the post-release click (and iOS's own callout menu).
+    didLongPress: fired,
+    handlers: {
+      onTouchStart: (e: React.TouchEvent) => {
+        const t = e.touches[0]
+        if (!t) return
+        fired.current = false
+        origin.current = { x: t.clientX, y: t.clientY }
+        timer.current = setTimeout(() => {
+          fired.current = true
+          onLongPress(t.clientX, t.clientY)
+        }, LONG_PRESS_MS)
+      },
+      onTouchMove: (e: React.TouchEvent) => {
+        const t = e.touches[0]
+        if (!t || !origin.current) return
+        const moved = Math.hypot(t.clientX - origin.current.x, t.clientY - origin.current.y)
+        if (moved > LONG_PRESS_MOVE_TOLERANCE_PX) clear()
+      },
+      onTouchEnd: clear,
+      onTouchCancel: clear,
+    },
+  }
+}
+
 // ─── Move Modal ───────────────────────────────────────────────────────────────
 
 function MoveModal({
@@ -192,6 +238,7 @@ function FileCard({
   selected,
   onSelect,
   onContextMenu,
+  onLongPress,
   onDragStart,
   onDragEnd,
   onDownload,
@@ -204,6 +251,8 @@ function FileCard({
   selected?: boolean
   onSelect?: (id: string) => void
   onContextMenu: (e: React.MouseEvent, fileId: string) => void
+  /** Long-press equivalent for touch devices (no right-click on phones). */
+  onLongPress: (x: number, y: number, fileId: string) => void
   onDragStart: (fileId: string) => void
   onDragEnd: () => void
   onDownload: (fileId: string, fileName: string) => void
@@ -215,6 +264,7 @@ function FileCard({
   // Signed URL is fetched only once the card approaches the viewport — see
   // useNearViewport for why (large galleries used to self-DDoS on mount).
   const [cardRef, near] = useNearViewport<HTMLDivElement>()
+  const longPress = useLongPress((x, y) => onLongPress(x, y, file.id))
   const apiFetch = useApiFetch()
   const { data: signedUrl } = useQuery({
     queryKey: ['gallery_signed_url', file.id],
@@ -246,6 +296,9 @@ function FileCard({
         onDragStart={() => onDragStart(file.id)}
         onDragEnd={onDragEnd}
         onContextMenu={(e) => onContextMenu(e, file.id)}
+        {...longPress.handlers}
+        onClickCapture={(e) => { if (longPress.didLongPress.current) { e.preventDefault(); e.stopPropagation() } }}
+        style={{ WebkitTouchCallout: 'none' }}
         className={cn('flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors cursor-grab active:cursor-grabbing rounded-lg select-none', selected && 'bg-primary/5')}
       >
         {onSelect && (
@@ -299,6 +352,9 @@ function FileCard({
       onDragStart={() => onDragStart(file.id)}
       onDragEnd={onDragEnd}
       onContextMenu={(e) => onContextMenu(e, file.id)}
+      {...longPress.handlers}
+      onClickCapture={(e) => { if (longPress.didLongPress.current) { e.preventDefault(); e.stopPropagation() } }}
+      style={{ WebkitTouchCallout: 'none' }}
       className={cn('clay-card overflow-hidden cursor-grab active:cursor-grabbing select-none group relative', selected && 'ring-2 ring-primary')}
     >
       {onSelect && (
@@ -590,6 +646,11 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   const handleContextMenu = (e: React.MouseEvent, fileId: string) => {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, fileId })
+  }
+
+  // Touch equivalent — opens the same menu at the finger position.
+  const handleLongPress = (x: number, y: number, fileId: string) => {
+    setContextMenu({ x, y, fileId })
   }
 
   const handleDeleteFile = async (fileId: string) => {
@@ -940,6 +1001,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 selected={selectedIds.has(file.id)}
                 onSelect={canDownload ? toggleSelect : undefined}
                 onContextMenu={handleContextMenu}
+                onLongPress={handleLongPress}
                 onDragStart={setDraggingFileId}
                 onDragEnd={() => setDraggingFileId(null)}
                 onDownload={handleDownload}
@@ -984,6 +1046,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 selected={selectedIds.has(file.id)}
                 onSelect={canDownload ? toggleSelect : undefined}
                 onContextMenu={handleContextMenu}
+                onLongPress={handleLongPress}
                 onDragStart={setDraggingFileId}
                 onDragEnd={() => setDraggingFileId(null)}
                 onDownload={handleDownload}

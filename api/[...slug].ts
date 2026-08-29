@@ -2557,6 +2557,7 @@ interface CalendarProjectRow {
 const CAL_COLOR_PLANNED  = 'bg-violet-500' // created, nothing delivered yet
 const CAL_COLOR_DELIVERED = 'bg-blue-500'  // a deliverable has been uploaded
 const CAL_COLOR_APPROVED = 'bg-green-500'  // client approved — done
+const CAL_COLOR_POSTED   = 'bg-gray-400'   // client published it (migration 008)
 
 /** Colour for a project's calendar presence. "Something uploaded" is measured
  *  as an actual deliverable file existing, not a status guess, because status
@@ -2690,6 +2691,7 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
       content_type: string | null; content_status: string | null; comments: string | null
       double_down: number; inspiration_url: string | null; script: string | null; caption: string | null
       project_id: string | null
+      posted: number | null
       created_at: string
     }>(
       `SELECT DISTINCT e.*
@@ -2731,14 +2733,18 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
       // Linked entries show project progress; unlinked ones keep the colour
       // their author picked.
       const linked = m.project_id ? lifecycleById.get(m.project_id) : undefined
+      // Posted is the terminal state — it outranks the lifecycle colour, and
+      // an author-chosen colour, because the piece is already out.
+      const isPosted = Boolean(m.posted)
       events.push({
         id: m.id,
         type: 'manual',
         owner_id: m.owner_id,
         project_id: m.project_id ?? undefined,
+        posted: isPosted,
         title: m.title,
         date: m.date,
-        color: linked?.color ?? m.color,
+        color: isPosted ? CAL_COLOR_POSTED : (linked?.color ?? m.color),
         content_type: m.content_type as any ?? null,
         content_status: m.content_status as any ?? null,
         comments: m.comments ?? null,
@@ -2895,12 +2901,29 @@ async function handleCalendarEvent(req: VercelRequest, res: VercelResponse) {
     )
 
     if (!event) return err(res, 'Event not found', 404)
-    if (event.owner_id !== clerkUserId && profile.role !== 'admin') return err(res, 'Forbidden', 403)
+
+    // Owner and admin may edit everything. A client the entry is assigned to
+    // isn't the owner (copywriters create entries FOR clients), but they are
+    // the one who actually publishes — so they may toggle `posted`, and
+    // nothing else.
+    const isOwnerOrAdmin = event.owner_id === clerkUserId || profile.role === 'admin'
+    let postedOnlyByAssignedClient = false
+    if (!isOwnerOrAdmin && profile.role === 'client' && req.method === 'PATCH') {
+      const touchesOnlyPosted = Object.keys(req.body ?? {}).every((k) => k === 'posted')
+      if (touchesOnlyPosted) {
+        const [assigned] = await dbQuery<{ profile_id: string }>(
+          "SELECT profile_id FROM calendar_event_participants WHERE event_id = ? AND profile_id = ? AND role = 'client'",
+          [id, clerkUserId],
+        )
+        postedOnlyByAssignedClient = !!assigned
+      }
+    }
+    if (!isOwnerOrAdmin && !postedOnlyByAssignedClient) return err(res, 'Forbidden', 403)
 
     if (req.method === 'PATCH') {
       const {
         title, date, color, content_type, content_status, comments, double_down,
-        inspiration_url, script, caption,
+        inspiration_url, script, caption, posted,
         assigned_client_ids, assigned_team_ids,
       } = req.body as {
         title?: string
@@ -2913,6 +2936,7 @@ async function handleCalendarEvent(req: VercelRequest, res: VercelResponse) {
         inspiration_url?: string | null
         script?: string | null
         caption?: string | null
+        posted?: boolean
         assigned_client_ids?: string[]
         assigned_team_ids?: string[]
       }
@@ -2940,6 +2964,7 @@ async function handleCalendarEvent(req: VercelRequest, res: VercelResponse) {
       if (inspiration_url !== undefined) { fields.push('inspiration_url = ?'); values.push(inspiration_url ?? null) }
       if (script          !== undefined) { fields.push('script = ?');          values.push(script ?? null) }
       if (caption         !== undefined) { fields.push('caption = ?');         values.push(caption ?? null) }
+      if (posted          !== undefined) { fields.push('posted = ?');          values.push(posted ? 1 : 0) }
 
       if (fields.length === 0 && assigned_client_ids === undefined && assigned_team_ids === undefined) {
         return err(res, 'No fields to update', 400)

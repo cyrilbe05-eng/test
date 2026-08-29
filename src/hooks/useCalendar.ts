@@ -42,6 +42,8 @@ export type UpdateCalendarEventBody = {
   inspiration_url?: string | null
   script?: string | null
   caption?: string | null
+  /** Client-set publish flag (migration 008). */
+  posted?: boolean
   assigned_client_ids?: string[]
   assigned_team_ids?: string[]
 }
