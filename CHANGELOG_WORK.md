@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-08-07 — Mobile long-press menu + client "Posted" tag (`238ddfa`)
+
+> **⚠️ ACTION REQUIRED:** `ALTER TABLE calendar_events ADD COLUMN posted INTEGER NOT NULL DEFAULT 0;`
+> (`db/migrations/008_calendar_posted.sql`). Pre-migration safe — posted reads false, colours unchanged.
+
+- **Gallery on touch:** rename/move/delete were unreachable on phones (menu was right-click only).
+  Press-and-hold 450 ms opens the same menu at the finger; scroll cancels it (10 px tolerance), the
+  follow-up click is swallowed, iOS callout suppressed. Grid + list layouts.
+- **"Posted" tag (migration 008):** clients mark an entry published; terminal state that outranks
+  every lifecycle colour → light grey. Calendar now reads violet planned → blue in production →
+  green approved → grey posted. Checkmark shown on entries in all three calendars + day-overflow
+  list; toggle in the client event modal, saves on click (not via the dirty/Save flow).
+- **Permission nuance:** owner/admin as usual, **plus an assigned client may set `posted` and
+  nothing else** — copywriters create entries FOR clients, so the publisher often isn't the owner.
+- Own column, not a new `content_status` value: that column has a CHECK constraint and widening one
+  in SQLite means rebuilding the table.
+
+---
+
 ## 2026-08-06 — Calendar entries change colour with project progress (`9e65d0c`)
 
 > **⚠️ ACTION REQUIRED:** run `db/migrations/007_preview_matches.sql` FIRST (read-only — shows which
