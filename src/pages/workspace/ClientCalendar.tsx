@@ -210,7 +210,11 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
   // set it even when they don't own the entry (copywriters create entries FOR
   // clients) — the API allows exactly that one field for them.
   const [posted, setPosted] = useState(event.posted ?? false)
-  const canMarkPosted = isManual && (isOwner || (event.assigned_client_ids ?? []).includes(currentUserId))
+  // An admin looking at a client workspace (impersonation ends up here too)
+  // can mark posted as well — the API already permits admins.
+  const { profile: viewer } = useAuth()
+  const isAdminViewer = viewer?.role === 'admin'
+  const canMarkPosted = isManual && (isOwner || isAdminViewer || (event.assigned_client_ids ?? []).includes(currentUserId))
   const togglePosted = () => {
     const next = !posted
     setPosted(next)
