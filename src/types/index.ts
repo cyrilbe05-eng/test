@@ -65,6 +65,9 @@ export interface Profile {
   time_saved_hours: number | null
   /** Team sub-type; null/absent means editor. Only meaningful when role='team'. */
   team_role?: TeamRole | null
+  /** Admin sub-type (migration 010): 'manager' = admin minus account
+   *  creation, password resets and account deletion. null = full admin. */
+  admin_role?: 'manager' | null
   password_changed: boolean
   disabled: boolean
   created_at: string

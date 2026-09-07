@@ -7,6 +7,7 @@ import { useApiFetch } from '@/lib/api'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { CreateUserModal } from '@/components/admin/CreateUserModal'
 import { startImpersonation } from '@/lib/auth'
+import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { Profile, Plan, ChatConnection, ChatGroup } from '@/types'
 
@@ -56,6 +57,10 @@ function StatBlock({ label, value, sub }: { label: string; value: string | numbe
 }
 
 function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: { user: UserRow; plans: Plan[]; onClose: () => void; onViewAs: (u: UserRow) => void; onResetPassword: (u: UserRow) => void }) {
+  // Managers are admins minus account creation, password resets and deletion
+  // (migration 010) — the server enforces it; this just avoids dead buttons.
+  const { profile: viewer } = useAuth()
+  const isManagerViewer = viewer?.admin_role === 'manager'
   const apiFetch = useApiFetch()
   const qc = useQueryClient()
   const isClient = user.role === 'client'
@@ -152,6 +157,12 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
             })}>
               {user.role}
             </span>
+            {user.role === 'admin' && user.admin_role === 'manager' && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200"
+                title="Admin without account creation, password resets or deletion">
+                Manager
+              </span>
+            )}
             {/* Team sub-type (migration 006) — click to switch editor ⇄ copywriter */}
             {isTeam && (
               <button
@@ -311,6 +322,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
                 </svg>
                 View as {user.full_name.split(' ')[0]}
               </button>
+              {!isManagerViewer && (
               <button
                 onClick={() => onResetPassword(user)}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors text-sm font-semibold dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800"
@@ -320,6 +332,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
                 </svg>
                 Reset Password
               </button>
+              )}
             </div>
           )}
         </div>
@@ -340,6 +353,8 @@ type AdminTab = 'users' | 'connections'
 
 export default function AdminUserManagement() {
   const [showCreate, setShowCreate] = useState(false)
+  const { profile: viewer } = useAuth()
+  const isManagerViewer = viewer?.admin_role === 'manager'
   const [profileUser, setProfileUser] = useState<UserRow | null>(null)
   const [tab, setTab] = useState<AdminTab>('users')
   const [newConnA, setNewConnA] = useState('')
@@ -477,7 +492,7 @@ export default function AdminUserManagement() {
             <h1 className="text-2xl font-heading font-bold">User Management</h1>
             <p className="text-muted-foreground text-sm mt-1">{users.length} accounts · {connections.length} DMs · {groups.length} groups</p>
           </div>
-          {tab === 'users' && (
+          {tab === 'users' && !isManagerViewer && (
             <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-primary rounded-xl text-white text-sm font-semibold shadow-clay hover:brightness-110 transition-all active:scale-[0.98]">
               + Create Account
             </button>
@@ -718,7 +733,7 @@ export default function AdminUserManagement() {
                               {u.disabled
                                 ? <button onClick={() => enableUser(u.id, u.full_name)} className="text-xs text-primary hover:underline">Enable</button>
                                 : <button onClick={() => disableUser(u.id, u.full_name)} className="text-xs text-muted-foreground hover:text-foreground hover:underline">Disable</button>}
-                              <button onClick={() => deleteUser(u.id, u.full_name)} className="text-xs text-destructive hover:underline">Delete</button>
+                              {!isManagerViewer && <button onClick={() => deleteUser(u.id, u.full_name)} className="text-xs text-destructive hover:underline">Delete</button>}
                             </div>
                           </td>
                         </tr>
@@ -768,7 +783,7 @@ export default function AdminUserManagement() {
                               {u.disabled
                                 ? <button onClick={() => enableUser(u.id, u.full_name)} className="text-xs text-primary hover:underline">Enable</button>
                                 : <button onClick={() => disableUser(u.id, u.full_name)} className="text-xs text-muted-foreground hover:text-foreground hover:underline">Disable</button>}
-                              <button onClick={() => deleteUser(u.id, u.full_name)} className="text-xs text-destructive hover:underline">Delete</button>
+                              {!isManagerViewer && <button onClick={() => deleteUser(u.id, u.full_name)} className="text-xs text-destructive hover:underline">Delete</button>}
                             </div>
                           </td>
                         </tr>

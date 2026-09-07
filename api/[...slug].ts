@@ -35,6 +35,23 @@ const STREAM_URL_TTL_SECONDS = 3600
  *  calendar entries. NULL (legacy rows) reads as 'editor'. */
 const TEAM_ROLES = ['editor', 'copywriter'] as const
 
+/** A manager is an admin (migration 010) with a few capabilities removed.
+ *  Everything else an admin can do, they can do. */
+function isManagerAccount(profile: { role: string; admin_role?: string | null }): boolean {
+  return profile.role === 'admin' && profile.admin_role === 'manager'
+}
+
+/** Gate for the capabilities managers must NOT have. These are exactly the
+ *  privilege-escalation routes — creating an account, resetting someone's
+ *  password (you could then log in as them), and deleting accounts (which
+ *  cascades to their projects and stored files) — so they are enforced here
+ *  on the server, never only in the UI. */
+function requireFullAdmin(profile: { role: string; admin_role?: string | null }, action: string): void {
+  if (isManagerAccount(profile)) {
+    throw Object.assign(new Error(`Managers cannot ${action}. Ask a full admin.`), { status: 403 })
+  }
+}
+
 /** May this profile attach clients to a calendar entry? Admins always; team
  *  members only when they are copywriters. */
 function canAssignCalendarClients(profile: { role: string; team_role?: string | null }): boolean {
@@ -141,15 +158,20 @@ async function handleCreateUser(req: VercelRequest, res: VercelResponse) {
   try {
     const { profile: callerProfile } = await requireAuth(req)
     requireRole(callerProfile, 'admin')
+    requireFullAdmin(callerProfile, 'create accounts')
 
     const { full_name, email, phone, role, plan_id, client_id_label, team_role } = req.body
 
     if (!full_name || !email || !role) {
       res.status(400).json({ error: 'Missing required fields' }); return
     }
-    if (!['client', 'team'].includes(role)) {
+    // 'manager' is a UI-level choice; it is stored as an admin with a
+    // restricted admin_role (migration 010).
+    if (!['client', 'team', 'manager'].includes(role)) {
       res.status(400).json({ error: 'Invalid role' }); return
     }
+    const creatingManager = role === 'manager'
+    const dbRole = creatingManager ? 'admin' : role
     if (role === 'client' && !plan_id) {
       res.status(400).json({ error: 'plan_id required for client role' }); return
     }
@@ -173,7 +195,7 @@ async function handleCreateUser(req: VercelRequest, res: VercelResponse) {
          (id, role, full_name, email, phone, plan_id, client_id_label, password_hash, password_changed, disabled, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
       [
-        userId, role, full_name, email,
+        userId, dbRole, full_name, email,
         phone ?? null,
         plan_id ?? null,
         role === 'client' ? (client_id_label ?? null) : null,
@@ -181,6 +203,18 @@ async function handleCreateUser(req: VercelRequest, res: VercelResponse) {
         now, now,
       ]
     )
+
+    if (creatingManager) {
+      try {
+        await dbExecute('UPDATE profiles SET admin_role = ? WHERE id = ?', ['manager', userId])
+      } catch {
+        // Pre-migration-010: the account exists but would be a FULL admin,
+        // which is not what was asked for — remove it rather than silently
+        // over-granting.
+        await dbExecute('DELETE FROM profiles WHERE id = ?', [userId])
+        res.status(400).json({ error: 'Manager accounts need database migration 010 — run db/migrations/010_manager_role.sql' }); return
+      }
+    }
 
     if (role === 'team') {
       try {
@@ -204,6 +238,7 @@ async function handleDeleteUser(req: VercelRequest, res: VercelResponse) {
   try {
     const { profile: callerProfile } = await requireAuth(req)
     requireRole(callerProfile, 'admin')
+    requireFullAdmin(callerProfile, 'delete accounts')
 
     const targetId = req.query.id as string
 
@@ -276,12 +311,19 @@ async function handleUpdateUser(req: VercelRequest, res: VercelResponse) {
     const [target] = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [targetId])
     if (!target) { res.status(404).json({ error: 'User not found' }); return }
 
-    const { full_name, phone, plan_id, client_id_label, time_saved_hours, team_role } = req.body
+    const { full_name, phone, plan_id, client_id_label, time_saved_hours, team_role, admin_role } = req.body
 
     const updates: string[] = []
     const params: unknown[] = []
 
     if (full_name !== undefined) { updates.push('full_name = ?'); params.push(String(full_name)) }
+    if (admin_role !== undefined) {
+      // Full admins only — otherwise a manager could promote themselves.
+      requireFullAdmin(callerProfile, 'change admin permissions')
+      if (target.role !== 'admin') { res.status(400).json({ error: 'admin_role can only be set for admin accounts' }); return }
+      if (admin_role !== null && admin_role !== 'manager') { res.status(400).json({ error: "admin_role must be 'manager' or null" }); return }
+      updates.push('admin_role = ?'); params.push(admin_role)
+    }
     if (team_role !== undefined) {
       if (target.role !== 'team') { res.status(400).json({ error: 'team_role can only be set for team accounts' }); return }
       if (!TEAM_ROLES.includes(team_role)) { res.status(400).json({ error: `team_role must be one of ${TEAM_ROLES.join(', ')}` }); return }
@@ -374,6 +416,7 @@ async function handleResetUserPassword(req: VercelRequest, res: VercelResponse) 
   try {
     const { profile: callerProfile } = await requireAuth(req)
     requireRole(callerProfile, 'admin')
+    requireFullAdmin(callerProfile, 'reset passwords for other people')
 
     const targetId = req.query.id as string
     const [target] = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [targetId])

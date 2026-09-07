@@ -11,7 +11,7 @@ const schema = z.object({
   full_name: z.string().min(2, 'Name required'),
   email: z.string().email('Invalid email'),
   phone: z.string().optional(),
-  role: z.enum(['client', 'team']),
+  role: z.enum(['client', 'team', 'manager']),
   plan_id: z.string().optional(),
   // Team sub-type (migration 006) — same access, copywriters can additionally
   // assign clients to calendar entries.
@@ -124,8 +124,8 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
         ) : (
           /* Creation form */
           <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              {(['client', 'team'] as const).map((r) => (
+            <div className="grid grid-cols-3 gap-2">
+              {(['client', 'team', 'manager'] as const).map((r) => (
                 <label key={r} className="relative">
                   <input type="radio" value={r} {...register('role')} className="sr-only peer" />
                   <div className="border border-border peer-checked:border-primary peer-checked:bg-primary/10 rounded-xl p-3 text-center cursor-pointer transition-all">
@@ -144,6 +144,13 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
             <Field label="Phone (optional)" error={errors.phone?.message}>
               <input {...register('phone')} className={inputCls} placeholder="+33612345678" />
             </Field>
+
+            {role === 'manager' && (
+              <p className="text-xs text-muted-foreground bg-muted/50 rounded-xl px-3 py-2 leading-relaxed">
+                A manager has full admin access — projects, clients, calendar, analytics — except
+                creating accounts, resetting passwords and deleting accounts.
+              </p>
+            )}
 
             {role === 'team' && (
               <Field label="Team role" error={errors.team_role?.message}>
