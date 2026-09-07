@@ -24,6 +24,7 @@ import {
   useDeleteCalendarEvent,
 } from '@/hooks/useCalendar'
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
+import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus } from '@/types'
 
@@ -205,27 +206,6 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
   }, [title, date, color, contentType, contentStatus, comments, doubleDown, inspirationUrl, script, caption, event])
 
   const canEdit = isManual && isOwner
-  // "Posted" is the client's own signal that the piece went live. It saves on
-  // click rather than joining the dirty/Save flow, and an assigned client may
-  // set it even when they don't own the entry (copywriters create entries FOR
-  // clients) — the API allows exactly that one field for them.
-  const [posted, setPosted] = useState(event.posted ?? false)
-  // An admin looking at a client workspace (impersonation ends up here too)
-  // can mark posted as well — the API already permits admins.
-  const { profile: viewer } = useAuth()
-  const isAdminViewer = viewer?.role === 'admin'
-  const canMarkPosted = isManual && (isOwner || isAdminViewer || (event.assigned_client_ids ?? []).includes(currentUserId))
-  const togglePosted = () => {
-    const next = !posted
-    setPosted(next)
-    updateEvent.mutate(
-      { id: event.id, posted: next },
-      {
-        onSuccess: () => toast.success(next ? 'Marked as posted' : 'Posted mark removed'),
-        onError: () => { setPosted(!next); toast.error('Could not update') },
-      },
-    )
-  }
 
   const handleSave = () => {
     if (!title.trim()) { toast.error('Enter a title'); return }
@@ -348,26 +328,9 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
                 <span className="text-xs text-muted-foreground">{format(parseISO(event.date), 'MMMM d, yyyy')}</span>
               )}
             </PropRow>
-            {(canMarkPosted || posted) && (
-              <PropRow label="Posted">
-                {canMarkPosted ? (
-                  <button
-                    onClick={togglePosted}
-                    title="Mark once this piece is actually published"
-                    className={cn(
-                      'flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all',
-                      posted
-                        ? 'bg-gray-400 text-white border-gray-400'
-                        : 'bg-muted text-muted-foreground border-border hover:border-gray-400 hover:text-foreground',
-                    )}
-                  >
-                    {posted ? '✓ Posted' : 'Mark as posted'}
-                  </button>
-                ) : (
-                  <span className="text-xs text-muted-foreground">✓ Posted</span>
-                )}
-              </PropRow>
-            )}
+            <PropRow label="Posted">
+              <PostedToggle event={event} />
+            </PropRow>
             <PropRow label="Double Down">
               {canEdit ? (
                 <button onClick={() => setDoubleDown(!doubleDown)} className={cn('flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all', doubleDown ? 'bg-orange-500 text-white border-orange-500' : 'bg-muted text-muted-foreground border-border hover:border-orange-400 hover:text-orange-500')}>

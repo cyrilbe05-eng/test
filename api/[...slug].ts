@@ -748,6 +748,38 @@ async function handleClaimProject(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+/** Mark a project's finished piece as published (migration 009).
+ *  The calendar entry generated from this project then shows grey "Posted".
+ *  The client who owns the project, or an admin, may set it — they are the
+ *  ones who actually publish. */
+async function handleProjectPosted(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    const { clerkUserId, profile } = await requireAuth(req)
+    const projectId = req.query.id as string
+    const { posted } = req.body as { posted?: boolean }
+    if (typeof posted !== 'boolean') { res.status(400).json({ error: 'posted (boolean) required' }); return }
+
+    const [project] = await dbQuery<{ id: string; client_id: string }>(
+      'SELECT id, client_id FROM projects WHERE id = ?',
+      [projectId],
+    )
+    if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+    if (profile.role !== 'admin' && project.client_id !== clerkUserId) {
+      res.status(403).json({ error: 'Forbidden' }); return
+    }
+
+    try {
+      await dbExecute('UPDATE projects SET posted_at = ? WHERE id = ?', [posted ? nowIso() : null, projectId])
+    } catch {
+      res.status(400).json({ error: 'Marking as posted needs database migration 009 — run db/migrations/009_project_posted.sql' }); return
+    }
+    res.json({ ok: true, posted })
+  } catch (e: any) {
+    res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
+  }
+}
+
 async function handleUnassignProject(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'DELETE') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
@@ -2550,6 +2582,8 @@ interface CalendarProjectRow {
   created_at: string
   updated_at: string
   client_id: string
+  /** Set when the client marked the finished piece as published (migration 009). */
+  posted_at?: string | null
 }
 
 // Calendar lifecycle colours (migration 007). One entry, three states, so a
@@ -2589,15 +2623,15 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
 
     let projects: CalendarProjectRow[]
     if (profile.role === 'admin') {
-      projects = await dbQuery<CalendarProjectRow>('SELECT id, title, status, created_at, updated_at, client_id FROM projects ORDER BY created_at ASC')
+      projects = await dbQuery<CalendarProjectRow>('SELECT id, title, status, created_at, updated_at, client_id, posted_at FROM projects ORDER BY created_at ASC')
     } else if (profile.role === 'client') {
       projects = await dbQuery<CalendarProjectRow>(
-        'SELECT id, title, status, created_at, updated_at, client_id FROM projects WHERE client_id = ? ORDER BY created_at ASC',
+        'SELECT id, title, status, created_at, updated_at, client_id, posted_at FROM projects WHERE client_id = ? ORDER BY created_at ASC',
         [clerkUserId]
       )
     } else {
       projects = await dbQuery<CalendarProjectRow>(
-        `SELECT pr.id, pr.title, pr.status, pr.created_at, pr.updated_at, pr.client_id
+        `SELECT pr.id, pr.title, pr.status, pr.created_at, pr.updated_at, pr.client_id, pr.posted_at
          FROM projects pr
          INNER JOIN project_assignments pa ON pa.project_id = pr.id AND pa.team_member_id = ?
          ORDER BY pr.created_at ASC`,
@@ -2610,11 +2644,13 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
     // Lifecycle state for every project the caller can see. Used both for the
     // automatic project entries below and for manual entries linked to one.
     const deliveredSet = await projectsWithDeliverables(projects.map((p) => p.id))
-    const lifecycleById = new Map<string, { status: string; color: string }>()
+    const lifecycleById = new Map<string, { status: string; color: string; posted: boolean }>()
     for (const p of projects) {
+      const isPosted = !!p.posted_at
       lifecycleById.set(p.id, {
         status: p.status,
-        color: projectLifecycleColor(p.status, deliveredSet.has(p.id)),
+        posted: isPosted,
+        color: isPosted ? CAL_COLOR_POSTED : projectLifecycleColor(p.status, deliveredSet.has(p.id)),
       })
     }
 
@@ -2624,7 +2660,8 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
       // plus a separate green "Approved" entry on a different day.
       const lifecycle = lifecycleById.get(p.id)!
       const stateLabel =
-        lifecycle.color === CAL_COLOR_APPROVED ? 'Approved ✓'
+        lifecycle.posted ? 'Posted'
+        : lifecycle.color === CAL_COLOR_APPROVED ? 'Approved ✓'
         : lifecycle.color === CAL_COLOR_DELIVERED ? 'In review'
         : 'Created'
       events.push({
@@ -2634,6 +2671,7 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         title: `${p.title} — ${stateLabel}`,
         date: p.created_at.slice(0, 10),
         color: lifecycle.color,
+        posted: lifecycle.posted,
         created_at: p.created_at,
       })
     }
@@ -2716,15 +2754,17 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
     const linkedIds = [...new Set(manualRows.map((m) => m.project_id).filter((id): id is string => !!id))]
     const missingIds = linkedIds.filter((id) => !lifecycleById.has(id))
     if (missingIds.length > 0) {
-      const extra = await dbQuery<{ id: string; status: string }>(
-        `SELECT id, status FROM projects WHERE id IN (${missingIds.map(() => '?').join(',')})`,
+      const extra = await dbQuery<{ id: string; status: string; posted_at: string | null }>(
+        `SELECT id, status, posted_at FROM projects WHERE id IN (${missingIds.map(() => '?').join(',')})`,
         missingIds,
       )
       const extraDelivered = await projectsWithDeliverables(extra.map((p) => p.id))
       for (const p of extra) {
+        const isPosted = !!p.posted_at
         lifecycleById.set(p.id, {
           status: p.status,
-          color: projectLifecycleColor(p.status, extraDelivered.has(p.id)),
+          posted: isPosted,
+          color: isPosted ? CAL_COLOR_POSTED : projectLifecycleColor(p.status, extraDelivered.has(p.id)),
         })
       }
     }
@@ -4136,6 +4176,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug.length === 2) {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleGetProject(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'posted') {
+      ;(req as any).query = { ...(req.query || {}), id: slug[1] }
+      return handleProjectPosted(req, res)
     }
     if (slug.length === 3 && slug[2] === 'claim') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }

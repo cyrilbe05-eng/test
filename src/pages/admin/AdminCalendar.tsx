@@ -25,6 +25,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
+import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus, Profile } from '@/types'
 
@@ -244,20 +245,6 @@ function EventModal({
   const updateEvent = useUpdateCalendarEvent()
   const deleteEvent = useDeleteCalendarEvent()
   const isManual = event.type === 'manual'
-  // "Posted" — the piece is actually published. Terminal state: the entry goes
-  // light grey. Saves on click rather than joining the dirty/Save flow.
-  const [posted, setPosted] = useState(event.posted ?? false)
-  const togglePosted = () => {
-    const next = !posted
-    setPosted(next)
-    updateEvent.mutate(
-      { id: event.id, posted: next },
-      {
-        onSuccess: () => toast.success(next ? 'Marked as posted' : 'Posted mark removed'),
-        onError: () => { setPosted(!next); toast.error('Could not update') },
-      },
-    )
-  }
 
   const isDirty = useMemo(() => {
     return (
@@ -374,22 +361,9 @@ function EventModal({
                 <span className="text-xs text-muted-foreground">{format(parseISO(event.date), 'MMMM d, yyyy')}</span>
               )}
             </PropRow>
-            {isManual && (
-              <PropRow label="Posted">
-                <button
-                  onClick={togglePosted}
-                  title="Mark once this piece is actually published"
-                  className={cn(
-                    'flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all',
-                    posted
-                      ? 'bg-gray-400 text-white border-gray-400'
-                      : 'bg-muted text-muted-foreground border-border hover:border-gray-400 hover:text-foreground',
-                  )}
-                >
-                  {posted ? '✓ Posted' : 'Mark as posted'}
-                </button>
-              </PropRow>
-            )}
+            <PropRow label="Posted">
+              <PostedToggle event={event} />
+            </PropRow>
             <PropRow label="Double Down">
               {isManual ? (
                 <button onClick={() => setDoubleDown(!doubleDown)} className={cn('flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all', doubleDown ? 'bg-orange-500 text-white border-orange-500' : 'bg-muted text-muted-foreground border-border hover:border-orange-400 hover:text-orange-500')}>
