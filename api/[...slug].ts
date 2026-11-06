@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { decodeJwt } from 'jose'
 import { requireAuth, requireRole, signJwt, hashPassword, comparePassword } from './_helpers/auth.js'
-import { dbQuery, dbExecute, newId, nowIso } from './_helpers/db.js'
+import { dbQuery, dbQueryIn, dbExecute, newId, nowIso } from './_helpers/db.js'
 import {
   getPresignedUploadUrl,
   getPresignedDownloadUrl,
@@ -2208,13 +2208,12 @@ async function handleGetGroups(req: VercelRequest, res: VercelResponse) {
     }
 
     if (groups.length === 0) { res.json([]); return }
-    const placeholders = groups.map(() => '?').join(', ')
     const groupIds = groups.map((g) => g.id)
-    const members = await dbQuery<MemberRow>(
-      `SELECT m.group_id, m.user_id, p.full_name, p.email, p.role, p.avatar_url
+    const members = await dbQueryIn<MemberRow>(
+      (ph) => `SELECT m.group_id, m.user_id, p.full_name, p.email, p.role, p.avatar_url
        FROM chat_group_members m
        JOIN profiles p ON p.id = m.user_id
-       WHERE m.group_id IN (${placeholders})`,
+       WHERE m.group_id IN (${ph})`,
       groupIds
     )
 
@@ -2463,9 +2462,8 @@ async function handleGetMessages(req: VercelRequest, res: VercelResponse) {
     let readReceipts: ReadReceiptRow[] = []
     if (messages.length > 0) {
       const msgIds = messages.map((m) => m.id)
-      const placeholders = msgIds.map(() => '?').join(', ')
-      readReceipts = await dbQuery<ReadReceiptRow>(
-        `SELECT message_id, user_id FROM chat_read_receipts WHERE message_id IN (${placeholders})`,
+      readReceipts = await dbQueryIn<ReadReceiptRow>(
+        (ph) => `SELECT message_id, user_id FROM chat_read_receipts WHERE message_id IN (${ph})`,
         msgIds
       )
     }
@@ -2913,9 +2911,9 @@ async function projectsWithClientUploads(projectIds: string[]): Promise<Set<stri
 /** Which of these project ids have at least one deliverable uploaded. */
 async function projectsWithDeliverables(projectIds: string[]): Promise<Set<string>> {
   if (projectIds.length === 0) return new Set()
-  const rows = await dbQuery<{ project_id: string }>(
-    `SELECT DISTINCT project_id FROM project_files
-     WHERE file_type = 'deliverable' AND project_id IN (${projectIds.map(() => '?').join(',')})`,
+  const rows = await dbQueryIn<{ project_id: string }>(
+    (ph) => `SELECT DISTINCT project_id FROM project_files
+     WHERE file_type = 'deliverable' AND project_id IN (${ph})`,
     projectIds,
   )
   return new Set(rows.map((r) => r.project_id))
@@ -3070,12 +3068,10 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
     )
 
     const manualEventIds = manualRows.map((m) => m.id)
-    const manualParticipants = manualEventIds.length > 0
-      ? await dbQuery<{ event_id: string; profile_id: string; role: string }>(
-          `SELECT event_id, profile_id, role FROM calendar_event_participants WHERE event_id IN (${manualEventIds.map(() => '?').join(',')})`,
-          manualEventIds
-        )
-      : []
+    const manualParticipants = await dbQueryIn<{ event_id: string; profile_id: string; role: string }>(
+      (ph) => `SELECT event_id, profile_id, role FROM calendar_event_participants WHERE event_id IN (${ph})`,
+      manualEventIds
+    )
 
     // A manual entry may link to a project the caller can't otherwise see in
     // this feed (e.g. a team member not assigned to it) — fetch those too so
@@ -3083,8 +3079,8 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
     const linkedIds = [...new Set(manualRows.map((m) => m.project_id).filter((id): id is string => !!id))]
     const missingIds = linkedIds.filter((id) => !lifecycleById.has(id))
     if (missingIds.length > 0) {
-      const extra = await dbQuery<{ id: string; status: string; posted_at: string | null }>(
-        `SELECT id, status, posted_at FROM projects WHERE id IN (${missingIds.map(() => '?').join(',')})`,
+      const extra = await dbQueryIn<{ id: string; status: string; posted_at: string | null }>(
+        (ph) => `SELECT id, status, posted_at FROM projects WHERE id IN (${ph})`,
         missingIds,
       )
       const extraDelivered = await projectsWithDeliverables(extra.map((p) => p.id))
@@ -3184,12 +3180,10 @@ async function handleCalendarEvents(req: VercelRequest, res: VercelResponse) {
       }
 
       const eventIds = (events as { id: string }[]).map((e) => e.id)
-      const participants = eventIds.length > 0
-        ? await dbQuery<{ event_id: string; profile_id: string; role: string }>(
-            `SELECT event_id, profile_id, role FROM calendar_event_participants WHERE event_id IN (${eventIds.map(() => '?').join(',')})`,
-            eventIds
-          )
-        : []
+      const participants = await dbQueryIn<{ event_id: string; profile_id: string; role: string }>(
+        (ph) => `SELECT event_id, profile_id, role FROM calendar_event_participants WHERE event_id IN (${ph})`,
+        eventIds
+      )
 
       const enriched = (events as Record<string, unknown>[]).map((e) => ({
         ...(role === 'client' ? clientSafeEvent(e) : e),
