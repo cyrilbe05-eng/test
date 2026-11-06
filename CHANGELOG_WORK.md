@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-11-06 — Calendar blank past 100 entries (`8b67ec5`)
+
+- **Report:** copywriter Florance's scripts disappeared from the calendar overnight, with no deploy.
+- **Root cause:** D1 caps a statement at **100 bound parameters**. `/api/calendar` fetched
+  participants with one `IN (?)` placeholder per entry the caller owns or is on, so the 101st entry
+  made the whole request fail → empty calendar. Data-driven, which is why nothing in git changed.
+- **Fix:** `dbQueryIn()` in `api/_helpers/db.ts` slices `IN` lists under the cap. Applied to every
+  list that grows with stored data: calendar participants (feed + events list), linked projects,
+  deliverable lookup (admin feed with 100+ projects was next), chat read receipts (a thread past
+  100 messages failed the same way), chat group members. Request-body lists (forward recipients,
+  group member checks) left as is — small by nature.
+- Test: `api/_helpers/db.test.ts` stubs D1's 100-param refusal.
+- **Follow-up:** any new `IN (${…})` built from query results must use `dbQueryIn`.
+
+---
+
 ## 2026-08-07 — Mobile long-press menu + client "Posted" tag (`238ddfa`)
 
 > **⚠️ ACTION REQUIRED:** `ALTER TABLE calendar_events ADD COLUMN posted INTEGER NOT NULL DEFAULT 0;`
