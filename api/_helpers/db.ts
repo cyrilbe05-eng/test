@@ -49,6 +49,29 @@ export async function dbExecute(sql: string, params: unknown[] = []): Promise<{ 
   return { changes: (results[0] as any)?.changes ?? 0 }
 }
 
+// D1 rejects any statement with more than 100 bound parameters. An
+// `IN (?, ?, …)` list built from earlier query results grows with the data, so
+// it works for months and then fails outright once a user passes 100 rows
+// (e.g. a copywriter's 101st calendar entry blanked her whole calendar).
+const D1_MAX_BOUND_PARAMS = 100
+
+/** Run `SELECT … WHERE col IN (${placeholders})` over any number of ids by
+ *  slicing them under D1's parameter cap. The ids must be the statement's only
+ *  bound parameters. Results are concatenated; order across slices is not kept. */
+export async function dbQueryIn<T>(
+  buildSql: (placeholders: string) => string,
+  ids: readonly unknown[],
+): Promise<T[]> {
+  const slices: unknown[][] = []
+  for (let i = 0; i < ids.length; i += D1_MAX_BOUND_PARAMS) {
+    slices.push(ids.slice(i, i + D1_MAX_BOUND_PARAMS))
+  }
+  const results = await Promise.all(
+    slices.map((slice) => dbQuery<T>(buildSql(slice.map(() => '?').join(',')), slice)),
+  )
+  return results.flat()
+}
+
 // Convenience: run multiple statements in one request
 export async function dbBatch(statements: { sql: string; params?: unknown[] }[]): Promise<void> {
   // D1 REST API processes one statement per request; batch by calling sequentially
