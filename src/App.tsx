@@ -49,6 +49,8 @@ import AdminMessages from '@/pages/admin/AdminMessages'
 import AdminCalendar from '@/pages/admin/AdminCalendar'
 import AdminClientCare from '@/pages/admin/AdminClientCare'
 import AdminEditorPerformance from '@/pages/admin/AdminEditorPerformance'
+import TeamPlans from '@/pages/team/TeamPlans'
+import TeamPlan from '@/pages/team/TeamPlan'
 import TeamGallery from '@/pages/team/TeamGallery'
 import TeamMessages from '@/pages/team/TeamMessages'
 import TeamCalendar from '@/pages/team/TeamCalendar'
@@ -163,6 +165,8 @@ function ProductionApp() {
           <Route path="/team/messages" element={<ProtectedRoute allowedRoles={['team']}><TeamMessages /></ProtectedRoute>} />
           <Route path="/team/calendar" element={<ProtectedRoute allowedRoles={['team']}><TeamCalendar /></ProtectedRoute>} />
           <Route path="/team/stats" element={<ProtectedRoute allowedRoles={['team']}><TeamStats /></ProtectedRoute>} />
+          <Route path="/team/plans" element={<ProtectedRoute allowedRoles={['team']}><TeamPlans /></ProtectedRoute>} />
+          <Route path="/team/plans/:contractId" element={<ProtectedRoute allowedRoles={['team']}><TeamPlan /></ProtectedRoute>} />
 
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />

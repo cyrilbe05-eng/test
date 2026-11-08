@@ -141,6 +141,11 @@ describe('health status', () => {
     expect(r.reasons).toEqual(['Contract ends in 10 days'])
   })
 
+  it('a RENEWED contract does not raise "Contract ends in X days"', () => {
+    const r = evalHealth(client({ care: { ...client().care!, contract_end: inDays(10), renewal_status: 'renewed' } }))
+    expect(r.health).toBe('healthy')
+  })
+
   it('NEEDS ATTENTION: contract ends within 30 days', () => {
     expect(evalHealth(client({ care: { ...client().care!, contract_end: inDays(30) } })).health).toBe('needs_attention')
     expect(evalHealth(client({ care: { ...client().care!, contract_end: inDays(31) } })).health).toBe('healthy')

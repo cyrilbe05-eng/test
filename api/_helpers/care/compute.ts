@@ -3,6 +3,7 @@
 // them into alerts, health, stats and output rates.
 
 import { CARE_CONFIG, CLIENT_VISIBLE_STATUSES, type CareConfig, type RenewalStatus } from './config.js'
+import { overdueClientSteps, type PlanItem } from './plans.js'
 
 const DAY = 86_400_000
 
@@ -46,6 +47,8 @@ export interface ClientInput {
    *  mirrored into `care` so the rules below read them in one place. */
   contract?: { id: string; number: number; package: 'editing_only' | 'full_package'; start_date: string; end_date: string } | null
   care: CareFields | null
+  /** Production plan of the current contract, auto ticks already applied. */
+  plan?: PlanItem[]
   last_contact_at: string | null
   projects: ProjectInput[]
 }
@@ -139,7 +142,7 @@ export function projectFacts(p: ProjectInput, now: number): ProjectFacts {
 
 // ── Alerts + health ─────────────────────────────────────────────────────────
 
-export type AlertType = 'no_brief' | 'stuck_in_progress' | 'due_today' | 'no_contact'
+export type AlertType = 'no_brief' | 'stuck_in_progress' | 'due_today' | 'no_contact' | 'plan_overdue'
 export interface Alert { type: AlertType; message: string; project_id?: string }
 export type Health = 'at_risk' | 'needs_attention' | 'healthy'
 
@@ -173,6 +176,12 @@ export function computeAlerts(client: ClientInput, facts: ProjectFacts[], now: n
     if (f.due_today) alerts.push({ type: 'due_today', project_id: f.id, message: `"${f.title}" is due from the editor today` })
   }
 
+  // Client plan steps past their date (auto ticks were applied when loading,
+  // so uploaded footage never shows as overdue).
+  for (const s of overdueClientSteps(client.plan ?? [], now)) {
+    alerts.push({ type: 'plan_overdue', message: `"${s.title}" overdue by ${plural(s.days_late, 'day')}` })
+  }
+
   if (client.last_contact_at == null) alerts.push({ type: 'no_contact', message: 'No contact logged yet' })
   else if (now - ms(client.last_contact_at) >= cfg.alerts.noContactDays * DAY) {
     alerts.push({ type: 'no_contact', message: `No contact for ${plural(wholeDays(ms(client.last_contact_at), now), 'day')}` })
@@ -201,7 +210,8 @@ export function computeHealth(
     atRisk.push(`${contractPhrase(daysLeft)} and renewal hasn't been discussed`)
   }
   const attention = alerts.map((a) => a.message)
-  if (daysLeft != null && daysLeft <= cfg.health.attentionContractDays) attention.push(contractPhrase(daysLeft))
+  // A renewed contract already has its successor — no "ends in X days" alert.
+  if (daysLeft != null && daysLeft <= cfg.health.attentionContractDays && renewal !== 'renewed') attention.push(contractPhrase(daysLeft))
 
   // At risk: the at-risk reasons first, then every other active alert, so the
   // card and the "Text today" list show the full picture without repeats.

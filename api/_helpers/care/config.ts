@@ -82,6 +82,25 @@ export const REVISION_CATEGORY_KEYS = Object.keys(REVISION_CATEGORIES) as Revisi
 
 export type CareConfig = typeof CARE_CONFIG
 
+/** Standard production plan for full-package contracts. Each step's date is
+ *  `daysAfterPrevious` days after the step before it (the first counts from
+ *  the plan's start date). Copywriters/admins can edit every line afterwards. */
+export const PLAN_TEMPLATE: {
+  title: string
+  owner: 'pingu' | 'client' | 'both'
+  daysAfterPrevious: number
+  autoRule: 'none' | 'footage_uploaded' | 'all_delivered'
+}[] = [
+  { title: 'Onboarding call',          owner: 'both',   daysAfterPrevious: 0,  autoRule: 'none' },
+  { title: 'Scripts · batch 1',        owner: 'pingu',  daysAfterPrevious: 3,  autoRule: 'none' },
+  { title: 'Record + upload · batch 1', owner: 'client', daysAfterPrevious: 4,  autoRule: 'footage_uploaded' },
+  { title: 'Scripts · batch 2',        owner: 'pingu',  daysAfterPrevious: 7,  autoRule: 'none' },
+  { title: 'Record + upload · batch 2', owner: 'client', daysAfterPrevious: 4,  autoRule: 'footage_uploaded' },
+  { title: 'Scripts · batch 3',        owner: 'pingu',  daysAfterPrevious: 7,  autoRule: 'none' },
+  { title: 'Record + upload · batch 3', owner: 'client', daysAfterPrevious: 4,  autoRule: 'footage_uploaded' },
+  { title: 'All videos delivered',     owner: 'pingu',  daysAfterPrevious: 21, autoRule: 'all_delivered' },
+]
+
 /** Project statuses that mean the client has received a version. Entering any
  *  of them for the first time = the video was "delivered". */
 export const CLIENT_VISIBLE_STATUSES = ['client_reviewing', 'revision_requested', 'client_approved'] as const

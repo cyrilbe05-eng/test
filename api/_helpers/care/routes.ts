@@ -12,6 +12,8 @@
 //   GET    /api/admin/care/clients/:id/contracts  list contracts
 //   POST   /api/admin/care/clients/:id/contracts  add a contract
 //   PATCH  /api/admin/care/contracts/:id          edit; "renewed" creates the next one
+//   PUT    /api/admin/care/clients/:id/team       set assigned copywriters
+//   (production plan editing: /api/team/plans/... — see plan-routes.ts)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { dbQuery, dbExecute, newId, nowIso } from '../db.js'
@@ -24,6 +26,7 @@ import { evaluateClient, computeOutputRate, urgencyCompare, type ClientCare } fr
 import { loadClients, loadOnboarding, loadRecentContacts, loadEditorNames } from './data.js'
 import { requireCareAdmin, sendError, processRevisionsSafely } from './access.js'
 import { loadContracts, createContract, updateContract } from './contracts.js'
+import { loadAssignments, setClientCopywriters, planWithState } from './plans.js'
 
 function card(c: ClientCare, instagram: Map<string, string[]>) {
   return {
@@ -108,12 +111,14 @@ async function buildClientDetail(clientId: string) {
   const now = Date.now()
   const [client] = await loadClients(clientId)
   if (!client) return null
-  const [onboarding, contacts, editorNames, revisions, matcher, instagram, contracts] = await Promise.all([
+  const [onboarding, contacts, editorNames, revisions, matcher, instagram, contracts, assigned, copywriters] = await Promise.all([
     loadOnboarding(clientId), loadRecentContacts(clientId), loadEditorNames(),
     loadClientRevisions(clientId).catch(() => ({ sop_rules: [], revision_backlog: [] })),
     getMatcher(),
     loadInstagramHandles(clientId),
     loadContracts(clientId),
+    loadAssignments(clientId),
+    dbQuery<{ id: string; full_name: string }>("SELECT id, full_name FROM profiles WHERE role = 'team' AND team_role = 'copywriter' AND disabled = 0 ORDER BY full_name"),
   ])
   const ev = evaluateClient(client, now)
 
@@ -126,6 +131,11 @@ async function buildClientDetail(clientId: string) {
     // All contracts (oldest first) and which one is current.
     contracts: (contracts.get(clientId) ?? []).map(({ client_id: _c, ...k }) => k),
     current_contract_id: client.contract?.id ?? null,
+    // Copywriters looking after this client (migration 014) + who can be picked.
+    copywriters: assigned.map((a) => ({ id: a.team_member_id, name: a.name })),
+    available_copywriters: copywriters.map((c) => ({ id: c.id, name: c.full_name })),
+    // Production plan of the current contract (auto ticks applied).
+    plan: planWithState(client.plan ?? [], now).map(({ contract_id: _k, client_id: _c, ...i }) => i),
     care: client.care ?? {
       contract_start: null, contract_end: null, videos_included: null,
       renewal_status: 'not_discussed', care_notes: null, miro_url: null,
@@ -223,6 +233,22 @@ async function handleDeleteContact(req: VercelRequest, res: VercelResponse, cont
   }
 }
 
+/** PUT — set the copywriters assigned to a client. */
+async function handleClientTeam(req: VercelRequest, res: VercelResponse, clientId: string) {
+  if (req.method !== 'PUT') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    await requireCareAdmin(req)
+    await requireActiveClient(clientId)
+    await setClientCopywriters(clientId, req.body)
+    res.json(await buildClientDetail(clientId))
+  } catch (e: any) {
+    if (/no such table: client_team_assignments/i.test(String(e?.message))) {
+      res.status(500).json({ error: 'Copywriter links need database migration 014 — run db/migrations/014_production_plans.sql' }); return
+    }
+    sendError(res, e)
+  }
+}
+
 /** GET = list; POST = add a contract (next number). */
 async function handleClientContracts(req: VercelRequest, res: VercelResponse, clientId: string) {
   if (req.method !== 'GET' && req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
@@ -312,6 +338,7 @@ export async function handleCareRoute(req: VercelRequest, res: VercelResponse, r
   if (rest.length === 3 && rest[0] === 'clients' && rest[2] === 'instagram') return handleClientInstagram(req, res, rest[1])
   if (rest.length === 2 && rest[0] === 'contacts') return handleDeleteContact(req, res, rest[1])
   if (rest.length === 3 && rest[0] === 'clients' && rest[2] === 'contracts') return handleClientContracts(req, res, rest[1])
+  if (rest.length === 3 && rest[0] === 'clients' && rest[2] === 'team') return handleClientTeam(req, res, rest[1])
   if (rest.length === 2 && rest[0] === 'contracts') return handleContract(req, res, rest[1])
   res.status(404).json({ error: 'Not found' })
 }

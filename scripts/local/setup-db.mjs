@@ -89,6 +89,8 @@ const editors = [
   profile({ role: 'team', team_role: 'copywriter', full_name: 'Clara Copy', email: 'clara@pingu.local' }),
 ]
 const videoEditors = editors.slice(0, 3)
+const clara = editors[3]
+const cora = profile({ role: 'team', team_role: 'copywriter', full_name: 'Cora Words', email: 'cora@pingu.local' })
 
 // Each client is shaped to land in a specific health situation (see notes).
 const CLIENTS = [
@@ -325,13 +327,45 @@ db.exec(m013.slice(m013.indexOf('-- COPY')))
   for (const key of ['healthy', 'stuck', 'new']) db.prepare("UPDATE client_contracts SET package = 'full_package' WHERE client_id = ?").run(clientIds[key])
 }
 
+// Copywriters ↔ clients + production plans (migration 014).
+//  - Clara: Bloom + Nova. Cora: Saffron (no plan yet → create from template).
+//  - Bloom: plan under way; its "record + upload" steps tick themselves from
+//    the footage Bloom uploaded.
+//  - Nova: the onboarding call (client step) is overdue.
+{
+  insert('client_team_assignments', { client_id: clientIds.healthy, team_member_id: clara })
+  insert('client_team_assignments', { client_id: clientIds.stuck, team_member_id: clara })
+  insert('client_team_assignments', { client_id: clientIds.new, team_member_id: cora })
+  // Same steps and gaps as PLAN_TEMPLATE in api/_helpers/care/config.ts.
+  const TEMPLATE = [
+    ['Onboarding call', 'both', 0, 'none'], ['Scripts · batch 1', 'pingu', 3, 'none'],
+    ['Record + upload · batch 1', 'client', 4, 'footage_uploaded'], ['Scripts · batch 2', 'pingu', 7, 'none'],
+    ['Record + upload · batch 2', 'client', 4, 'footage_uploaded'], ['Scripts · batch 3', 'pingu', 7, 'none'],
+    ['Record + upload · batch 3', 'client', 4, 'footage_uploaded'], ['All videos delivered', 'pingu', 21, 'all_delivered'],
+  ]
+  const makePlan = (clientKey, startDaysAgo, doneTitles) => {
+    const clientId = clientIds[clientKey]
+    const contract = db.prepare('SELECT id, start_date, end_date FROM client_contracts WHERE client_id = ? ORDER BY number DESC').all(clientId)
+      .find((k) => k.start_date <= dateOnly(NOW) && dateOnly(NOW) <= k.end_date)
+    let ms = daysAgo(startDaysAgo)
+    TEMPLATE.forEach(([title, owner, gap, rule], i) => {
+      ms += gap * DAY
+      const done = doneTitles.includes(title)
+      insert('production_plan_items', { id: randomUUID(), contract_id: contract.id, client_id: clientId, date: dateOnly(ms), title, owner,
+        done: done ? 1 : 0, done_at: done ? iso(ms + 3_600_000) : null, done_by: done ? clara : null, auto_rule: rule, sort_order: i })
+    })
+  }
+  makePlan('healthy', 20, ['Onboarding call', 'Scripts · batch 1'])
+  makePlan('stuck', 5, ['Scripts · batch 1'])
+}
+
 // ── 5. Summary ──────────────────────────────────────────────────────────────
 
 const count = (t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n
 console.log(`Local database ready: ${path.relative(ROOT, DB_FILE)}`)
-for (const t of ['profiles', 'projects', 'project_assignments', 'deadlines', 'project_files', 'status_history', 'timeline_comments', 'client_care', 'client_contacts', 'client_onboarding', 'revision_entries', 'client_contracts']) {
+for (const t of ['profiles', 'projects', 'project_assignments', 'deadlines', 'project_files', 'status_history', 'timeline_comments', 'client_care', 'client_contacts', 'client_onboarding', 'revision_entries', 'client_contracts', 'client_team_assignments', 'production_plan_items']) {
   console.log(`  ${t.padEnd(20)} ${count(t)}`)
 }
 console.log(`\nLog in at http://localhost:5173 with admin@pingu.local / ${LOCAL_PASSWORD}`)
-console.log('(also: manager@pingu.local, elias@pingu.local, bloom@client.local — same password)')
+console.log('(also: manager@pingu.local, elias@pingu.local, clara@ / cora@pingu.local (copywriters), bloom@client.local — same password)')
 db.close()

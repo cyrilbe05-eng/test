@@ -5,8 +5,10 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
   useCareClient, useMarkContacted, useUndoContact, useUpdateCare, useSaveInstagram,
-  useCreateContract, useUpdateContract,
+  useCreateContract, useUpdateContract, useSetCopywriters,
 } from '@/hooks/useCare'
+import { usePlan } from '@/hooks/usePlans'
+import { PlanEditor } from '@/components/plans/PlanEditor'
 import { InstagramInput, InstagramLinks } from '@/components/care/Instagram'
 import { parseInstagramList } from '@/lib/instagram'
 import { HealthBadge } from '@/components/care/HealthBadge'
@@ -305,6 +307,43 @@ function Contracts({ detail }: { detail: ClientCareDetail }) {
   )
 }
 
+// ── Copywriters + production plan ───────────────────────────────────────────
+
+function Copywriters({ detail }: { detail: ClientCareDetail }) {
+  const set = useSetCopywriters()
+  const assigned = new Set(detail.copywriters.map((c) => c.id))
+  const toggle = (id: string) => {
+    const next = new Set(assigned)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    set.mutate({ clientId: detail.client.id, ids: [...next] }, { onError: (e) => toast.error(errMsg(e)) })
+  }
+  return (
+    <Block title="Copywriters">
+      {detail.available_copywriters.length === 0 ? <p className="text-sm text-muted-foreground">—</p> : (
+        <div className="flex flex-wrap gap-2">
+          {detail.available_copywriters.map((c) => (
+            <button key={c.id} role="checkbox" aria-checked={assigned.has(c.id)} disabled={set.isPending} onClick={() => toggle(c.id)}
+              className={cn('min-h-[44px] px-3 rounded-lg border text-sm', assigned.has(c.id) ? 'border-primary bg-primary/10 text-primary font-medium' : 'border-border hover:bg-muted')}>
+              {assigned.has(c.id) ? '✓ ' : ''}{c.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </Block>
+  )
+}
+
+function PlanSection({ detail }: { detail: ClientCareDetail }) {
+  const current = detail.contracts.find((c) => c.id === detail.current_contract_id)
+  const { data } = usePlan(current?.package === 'full_package' ? current.id : null)
+  if (current?.package !== 'full_package') return null
+  return (
+    <Block title="Plan">
+      {data ? <PlanEditor plan={data} /> : <div className="h-11" />}
+    </Block>
+  )
+}
+
 // ── Notes + Miro ────────────────────────────────────────────────────────────
 
 function NotesForm({ detail }: { detail: ClientCareDetail }) {
@@ -468,6 +507,8 @@ export function ClientCarePanel({ clientId, onClose }: { clientId: string; onClo
                 </Block>
               )}
               <Stats detail={data} />
+              <PlanSection detail={data} />
+              <Copywriters detail={data} />
               <Contracts detail={data} />
               <SopRules detail={data} miro={<MiroForm detail={data} />} />
               <RevisionBacklog detail={data} />

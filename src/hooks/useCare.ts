@@ -81,6 +81,12 @@ export function useUpdateContract() {
     apiFetch<ClientCareDetail>(`/api/admin/care/contracts/${contractId}`, { method: 'PATCH', body: JSON.stringify(body) }))
 }
 
+export function useSetCopywriters() {
+  const apiFetch = useApiFetch()
+  return useCareWrite(({ clientId, ids }: { clientId: string; ids: string[] }) =>
+    apiFetch<ClientCareDetail>(`/api/admin/care/clients/${clientId}/team`, { method: 'PUT', body: JSON.stringify({ team_member_ids: ids }) }))
+}
+
 export function useSaveInstagram() {
   const apiFetch = useApiFetch()
   return useCareWrite(({ clientId, handles }: { clientId: string; handles: string[] }) =>

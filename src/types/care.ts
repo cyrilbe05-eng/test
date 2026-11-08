@@ -95,6 +95,8 @@ export interface ClientCareDetail {
   instagram: string[]
   contracts: Contract[]
   current_contract_id: string | null
+  copywriters: { id: string; name: string }[]
+  available_copywriters: { id: string; name: string }[]
   care: CareFields
   onboarding: Record<OnboardingStep, string | null>
   health: Health

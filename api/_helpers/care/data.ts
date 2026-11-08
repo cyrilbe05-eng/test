@@ -4,6 +4,8 @@
 import { dbQuery } from '../db.js'
 import type { CareFields, ClientInput, DeadlineRow, HistoryRow, ProjectInput } from './compute.js'
 import { loadContracts, currentContract } from './contracts.js'
+import { loadPlanItems, applyAutoTicks, saveAutoTicks } from './plans.js'
+import { projectFacts } from './compute.js'
 
 interface ClientRow {
   id: string; full_name: string; email: string; phone: string | null
@@ -29,7 +31,7 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
   // Every project-level query is restricted to these same clients.
   const clientScope = `SELECT id FROM profiles WHERE role = 'client'${active}${clientId ? ' AND id = ?' : ''}`
 
-  const [clients, care, contacts, projects, history, deliverables, deadlines, assignments] = await Promise.all([
+  const [clients, care, contacts, projects, history, deliverables, deadlines, assignments, footage] = await Promise.all([
     dbQuery<ClientRow>(
       `SELECT p.id, p.full_name, p.email, p.phone, p.client_id_label, pl.name AS plan_name
        FROM profiles p LEFT JOIN plans pl ON pl.id = p.plan_id
@@ -65,6 +67,12 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
       `SELECT pa.project_id, pa.team_member_id
        FROM project_assignments pa JOIN projects pr ON pr.id = pa.project_id
        WHERE pr.client_id IN (${clientScope})`, args),
+    // Footage the CLIENT uploaded (drives "record + upload" plan auto ticks).
+    dbQuery<{ client_id: string; created_at: string }>(
+      `SELECT pr.client_id, pf.created_at
+       FROM project_files pf JOIN projects pr ON pr.id = pf.project_id
+       WHERE pf.file_type = 'source_video' AND pf.uploader_id = pr.client_id
+         AND pr.client_id IN (${clientScope})`, args),
   ])
 
   const group = <T extends { [k: string]: any }>(rows: T[], key: keyof T) => {
@@ -83,8 +91,9 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
   const deadlinesBy = group(deadlines, 'project_id')
   const editorsBy = group(assignments, 'project_id')
   const projectsBy = group(projects, 'client_id')
+  const footageBy = group(footage, 'client_id')
 
-  return clients.map((c) => {
+  const result: ClientInput[] = clients.map((c) => {
     const careRow = careBy.get(c.id)
     const contract = currentContract(contractsBy.get(c.id) ?? [], now)
     return {
@@ -111,6 +120,32 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
       })),
     }
   })
+
+  // Production plan of the current contract, with auto ticks applied and
+  // saved here — the single path every page uses (dashboard, copywriter
+  // page, Client Care alerts), so they always agree.
+  const plans = await loadPlanItems(result.map((c) => c.contract?.id).filter(Boolean) as string[])
+  for (const c of result) {
+    const items = c.contract ? plans.get(c.contract.id) ?? [] : []
+    if (items.length && c.care) {
+      const start = `${c.contract!.start_date}T00:00:00.000Z`
+      const end = `${c.contract!.end_date}T23:59:59.999Z`
+      const deliveries = c.projects
+        .map((p) => projectFacts(p, now).delivered_at)
+        .filter((d): d is string => !!d && d >= start && d <= end)
+        .sort()
+      const ticks = applyAutoTicks(items, (footageBy.get(c.id) ?? []).map((f) => f.created_at), deliveries, c.care.videos_included, now)
+      if (ticks.length) {
+        await saveAutoTicks(ticks)
+        for (const t of ticks) {
+          const it = items.find((i) => i.id === t.id)!
+          Object.assign(it, { done: 1, done_at: t.done_at, done_by: 'auto' })
+        }
+      }
+    }
+    c.plan = items
+  }
+  return result
 }
 
 export async function loadOnboarding(clientId: string): Promise<OnboardingRow | null> {

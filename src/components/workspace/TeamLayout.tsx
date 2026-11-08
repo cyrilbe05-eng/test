@@ -44,12 +44,17 @@ const NAV_LINKS = [
   { to: '/team/messages', label: 'Messages', icon: <IconChat /> },
 ]
 
+// Copywriters only (production plans of their assigned clients). Appended so
+// editors' menus are unchanged.
+const PLANS_LINK = { to: '/team/plans', label: 'Plans', exact: false, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> }
+
 interface TeamLayoutProps {
   children: React.ReactNode
 }
 
 export function TeamLayout({ children }: TeamLayoutProps) {
   const { profile, impersonating, stopImpersonating } = useAuth()
+  const links = profile?.team_role === 'copywriter' ? [...NAV_LINKS, PLANS_LINK] : NAV_LINKS
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -81,7 +86,7 @@ export function TeamLayout({ children }: TeamLayoutProps) {
 
       <nav className="px-2 space-y-0.5 flex-1">
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-1">Team</p>
-        {NAV_LINKS.map(({ to, label, icon, exact }) => (
+        {links.map(({ to, label, icon, exact }) => (
           <Link
             key={to}
             to={to}
@@ -165,7 +170,7 @@ export function TeamLayout({ children }: TeamLayoutProps) {
               {profile?.full_name.charAt(0)}
             </div>
             <div className="w-full h-px bg-border/60 mb-1" />
-            {NAV_LINKS.map(({ to, icon, label, exact }) => (
+            {links.map(({ to, icon, label, exact }) => (
               <Link
                 key={to}
                 to={to}
@@ -194,7 +199,7 @@ export function TeamLayout({ children }: TeamLayoutProps) {
 
       {/* ── Bottom nav — mobile only ── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-card/90 backdrop-blur-xl border-t border-border flex items-stretch h-16 safe-area-bottom">
-        {NAV_LINKS.map(({ to, label, icon, exact }) => {
+        {links.map(({ to, label, icon, exact }) => {
           const active = isActive(to, exact)
           return (
             <Link
