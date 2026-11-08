@@ -72,6 +72,18 @@ export interface ProjectFacts {
 }
 
 const ms = (s: string) => new Date(s).getTime()
+
+/** Was an editor deadline met? The admin's recorded outcome when resolved;
+ *  otherwise derived — the editor's first handoff ("in review") before the due
+ *  time means met; due time passed without a handoff means missed; null = not
+ *  decided yet. */
+export function deadlineOutcome(deadline: DeadlineRow, history: HistoryRow[], now: number): boolean | null {
+  if (deadline.status === 'met') return true
+  if (deadline.status === 'missed') return false
+  const handoff = history.find((h) => h.new_status === 'in_review' && ms(h.created_at) >= ms(deadline.created_at))
+  if (handoff) return ms(handoff.created_at) <= ms(deadline.due_at)
+  return now > ms(deadline.due_at) ? false : null
+}
 const isClientVisible = (s: string) => (CLIENT_VISIBLE_STATUSES as readonly string[]).includes(s)
 
 /** Same calendar day in UTC. */
@@ -99,20 +111,8 @@ export function projectFacts(p: ProjectInput, now: number): ProjectFacts {
     in_progress_since = entered?.created_at ?? p.updated_at
   }
 
-  // On time: the deadline's recorded outcome when the admin resolved it;
-  // otherwise derived — the editor's first handoff ("in review") before the
-  // due time means met; due time passed without a handoff means missed.
   const deadline = p.deadlines[0] ?? null
-  let on_time: boolean | null = null
-  if (deadline) {
-    if (deadline.status === 'met') on_time = true
-    else if (deadline.status === 'missed') on_time = false
-    else {
-      const handoff = p.history.find((h) => h.new_status === 'in_review' && ms(h.created_at) >= ms(deadline.created_at))
-      if (handoff) on_time = ms(handoff.created_at) <= ms(deadline.due_at)
-      else if (now > ms(deadline.due_at)) on_time = false
-    }
-  }
+  const on_time = deadline ? deadlineOutcome(deadline, p.history, now) : null
 
   const due_today = p.deadlines.some((d) => d.status === 'pending' && sameUtcDay(ms(d.due_at), now))
     && !['client_reviewing', 'client_approved', 'revision_requested'].includes(p.status)

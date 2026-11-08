@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
 import type { CareOverview, CarePatchBody, ClientCareDetail, RevisionCategory } from '@/types/care'
+import type { EditorPerformance, PerformancePeriod } from '@/types/editors'
+
+export function useEditorPerformance(period: PerformancePeriod) {
+  const apiFetch = useApiFetch()
+  return useQuery({
+    queryKey: ['editors', 'performance', period],
+    retry: false,
+    queryFn: () => apiFetch<EditorPerformance>(`/api/admin/editors/performance?days=${period}`),
+  })
+}
 
 export function useCareOverview() {
   const apiFetch = useApiFetch()

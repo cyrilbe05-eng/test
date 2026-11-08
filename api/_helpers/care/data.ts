@@ -19,18 +19,20 @@ export interface OnboardingRow {
 }
 
 /** Load active (not disabled) clients with everything the care rules need.
- *  Pass clientId to load a single client. */
-export async function loadClients(clientId?: string): Promise<ClientInput[]> {
+ *  Pass clientId to load a single client; includeDisabled for history-based
+ *  reports (editor performance) where past work still counts. */
+export async function loadClients(clientId?: string, opts: { includeDisabled?: boolean } = {}): Promise<ClientInput[]> {
   const only = clientId ? ' AND p.id = ?' : ''
   const args = clientId ? [clientId] : []
-  // Every project-level query is restricted to these same active clients.
-  const clientScope = `SELECT id FROM profiles WHERE role = 'client' AND disabled = 0${clientId ? ' AND id = ?' : ''}`
+  const active = opts.includeDisabled ? '' : ' AND disabled = 0'
+  // Every project-level query is restricted to these same clients.
+  const clientScope = `SELECT id FROM profiles WHERE role = 'client'${active}${clientId ? ' AND id = ?' : ''}`
 
   const [clients, care, contacts, projects, history, deliverables, deadlines, assignments] = await Promise.all([
     dbQuery<ClientRow>(
       `SELECT p.id, p.full_name, p.email, p.phone, p.client_id_label, pl.name AS plan_name
        FROM profiles p LEFT JOIN plans pl ON pl.id = p.plan_id
-       WHERE p.role = 'client' AND p.disabled = 0${only}
+       WHERE p.role = 'client'${opts.includeDisabled ? '' : ' AND p.disabled = 0'}${only}
        ORDER BY p.full_name ASC`, args),
     dbQuery<CareFields & { client_id: string }>(
       `SELECT client_id, contract_start, contract_end, videos_included, renewal_status, care_notes, miro_url

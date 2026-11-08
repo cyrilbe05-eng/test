@@ -11,42 +11,15 @@
 //   PUT    /api/admin/care/clients/:id/instagram  replace Instagram accounts
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { requireAuth, requireRole } from '../auth.js'
 import { dbQuery, dbExecute, newId, nowIso } from '../db.js'
 import { CARE_CONFIG, REVISION_CATEGORIES, REVISION_CATEGORY_KEYS, type RevisionCategory } from './config.js'
 import { parseCarePatch, type CarePatch, type OnboardingStep } from './validate.js'
-import { processPendingRevisions, recategorizeEntry, archiveRule, loadClientRevisions } from './sop.js'
+import { recategorizeEntry, archiveRule, loadClientRevisions } from './sop.js'
 import { getMatcher, lastModelError } from './similarity.js'
 import { loadInstagramHandles, replaceInstagramHandles } from './instagram.js'
-
-/** Categorise/merge any new revision notes before showing data. Best-effort:
- *  a failure here is logged and never stops the Client Care pages. */
-async function processRevisionsSafely(clientId?: string) {
-  try { await processPendingRevisions({ clientId }) } catch (e: any) {
-    console.warn('[care] revision processing skipped:', e?.message)
-  }
-}
 import { evaluateClient, computeOutputRate, urgencyCompare, type ClientCare } from './compute.js'
 import { loadClients, loadOnboarding, loadRecentContacts, loadEditorNames } from './data.js'
-
-/** Full admins only: clients, editors AND managers are refused. */
-async function requireCareAdmin(req: VercelRequest) {
-  const auth = await requireAuth(req)
-  requireRole(auth.profile, 'admin')
-  if ((auth.profile as any).admin_role === 'manager') {
-    throw Object.assign(new Error('Client Care is available to full admins only'), { status: 403 })
-  }
-  return auth
-}
-
-function sendError(res: VercelResponse, e: any) {
-  const msg: string = e?.message ?? 'Internal error'
-  if (/no such table|no such column/i.test(msg)) {
-    res.status(500).json({ error: 'Client Care needs database migration 011 — run db/migrations/011_client_care.sql' })
-    return
-  }
-  res.status(e?.status ?? 500).json({ error: msg })
-}
+import { requireCareAdmin, sendError, processRevisionsSafely } from './access.js'
 
 function card(c: ClientCare, instagram: Map<string, string[]>) {
   return {

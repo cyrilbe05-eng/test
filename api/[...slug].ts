@@ -20,6 +20,7 @@ import { sendEmailNotifications, sendEmailNotification, projectUrl } from './_he
 import { handleCareRoute } from './_helpers/care/routes.js'
 import { recordRevisionEntries } from './_helpers/care/sop.js'
 import { handleInstagramRoute } from './_helpers/care/instagram.js'
+import { handleEditorsRoute } from './_helpers/care/editors.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
 // Signed-URL lifetimes. Downloads get 5 h: on slow routes (e.g. the Mumbai
@@ -4511,6 +4512,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Client Care (admin-only) — see api/_helpers/care/routes.ts
     if (slug[1] === 'care') {
       return handleCareRoute(req, res, slug.slice(2))
+    }
+    // Editor performance (admin-only) — see api/_helpers/care/editors.ts
+    if (slug[1] === 'editors') {
+      return handleEditorsRoute(req, res, slug.slice(2))
     }
     res.status(404).json({ error: 'Not found' }); return
   }
