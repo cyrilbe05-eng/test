@@ -10,9 +10,11 @@ import type { AutoRule, Plan, PlanOwner, PlanStep } from '@/types/plans'
 // highlighted, overdue client steps marked.
 
 const OWNER_LABEL: Record<PlanOwner, string> = { pingu: 'Pingu', client: 'Client', both: 'Both' }
-const AUTO_LABEL: Record<AutoRule, string> = { none: '—', footage_uploaded: 'Footage uploaded', all_delivered: 'All delivered' }
 const inputCls = 'w-full min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30'
+// Button anatomy: primary = solid, secondary = outlined, destructive = red text.
 const btn = 'min-h-[44px] px-3 rounded-lg border border-border text-sm hover:bg-muted disabled:opacity-50'
+const primaryBtn = 'min-h-[44px] px-4 rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 disabled:opacity-40'
+const dangerBtn = 'min-h-[44px] px-3 rounded-lg text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50'
 const day = (d: string) => format(new Date(`${d}T12:00:00Z`), 'd MMM')
 const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
 const todayStr = () => new Date().toISOString().slice(0, 10)
@@ -28,16 +30,16 @@ function OwnerTag({ owner }: { owner: PlanOwner }) {
 
 type Draft = { date: string; title: string; owner: PlanOwner; auto_rule: AutoRule }
 
+// Date · step · owner. (Auto ticks come with the template steps — "record +
+// upload" ticks on footage, "all videos delivered" on delivery — and are kept
+// when a step is edited; steps added by hand are ticked by hand.)
 function StepFields({ draft, onChange }: { draft: Draft; onChange: (d: Draft) => void }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-[9rem_minmax(0,1fr)] gap-2">
+    <div className="grid grid-cols-1 sm:grid-cols-[9rem_minmax(0,1fr)_8rem] gap-2">
       <input type="date" aria-label="Date" className={inputCls} value={draft.date} onChange={(e) => onChange({ ...draft, date: e.target.value })} />
       <input aria-label="Step" className={inputCls} value={draft.title} onChange={(e) => onChange({ ...draft, title: e.target.value })} />
       <select aria-label="Owner" className={inputCls} value={draft.owner} onChange={(e) => onChange({ ...draft, owner: e.target.value as PlanOwner })}>
         {(Object.keys(OWNER_LABEL) as PlanOwner[]).map((o) => <option key={o} value={o}>{OWNER_LABEL[o]}</option>)}
-      </select>
-      <select aria-label="Auto tick" className={inputCls} value={draft.auto_rule} onChange={(e) => onChange({ ...draft, auto_rule: e.target.value as AutoRule })}>
-        {(Object.keys(AUTO_LABEL) as AutoRule[]).map((r) => <option key={r} value={r}>{r === 'none' ? 'Auto: —' : `Auto: ${AUTO_LABEL[r]}`}</option>)}
       </select>
     </div>
   )
@@ -72,7 +74,7 @@ function StepRow({ step, index, steps, actions }: { step: PlanStep; index: numbe
             step.done ? 'bg-primary border-primary text-white' : 'border-muted-foreground/40')}>{step.done ? '✓' : ''}</span>
         </button>
         <span className={cn('w-14 flex-shrink-0 text-xs tabular-nums', step.state === 'overdue' ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-muted-foreground')}>{day(step.date)}</span>
-        <span className={cn('flex-1 min-w-0 text-sm truncate', step.state === 'next' && 'font-semibold')}>{step.title}</span>
+        <span className={cn('flex-1 min-w-0 text-sm leading-snug break-words py-1', step.state === 'next' && 'font-semibold')}>{step.title}</span>
         <OwnerTag owner={step.owner} />
         <button onClick={() => { setDraft({ date: step.date, title: step.title, owner: step.owner, auto_rule: step.auto_rule }); setEditing((v) => !v) }}
           aria-label={`Edit ${step.title}`} aria-expanded={editing}
@@ -82,11 +84,12 @@ function StepRow({ step, index, steps, actions }: { step: PlanStep; index: numbe
         <div className="px-2 pb-3 pt-1 space-y-2">
           <StepFields draft={draft} onChange={setDraft} />
           <div className="flex flex-wrap gap-2">
-            <button className={cn(btn, 'bg-primary text-white border-primary')} disabled={busy}
-              onClick={() => actions.update.mutate({ id: step.id, body: draft }, { onSuccess: () => setEditing(false), ...onErr })}>Save</button>
-            <button className={btn} disabled={busy || index === 0} onClick={() => move(-1)} aria-label="Move up">↑</button>
-            <button className={btn} disabled={busy || index === steps.length - 1} onClick={() => move(1)} aria-label="Move down">↓</button>
-            <button className={cn(btn, 'text-destructive ml-auto')} disabled={busy}
+            <button className={primaryBtn} disabled={busy || !draft.title.trim()}
+              onClick={() => actions.update.mutate({ id: step.id, body: { date: draft.date, title: draft.title, owner: draft.owner } }, { onSuccess: () => setEditing(false), ...onErr })}>Save</button>
+            <button className={btn} onClick={() => setEditing(false)}>Cancel</button>
+            <button className={cn(btn, 'w-11 px-0')} disabled={busy || index === 0} onClick={() => move(-1)} aria-label="Move up">↑</button>
+            <button className={cn(btn, 'w-11 px-0')} disabled={busy || index === steps.length - 1} onClick={() => move(1)} aria-label="Move down">↓</button>
+            <button className={cn(dangerBtn, 'ml-auto')} disabled={busy}
               onClick={() => { if (confirm(`Delete “${step.title}”?`)) actions.remove.mutate(step.id, onErr) }}>Delete</button>
           </div>
         </div>
@@ -104,13 +107,16 @@ export function PlanEditor({ plan }: { plan: Plan }) {
 
   if (plan.contract.package !== 'full_package') return <p className="text-sm text-muted-foreground">—</p>
 
+  // No plan yet for this contract: pick the start date, create the standard plan.
   if (!plan.items.length) {
     return (
-      <div className="flex flex-col sm:flex-row gap-2">
-        <input type="date" aria-label="Start" className={cn(inputCls, 'sm:w-44')} value={start} onChange={(e) => setStart(e.target.value)} />
-        <button className={cn(btn, 'bg-primary text-white border-primary font-semibold')} disabled={actions.fromTemplate.isPending}
-          onClick={() => actions.fromTemplate.mutate(start, onErr)}>
-          {actions.fromTemplate.isPending ? 'Creating…' : 'From template'}
+      <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+        <label className="block text-sm space-y-1">
+          <span className="block text-muted-foreground">Start</span>
+          <input type="date" className={cn(inputCls, 'sm:w-44')} value={start} onChange={(e) => setStart(e.target.value)} />
+        </label>
+        <button className={primaryBtn} disabled={actions.fromTemplate.isPending} onClick={() => actions.fromTemplate.mutate(start, onErr)}>
+          {actions.fromTemplate.isPending ? 'Creating…' : '+ New plan'}
         </button>
       </div>
     )
@@ -125,8 +131,8 @@ export function PlanEditor({ plan }: { plan: Plan }) {
         <div className="mt-3 space-y-2">
           <StepFields draft={draft} onChange={setDraft} />
           <div className="flex gap-2">
-            <button className={cn(btn, 'bg-primary text-white border-primary')} disabled={actions.add.isPending || !draft.title.trim()}
-              onClick={() => actions.add.mutate(draft, { onSuccess: () => { setAdding(false); setDraft({ ...draft, title: '' }) }, ...onErr })}>Add</button>
+            <button className={primaryBtn} disabled={actions.add.isPending || !draft.title.trim()}
+              onClick={() => actions.add.mutate({ date: draft.date, title: draft.title, owner: draft.owner }, { onSuccess: () => { setAdding(false); setDraft({ ...draft, title: '' }) }, ...onErr })}>Add</button>
             <button className={btn} onClick={() => setAdding(false)}>Cancel</button>
           </div>
         </div>

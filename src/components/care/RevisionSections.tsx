@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import { useArchiveRule, useRecategorize } from '@/hooks/useCare'
 import { Block } from '@/components/care/Block'
+import { Switch } from '@/components/care/Switch'
 import type { ClientCareDetail, RevisionCategory } from '@/types/care'
 
 // The client's SOP rules (merged automatically from revision notes) and the
@@ -74,16 +74,7 @@ export function RevisionBacklog({ detail }: { detail: ClientCareDetail }) {
   return (
     <Block
       title={`Revisions · ${detail.revision_backlog.length}`}
-      action={detail.revision_backlog.length > 0 && (
-        <button
-          role="switch"
-          aria-checked={openOnly}
-          onClick={() => setOpenOnly((v) => !v)}
-          className={cn('min-h-[44px] px-3 rounded-xl text-sm border', openOnly ? 'border-primary text-primary bg-primary/5' : 'border-border hover:bg-muted')}
-        >
-          Open only
-        </button>
-      )}
+      action={detail.revision_backlog.length > 0 && <Switch checked={openOnly} onChange={setOpenOnly} label="Open only" />}
     >
       {entries.length === 0 ? (
         <p className="text-sm text-muted-foreground">—</p>

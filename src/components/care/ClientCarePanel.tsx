@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useCare'
 import { usePlan } from '@/hooks/usePlans'
 import { PlanEditor } from '@/components/plans/PlanEditor'
+import { CheckRow } from '@/components/care/Switch'
 import { InstagramInput, InstagramLinks } from '@/components/care/Instagram'
 import { parseInstagramList } from '@/lib/instagram'
 import { HealthBadge } from '@/components/care/HealthBadge'
@@ -317,15 +318,13 @@ function Copywriters({ detail }: { detail: ClientCareDetail }) {
     if (next.has(id)) next.delete(id); else next.add(id)
     set.mutate({ clientId: detail.client.id, ids: [...next] }, { onError: (e) => toast.error(errMsg(e)) })
   }
+  // Multi-select: every ticked copywriter sees and edits this client's plan.
   return (
     <Block title="Copywriters">
       {detail.available_copywriters.length === 0 ? <p className="text-sm text-muted-foreground">—</p> : (
-        <div className="flex flex-wrap gap-2">
+        <div className="space-y-0.5">
           {detail.available_copywriters.map((c) => (
-            <button key={c.id} role="checkbox" aria-checked={assigned.has(c.id)} disabled={set.isPending} onClick={() => toggle(c.id)}
-              className={cn('min-h-[44px] px-3 rounded-lg border text-sm', assigned.has(c.id) ? 'border-primary bg-primary/10 text-primary font-medium' : 'border-border hover:bg-muted')}>
-              {assigned.has(c.id) ? '✓ ' : ''}{c.name}
-            </button>
+            <CheckRow key={c.id} checked={assigned.has(c.id)} disabled={set.isPending} onChange={() => toggle(c.id)} label={c.name} />
           ))}
         </div>
       )}
@@ -403,29 +402,15 @@ function Onboarding({ detail }: { detail: ClientCareDetail }) {
   )
   return (
     <Block title={`Onboarding · ${done}/${steps.length}`}>
-      <ul className="space-y-1">
+      <div className="space-y-0.5">
         {steps.map((step) => {
           const at = detail.onboarding[step]
           return (
-            <li key={step}>
-              <button
-                role="checkbox"
-                aria-checked={!!at}
-                disabled={update.isPending}
-                onClick={() => toggle(step)}
-                className="w-full min-h-[44px] flex items-center gap-3 px-2 rounded-xl hover:bg-muted/60 text-left disabled:opacity-60"
-              >
-                <span className={cn('w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 text-sm font-bold',
-                  at ? 'bg-primary border-primary text-white' : 'border-muted-foreground/40')} aria-hidden>
-                  {at ? '✓' : ''}
-                </span>
-                <span className={cn('flex-1 text-sm', at && 'text-muted-foreground')}>{ONBOARDING_LABELS[step]}</span>
-                {at && <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">{fmtDate(at)}</span>}
-              </button>
-            </li>
+            <CheckRow key={step} checked={!!at} disabled={update.isPending} onChange={() => toggle(step)} label={ONBOARDING_LABELS[step]}
+              aside={at ? <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">{fmtDate(at)}</span> : undefined} />
           )
         })}
-      </ul>
+      </div>
     </Block>
   )
 }

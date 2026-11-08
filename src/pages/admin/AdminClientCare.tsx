@@ -6,6 +6,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout'
 import { ClientCarePanel } from '@/components/care/ClientCarePanel'
 import { HealthBadge } from '@/components/care/HealthBadge'
 import { HEALTH_META } from '@/components/care/healthMeta'
+import { Switch } from '@/components/care/Switch'
 import { useCareOverview, useMarkContacted, useUndoContact } from '@/hooks/useCare'
 import { cn } from '@/lib/utils'
 import type { CareOverview, Health, HealthCard, RenewalStatus } from '@/types/care'
@@ -199,14 +200,7 @@ function Output({ output }: { output: CareOverview['output_rate'] }) {
           </div>
         ))}
       </div>
-      <button
-        role="switch"
-        aria-checked={byClient}
-        onClick={() => setByClient((v) => !v)}
-        className={cn('mt-3 min-h-[44px] px-3 rounded-lg text-sm border', byClient ? 'border-primary text-primary bg-primary/5' : 'border-border hover:bg-muted')}
-      >
-        By client
-      </button>
+      <Switch checked={byClient} onChange={setByClient} label="By client" className="mt-2" />
       {byClient && (
         <ul className="divide-y divide-border/60 mt-2">
           {output.per_client.map((c) => (
