@@ -32,14 +32,12 @@ export default function TeamPlans() {
                     </span>
                   </span>
                   {c.overdue > 0 && <span className="text-xs font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">{c.overdue} late</span>}
-                  {c.contract && <span className="text-xs tabular-nums text-muted-foreground whitespace-nowrap">{c.steps ? `${c.done}/${c.steps}` : 'No plan'}</span>}
+                  {full && <span className="text-xs tabular-nums text-muted-foreground whitespace-nowrap">{c.steps ? `${c.done}/${c.steps}` : 'No plan'}</span>}
                 </>
               )
-              // Every client with a contract can be planned (any package);
-              // without a contract there is nothing to attach a plan to.
               return (
                 <li key={c.client_id}>
-                  {c.contract ? (
+                  {c.contract && full ? (
                     <Link to={`/team/plans/${c.contract.id}`} className="flex items-center gap-3 min-h-[52px] py-2 -mx-2 px-2 rounded-lg hover:bg-muted/60">{inner}</Link>
                   ) : (
                     <div className={cn('flex items-center gap-3 min-h-[52px] py-2 opacity-60')}>{inner}</div>
