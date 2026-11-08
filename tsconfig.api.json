@@ -1,0 +1,19 @@
+{
+  // Typecheck for the Vercel API (api/**). The main tsconfig only includes
+  // src/, and esbuild bundles WITHOUT checking identifiers — an undefined
+  // function in the API sailed through tsc+lint+build and broke production
+  // (2026-07-14). This config closes that gap; `npm run build` runs it.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": false
+  },
+  "include": ["api"]
+}

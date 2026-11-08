@@ -1,0 +1,52 @@
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+import { format, formatDistanceToNow } from 'date-fns'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+/** Format seconds to MM:SS */
+export function formatTimestamp(seconds: number): string {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0')
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0')
+  return `${m}:${s}`
+}
+
+/** Parse MM:SS to seconds */
+export function parseTimestamp(ts: string): number {
+  const [m, s] = ts.split(':').map(Number)
+  return (m || 0) * 60 + (s || 0)
+}
+
+/** Generate a cryptographically random password */
+export function generatePassword(length = 16): string {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
+  const array = new Uint8Array(length)
+  crypto.getRandomValues(array)
+  return Array.from(array, (byte) => charset[byte % charset.length]).join('')
+}
+
+/** Sanitize a filename for storage keys */
+export function sanitizeFileName(name: string): string {
+  return name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '')
+}
+
+/** Order projects by their last activity — newest first. For completed
+ *  projects `updated_at` IS the completion moment, so the Completed dates in
+ *  list views read in proper date order instead of creation order. */
+export function sortByRecentActivity<T extends { updated_at: string }>(projects: T[]): T[] {
+  return [...projects].sort(
+    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+  )
+}
+
+/** Dashboard time label for a project: completed projects show the completion
+ *  date (client_approved is terminal, so updated_at IS the completion moment);
+ *  everything else shows relative time. */
+export function projectTimeLabel(project: { status: string; updated_at: string }): string {
+  if (project.status === 'client_approved') {
+    return `Completed ${format(new Date(project.updated_at), 'd MMM yyyy')}`
+  }
+  return formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })
+}
