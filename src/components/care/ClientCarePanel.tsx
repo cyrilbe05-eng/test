@@ -334,8 +334,8 @@ function Copywriters({ detail }: { detail: ClientCareDetail }) {
 
 function PlanSection({ detail }: { detail: ClientCareDetail }) {
   const current = detail.contracts.find((c) => c.id === detail.current_contract_id)
-  const { data } = usePlan(current?.package === 'full_package' ? current.id : null)
-  if (current?.package !== 'full_package') return null
+  const { data } = usePlan(current?.id ?? null)
+  if (!current) return null
   return (
     <Block title="Plan">
       {data ? <PlanEditor plan={data} /> : <div className="h-11" />}

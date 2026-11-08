@@ -105,8 +105,6 @@ export function PlanEditor({ plan }: { plan: Plan }) {
   const [draft, setDraft] = useState<Draft>({ date: todayStr(), title: '', owner: 'pingu', auto_rule: 'none' })
   const onErr = { onError: (e: unknown) => toast.error(errMsg(e)) }
 
-  if (plan.contract.package !== 'full_package') return <p className="text-sm text-muted-foreground">—</p>
-
   // No plan yet for this contract: pick the start date, create the standard plan.
   if (!plan.items.length) {
     return (

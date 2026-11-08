@@ -144,7 +144,7 @@ export async function handleTeamRoute(req: VercelRequest, res: VercelResponse, r
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
 
     if (rest[2] === 'from-template') {
-      if (k.package !== 'full_package') bad('Production plans are for full package contracts')
+      // Any package can have a plan (decided after Part 2 testing).
       const start = (req.body ?? {}).start_date
       if (start !== undefined && !isDate(start)) bad('start_date must be YYYY-MM-DD')
       // Default: today, or the contract start if it hasn't started yet.
