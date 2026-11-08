@@ -1,30 +1,20 @@
-import { format } from 'date-fns'
+import { useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { format, isToday } from 'date-fns'
+import { toast } from 'sonner'
 import { AdminLayout } from '@/components/admin/AdminLayout'
-import { useCareOverview } from '@/hooks/useCare'
+import { ClientCarePanel } from '@/components/care/ClientCarePanel'
+import { HealthBadge } from '@/components/care/HealthBadge'
+import { HEALTH_META } from '@/components/care/healthMeta'
+import { useCareOverview, useMarkContacted, useUndoContact } from '@/hooks/useCare'
 import { cn } from '@/lib/utils'
 import type { CareOverview, Health, HealthCard, OutputRate, RenewalStatus } from '@/types/care'
-
-// Status is never colour alone: every badge carries an icon AND a word.
-const HEALTH_META: Record<Health, { label: string; icon: string; badge: string; dot: string }> = {
-  at_risk:         { label: 'At risk',         icon: '!', badge: 'bg-red-500/10 text-red-700 dark:text-red-300 ring-red-500/30',       dot: 'bg-red-500' },
-  needs_attention: { label: 'Needs attention', icon: '•', badge: 'bg-amber-500/10 text-amber-800 dark:text-amber-200 ring-amber-500/30', dot: 'bg-amber-500' },
-  healthy:         { label: 'Healthy',         icon: '✓', badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-500/30', dot: 'bg-emerald-500' },
-}
 
 const RENEWAL_LABEL: Record<RenewalStatus, string> = {
   not_discussed: 'Not discussed',
   discussed: 'Discussed',
   renewed: 'Renewed',
   declined: 'Declined',
-}
-
-function HealthBadge({ health }: { health: Health }) {
-  const m = HEALTH_META[health]
-  return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ring-1 whitespace-nowrap', m.badge)}>
-      <span aria-hidden className="font-bold">{m.icon}</span>{m.label}
-    </span>
-  )
 }
 
 function daysLeftLabel(days: number | null): string | null {
@@ -51,22 +41,48 @@ function Section({ title, count, hint, children, className }: { title: string; c
 
 // ── Text today ──────────────────────────────────────────────────────────────
 
-function TextToday({ items }: { items: CareOverview['text_today'] }) {
+/** One-tap "Contacted" straight from the list, with Undo in the toast. */
+function QuickContacted({ item }: { item: CareOverview['text_today'][number] }) {
+  const mark = useMarkContacted()
+  const undo = useUndoContact()
+  const done = !!item.last_contact_at && isToday(new Date(item.last_contact_at))
+  const tick = () => mark.mutate(item.client_id, {
+    onSuccess: (detail) => toast.success(`Marked ${item.name} as contacted`, {
+      action: { label: 'Undo', onClick: () => undo.mutate(detail.contacts[0].id) },
+    }),
+    onError: (e) => toast.error((e as Error).message),
+  })
+  return (
+    <button
+      onClick={tick}
+      disabled={done || mark.isPending}
+      className={cn(
+        'min-h-[44px] px-3 rounded-xl text-sm font-semibold whitespace-nowrap flex-shrink-0 transition-colors',
+        done ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border border-border hover:bg-muted disabled:opacity-60',
+      )}
+    >
+      {done ? '✓ Contacted' : mark.isPending ? 'Saving…' : 'Contacted'}
+    </button>
+  )
+}
+
+function TextToday({ items, onOpen }: { items: CareOverview['text_today']; onOpen: (id: string) => void }) {
   if (items.length === 0) {
     return <p className="text-sm text-muted-foreground py-2">Nobody needs a message today. 🎉</p>
   }
   return (
     <ol className="divide-y divide-border/60">
       {items.map((item, i) => (
-        <li key={item.client_id} className="flex items-start gap-3 py-2.5 min-h-[44px]">
-          <span className="w-6 text-right text-sm font-semibold text-muted-foreground tabular-nums pt-0.5">{i + 1}</span>
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <li key={item.client_id} className="flex items-start gap-2 sm:gap-3 py-2.5">
+          <span className="w-5 text-right text-sm font-semibold text-muted-foreground tabular-nums pt-3">{i + 1}</span>
+          <button onClick={() => onOpen(item.client_id)} className="flex-1 min-w-0 min-h-[44px] text-left rounded-xl px-2 py-1.5 -my-1 hover:bg-muted/60 transition-colors">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-semibold break-words">{item.name}</span>
               <HealthBadge health={item.health} />
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5 break-words">{item.reasons.join(' · ')}</p>
-          </div>
+            </span>
+            <span className="block text-sm text-muted-foreground mt-0.5 break-words">{item.reasons.join(' · ')}</span>
+          </button>
+          <QuickContacted item={item} />
         </li>
       ))}
     </ol>
@@ -75,12 +91,15 @@ function TextToday({ items }: { items: CareOverview['text_today'] }) {
 
 // ── Health board ────────────────────────────────────────────────────────────
 
-function ClientCard({ c }: { c: HealthCard }) {
+function ClientCard({ c, onOpen }: { c: HealthCard; onOpen: (id: string) => void }) {
   const days = daysLeftLabel(c.days_left_on_contract)
   const shown = c.reasons.slice(0, 3)
   return (
-    <div className="rounded-xl border border-border bg-background p-3 min-h-[44px]">
-      <div className="flex items-start justify-between gap-2">
+    <button
+      onClick={() => onOpen(c.client_id)}
+      className="w-full text-left rounded-xl border border-border bg-background p-3 min-h-[44px] hover:border-primary/40 hover:shadow-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+    >
+      <span className="flex items-start justify-between gap-2">
         <span className="font-semibold leading-snug break-words min-w-0">{c.name}</span>
         {days && (
           <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full bg-muted whitespace-nowrap',
@@ -88,16 +107,16 @@ function ClientCard({ c }: { c: HealthCard }) {
             {days}
           </span>
         )}
-      </div>
-      <ul className="mt-1.5 space-y-0.5 text-sm text-muted-foreground">
-        {shown.map((r) => <li key={r} className="break-words">{r}</li>)}
-        {c.reasons.length > shown.length && <li className="text-xs">+{c.reasons.length - shown.length} more</li>}
-      </ul>
-    </div>
+      </span>
+      <span className="block mt-1.5 space-y-0.5 text-sm text-muted-foreground">
+        {shown.map((r) => <span key={r} className="block break-words">{r}</span>)}
+        {c.reasons.length > shown.length && <span className="block text-xs">+{c.reasons.length - shown.length} more</span>}
+      </span>
+    </button>
   )
 }
 
-function HealthBoard({ board }: { board: CareOverview['health_board'] }) {
+function HealthBoard({ board, onOpen }: { board: CareOverview['health_board']; onOpen: (id: string) => void }) {
   const groups: Health[] = ['at_risk', 'needs_attention', 'healthy']
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -110,7 +129,7 @@ function HealthBoard({ board }: { board: CareOverview['health_board'] }) {
           </div>
           {board[h].length === 0
             ? <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border p-3">No clients</p>
-            : <div className="space-y-2">{board[h].map((c) => <ClientCard key={c.client_id} c={c} />)}</div>}
+            : <div className="space-y-2">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
         </div>
       ))}
     </div>
@@ -206,7 +225,7 @@ function RenewalStatusPill({ status }: { status: RenewalStatus }) {
   )
 }
 
-function Renewals({ rows }: { rows: CareOverview['renewals'] }) {
+function Renewals({ rows, onOpen }: { rows: CareOverview['renewals']; onOpen: (id: string) => void }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">No contract end dates set yet.</p>
   return (
     <>
@@ -221,8 +240,10 @@ function Renewals({ rows }: { rows: CareOverview['renewals'] }) {
         </thead>
         <tbody className="divide-y divide-border/60">
           {rows.map((r) => (
-            <tr key={r.client_id}>
-              <td className="py-2 pr-3 font-medium">{r.name}</td>
+            <tr key={r.client_id} onClick={() => onOpen(r.client_id)} className="cursor-pointer hover:bg-muted/50">
+              <td className="pr-3 font-medium">
+                <button onClick={(e) => { e.stopPropagation(); onOpen(r.client_id) }} className="min-h-[44px] w-full text-left hover:underline">{r.name}</button>
+              </td>
               <td className="py-2 px-3 tabular-nums">{format(new Date(`${r.contract_end.slice(0, 10)}T12:00:00Z`), 'd MMM yyyy')}</td>
               <td className={cn('py-2 px-3 tabular-nums', (r.days_left ?? 99) <= 30 && r.renewal_status !== 'renewed' && 'font-semibold')}>{countdown(r.days_left)}</td>
               <td className="py-2 pl-3"><RenewalStatusPill status={r.renewal_status} /></td>
@@ -232,15 +253,15 @@ function Renewals({ rows }: { rows: CareOverview['renewals'] }) {
       </table>
       <div className="md:hidden space-y-2">
         {rows.map((r) => (
-          <div key={r.client_id} className="rounded-xl border border-border p-3 flex items-start justify-between gap-3 min-h-[44px]">
-            <div className="min-w-0">
-              <p className="font-semibold break-words">{r.name}</p>
-              <p className={cn('text-sm text-muted-foreground', (r.days_left ?? 99) <= 30 && r.renewal_status !== 'renewed' && 'text-foreground font-semibold')}>
+          <button key={r.client_id} onClick={() => onOpen(r.client_id)} className="w-full text-left rounded-xl border border-border p-3 flex items-start justify-between gap-3 min-h-[44px] hover:border-primary/40">
+            <span className="min-w-0">
+              <span className="block font-semibold break-words">{r.name}</span>
+              <span className={cn('block text-sm text-muted-foreground', (r.days_left ?? 99) <= 30 && r.renewal_status !== 'renewed' && 'text-foreground font-semibold')}>
                 {countdown(r.days_left)} · {format(new Date(`${r.contract_end.slice(0, 10)}T12:00:00Z`), 'd MMM yyyy')}
-              </p>
-            </div>
+              </span>
+            </span>
             <RenewalStatusPill status={r.renewal_status} />
-          </div>
+          </button>
         ))}
       </div>
     </>
@@ -251,6 +272,12 @@ function Renewals({ rows }: { rows: CareOverview['renewals'] }) {
 
 export default function AdminClientCare() {
   const { data, isLoading, error, refetch, isFetching } = useCareOverview()
+  // The open client lives in the URL (?client=…), so the phone's Back button
+  // closes the full-screen panel and a panel can be linked/bookmarked.
+  const [params, setParams] = useSearchParams()
+  const openClient = params.get('client')
+  const open = useCallback((id: string) => setParams({ client: id }), [setParams])
+  const close = useCallback(() => setParams({}), [setParams])
 
   return (
     <AdminLayout>
@@ -284,20 +311,21 @@ export default function AdminClientCare() {
           // Wide desktop: Text today and Output rate side by side on top.
           <div className="grid gap-4 md:gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
             <Section title="Text today" count={data.text_today.length} hint="Most urgent first" className="order-1">
-              <TextToday items={data.text_today} />
+              <TextToday items={data.text_today} onOpen={open} />
             </Section>
             <Section title="Output rate" hint={`Last ${data.output_rate.agency.window_days} days`} className="order-3 xl:order-2">
               <OutputBlock output={data.output_rate} />
             </Section>
-            <Section title="Health board" className="order-2 xl:order-3 xl:col-span-2">
-              <HealthBoard board={data.health_board} />
+            <Section title="Health board" hint="Tap a client for details" className="order-2 xl:order-3 xl:col-span-2">
+              <HealthBoard board={data.health_board} onOpen={open} />
             </Section>
             <Section title="Renewal tracker" count={data.renewals.length} hint="Soonest first" className="order-4 xl:col-span-2">
-              <Renewals rows={data.renewals} />
+              <Renewals rows={data.renewals} onOpen={open} />
             </Section>
           </div>
         ) : null}
       </main>
+      {openClient && <ClientCarePanel clientId={openClient} onClose={close} />}
     </AdminLayout>
   )
 }

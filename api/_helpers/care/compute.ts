@@ -304,6 +304,7 @@ export function computeOutputRate(facts: ProjectFacts[], deadlinesDue: { on_time
 export interface ClientCare {
   client_id: string
   name: string
+  last_contact_at: string | null
   health: Health
   reasons: string[]
   alerts: Alert[]
@@ -322,6 +323,7 @@ export function evaluateClient(client: ClientInput, now: number, cfg: CareConfig
   return {
     client_id: client.id,
     name: client.full_name,
+    last_contact_at: client.last_contact_at,
     health,
     reasons,
     alerts,

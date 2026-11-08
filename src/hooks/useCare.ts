@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
-import type { CareOverview } from '@/types/care'
+import type { CareOverview, CarePatchBody, ClientCareDetail } from '@/types/care'
 
 export function useCareOverview() {
   const apiFetch = useApiFetch()
@@ -10,4 +10,45 @@ export function useCareOverview() {
     retry: false,
     queryFn: () => apiFetch<CareOverview>('/api/admin/care/overview'),
   })
+}
+
+export function useCareClient(clientId: string | null) {
+  const apiFetch = useApiFetch()
+  return useQuery({
+    queryKey: ['care', 'client', clientId],
+    enabled: !!clientId,
+    retry: false,
+    queryFn: () => apiFetch<ClientCareDetail>(`/api/admin/care/clients/${clientId}`),
+  })
+}
+
+/** Every care write returns the client's fresh detail: store it, and refresh
+ *  the overview (health board / text-today) in the background. */
+function useCareWrite<V>(request: (v: V) => Promise<ClientCareDetail>) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: request,
+    onSuccess: (detail) => {
+      qc.setQueryData(['care', 'client', detail.client.id], detail)
+      qc.invalidateQueries({ queryKey: ['care', 'overview'] })
+    },
+  })
+}
+
+export function useMarkContacted() {
+  const apiFetch = useApiFetch()
+  return useCareWrite((clientId: string) =>
+    apiFetch<ClientCareDetail>(`/api/admin/care/clients/${clientId}/contacted`, { method: 'POST' }))
+}
+
+export function useUndoContact() {
+  const apiFetch = useApiFetch()
+  return useCareWrite((contactId: string) =>
+    apiFetch<ClientCareDetail>(`/api/admin/care/contacts/${contactId}`, { method: 'DELETE' }))
+}
+
+export function useUpdateCare() {
+  const apiFetch = useApiFetch()
+  return useCareWrite(({ clientId, body }: { clientId: string; body: CarePatchBody }) =>
+    apiFetch<ClientCareDetail>(`/api/admin/care/clients/${clientId}`, { method: 'PATCH', body: JSON.stringify(body) }))
 }
