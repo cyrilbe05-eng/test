@@ -56,9 +56,9 @@ function PeriodPicker({ value, onChange }: { value: PerformancePeriod; onChange:
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-muted/50 p-3 min-w-0">
+    <div className="rounded-lg bg-muted/50 px-3 py-2 min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-xl font-heading font-semibold tabular-nums mt-1">{value}</p>
+      <p className="text-lg font-heading font-semibold tabular-nums">{value}</p>
     </div>
   )
 }
@@ -84,22 +84,22 @@ function CategoryBars({ stats, labels }: { stats: PerfStats; labels: Record<stri
 function EditorCard({ e, labels, colorClass }: { e: Editor; labels: Record<string, string>; colorClass?: string }) {
   const t = e.totals
   return (
-    <section className="clay-card p-5 md:p-7 min-w-0">
-      <div className="flex items-baseline justify-between gap-3 mb-5">
-        <h3 className="text-lg font-heading font-semibold break-words flex items-center gap-2">
+    <section className="clay-card p-4 md:p-5 min-w-0">
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <h3 className="font-heading font-semibold break-words flex items-center gap-2">
           {colorClass && <span className={cn('w-3 h-3 rounded-full flex-shrink-0 self-center', colorClass)} aria-hidden />}
           {e.name}
           {e.disabled && <span className="text-xs font-medium text-muted-foreground">(disabled)</span>}
         </h3>
         <span className="text-xs text-muted-foreground capitalize whitespace-nowrap">{e.team_role}</span>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         <Stat label="Videos" value={String(t.videos)} />
         <Stat label="Revisions / video" value={fmt(t.revisions_per_video)} />
         <Stat label="Turnaround" value={fmt(t.avg_turnaround_days, ' d')} />
         <Stat label="On time" value={fmt(t.on_time_pct, '%')} />
       </div>
-      <h4 className="text-sm font-semibold mt-6 mb-3">
+      <h4 className="text-sm font-semibold mt-4 mb-2">
         Revisions
         {t.revision_notes > 0 && <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">{t.revision_notes}</span>}
       </h4>
@@ -183,9 +183,9 @@ export default function AdminEditorPerformance() {
 
   return (
     <AdminLayout>
-      <main className="px-4 md:px-8 py-8 md:py-10 space-y-6 md:space-y-8 max-w-[1600px]">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h2 className="text-2xl font-heading font-semibold tracking-tight">Editors</h2>
+      <main className="px-4 md:px-6 py-5 md:py-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-xl font-heading font-semibold tracking-tight">Editors</h2>
           <PeriodPicker value={period} onChange={(p) => setParams(p === '90' ? {} : { period: p })} />
         </div>
 
@@ -197,14 +197,14 @@ export default function AdminEditorPerformance() {
           <div className="clay-card p-6 text-sm text-muted-foreground">—</div>
         ) : data ? (
           <>
-            <div className="grid gap-6 md:gap-8 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {data.editors.map((e) => {
                 const inLegend = data.client_split.legend.find((l) => l.key === e.editor_id)
                 return <EditorCard key={e.editor_id} e={e} labels={labels} colorClass={inLegend ? colorFor(e.editor_id, data.client_split.legend) : undefined} />
               })}
             </div>
-            <section className="clay-card p-5 md:p-7 min-w-0">
-              <h3 className="text-lg font-heading font-semibold mb-5">Who edits each client</h3>
+            <section className="clay-card p-4 md:p-5 min-w-0">
+              <h3 className="font-heading font-semibold mb-3">Who edits each client</h3>
               <ClientSplit split={data.client_split} />
             </section>
           </>

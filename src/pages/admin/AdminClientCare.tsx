@@ -10,8 +10,8 @@ import { useCareOverview, useMarkContacted, useUndoContact } from '@/hooks/useCa
 import { cn } from '@/lib/utils'
 import type { CareOverview, Health, HealthCard, RenewalStatus } from '@/types/care'
 
-// Client Care (admin-only). Hierarchy: who to text today (largest) →
-// health board → renewals + output (smallest). Labels and numbers only.
+// Client Care (admin-only). Compact: most of it fits on one screen.
+// Labels and numbers only.
 
 const RENEWAL_LABEL: Record<RenewalStatus, string> = {
   not_discussed: 'Not discussed',
@@ -32,11 +32,11 @@ function daysLeft(days: number | null): string | null {
 
 function Section({ title, count, children, className, action }: { title: string; count?: number; children: React.ReactNode; className?: string; action?: React.ReactNode }) {
   return (
-    <section className={cn('clay-card p-5 md:p-7 min-w-0', className)}>
-      <div className="flex items-center justify-between gap-3 mb-5">
-        <h3 className="text-lg font-heading font-semibold">
+    <section className={cn('clay-card p-4 md:p-5 min-w-0', className)}>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h3 className="font-heading font-semibold">
           {title}
-          {count != null && <span className="ml-2 text-base font-medium text-muted-foreground">{count}</span>}
+          {count != null && <span className="ml-2 text-sm font-medium text-muted-foreground">{count}</span>}
         </h3>
         {action}
       </div>
@@ -60,7 +60,7 @@ function QuickContacted({ item }: { item: CareOverview['text_today'][number] }) 
       onClick={tick}
       disabled={done || mark.isPending}
       className={cn(
-        'min-h-[44px] px-4 rounded-xl text-sm font-semibold whitespace-nowrap flex-shrink-0 transition-colors',
+        'min-h-[44px] px-3 rounded-xl text-sm font-medium whitespace-nowrap flex-shrink-0 transition-colors',
         done ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border border-border hover:bg-muted disabled:opacity-60',
       )}
     >
@@ -70,17 +70,17 @@ function QuickContacted({ item }: { item: CareOverview['text_today'][number] }) 
 }
 
 function TextToday({ items, onOpen }: { items: CareOverview['text_today']; onOpen: (id: string) => void }) {
-  if (items.length === 0) return <p className="text-base text-muted-foreground">—</p>
+  if (items.length === 0) return <p className="text-sm text-muted-foreground">—</p>
   return (
-    <ol className="divide-y divide-border/60 -my-2">
+    <ol className="divide-y divide-border/60 -my-1">
       {items.map((item) => (
-        <li key={item.client_id} className="flex items-center gap-3 py-4">
-          <button onClick={() => onOpen(item.client_id)} className="flex-1 min-w-0 min-h-[44px] text-left rounded-xl px-2 -mx-2 py-1 hover:bg-muted/60 transition-colors">
-            <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <span className="text-lg font-semibold break-words">{item.name}</span>
+        <li key={item.client_id} className="flex items-center gap-2 py-1.5">
+          <button onClick={() => onOpen(item.client_id)} className="flex-1 min-w-0 min-h-[44px] text-left rounded-lg px-2 -mx-2 py-1 hover:bg-muted/60 transition-colors">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="text-sm font-semibold break-words">{item.name}</span>
               <HealthBadge health={item.health} />
             </span>
-            <span className="block text-sm text-muted-foreground mt-1 break-words">{item.reasons.join(' · ')}</span>
+            <span className="block text-xs text-muted-foreground break-words">{item.reasons.join(' · ')}</span>
           </button>
           <QuickContacted item={item} />
         </li>
@@ -96,7 +96,7 @@ function ClientCard({ c, onOpen }: { c: HealthCard; onOpen: (id: string) => void
   return (
     <button
       onClick={() => onOpen(c.client_id)}
-      className="w-full text-left rounded-xl border border-border bg-background px-3 py-2 min-h-[44px] hover:border-primary/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="w-full text-left rounded-lg border border-border bg-background px-3 py-1.5 min-h-[44px] hover:border-primary/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
       <span className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold truncate min-w-0">{c.name}</span>
@@ -120,17 +120,17 @@ function ClientCard({ c, onOpen }: { c: HealthCard; onOpen: (id: string) => void
 function HealthBoard({ board, onOpen }: { board: CareOverview['health_board']; onOpen: (id: string) => void }) {
   const groups: Health[] = ['at_risk', 'needs_attention', 'healthy']
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <div className="grid gap-4 lg:grid-cols-3">
       {groups.map((h) => (
         <div key={h} className="min-w-0">
-          <div className="flex items-center gap-2 mb-3">
-            <span className={cn('w-2.5 h-2.5 rounded-full', HEALTH_META[h].dot)} aria-hidden />
-            <h4 className="font-semibold">{HEALTH_META[h].label}</h4>
-            <span className="text-muted-foreground tabular-nums">{board[h].length}</span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className={cn('w-2 h-2 rounded-full', HEALTH_META[h].dot)} aria-hidden />
+            <h4 className="text-sm font-semibold">{HEALTH_META[h].label}</h4>
+            <span className="text-sm text-muted-foreground tabular-nums">{board[h].length}</span>
           </div>
           {board[h].length === 0
             ? <p className="text-sm text-muted-foreground">—</p>
-            : <div className="space-y-1.5">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
+            : <div className="space-y-1">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
         </div>
       ))}
     </div>
@@ -154,20 +154,20 @@ function RenewalPill({ status }: { status: RenewalStatus }) {
 function Renewals({ rows, onOpen }: { rows: CareOverview['renewals']; onOpen: (id: string) => void }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">—</p>
   return (
-    <ul className="divide-y divide-border/60 -my-2">
+    <ul className="grid gap-x-8 md:grid-cols-2 xl:grid-cols-3 -my-1">
       {rows.map((r) => {
         const soon = (r.days_left ?? 99) <= 30 && r.renewal_status !== 'renewed'
         return (
-          <li key={r.client_id}>
-            <button onClick={() => onOpen(r.client_id)} className="w-full min-h-[44px] py-3 flex items-center justify-between gap-3 text-left rounded-xl hover:bg-muted/50 px-2 -mx-2">
+          <li key={r.client_id} className="border-b border-border/60 last:border-0 md:[&:nth-last-child(-n+2)]:border-0 xl:[&:nth-last-child(-n+3)]:border-0">
+            <button onClick={() => onOpen(r.client_id)} className="w-full min-h-[44px] py-1.5 flex items-center justify-between gap-3 text-left rounded-lg hover:bg-muted/50 px-2 -mx-2">
               <span className="min-w-0">
-                <span className="block font-medium break-words">{r.name}</span>
+                <span className="block text-sm font-medium truncate">{r.name}</span>
                 <span className="block text-xs text-muted-foreground tabular-nums">
-                  {r.contract_number ? `Contract ${r.contract_number} · ` : ''}{day(r.contract_end)}
+                  {r.contract_number ? `#${r.contract_number} · ` : ''}{day(r.contract_end)}
                 </span>
               </span>
               <span className="flex items-center gap-3 flex-shrink-0">
-                <span className={cn('text-sm tabular-nums whitespace-nowrap', soon ? 'font-semibold' : 'text-muted-foreground')}>{daysLeft(r.days_left) ?? '—'}</span>
+                <span className={cn('text-xs tabular-nums whitespace-nowrap', soon ? 'font-semibold' : 'text-muted-foreground')}>{daysLeft(r.days_left) ?? '—'}</span>
                 <RenewalPill status={r.renewal_status} />
               </span>
             </button>
@@ -191,11 +191,11 @@ function Output({ output }: { output: CareOverview['output_rate'] }) {
   ]
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {tiles.map(([label, value]) => (
-          <div key={label} className="rounded-xl bg-muted/50 p-4 min-w-0">
+          <div key={label} className="rounded-lg bg-muted/50 px-3 py-2 min-w-0">
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-2xl font-heading font-semibold tabular-nums mt-1">{value}</p>
+            <p className="text-lg font-heading font-semibold tabular-nums">{value}</p>
           </div>
         ))}
       </div>
@@ -203,14 +203,14 @@ function Output({ output }: { output: CareOverview['output_rate'] }) {
         role="switch"
         aria-checked={byClient}
         onClick={() => setByClient((v) => !v)}
-        className={cn('mt-4 min-h-[44px] px-3 rounded-xl text-sm border', byClient ? 'border-primary text-primary bg-primary/5' : 'border-border hover:bg-muted')}
+        className={cn('mt-3 min-h-[44px] px-3 rounded-lg text-sm border', byClient ? 'border-primary text-primary bg-primary/5' : 'border-border hover:bg-muted')}
       >
         By client
       </button>
       {byClient && (
-        <ul className="divide-y divide-border/60 mt-3">
+        <ul className="divide-y divide-border/60 mt-2">
           {output.per_client.map((c) => (
-            <li key={c.client_id} className="py-2.5 flex items-baseline justify-between gap-3">
+            <li key={c.client_id} className="py-1.5 text-sm flex items-baseline justify-between gap-3">
               <span className="font-medium break-words min-w-0">{c.name}</span>
               <span className="text-sm tabular-nums text-muted-foreground whitespace-nowrap">
                 {c.delivered} · {fmt(c.avg_turnaround_days, ' d')} · {fmt(c.on_time_pct, '%')}
@@ -236,9 +236,9 @@ export default function AdminClientCare() {
 
   return (
     <AdminLayout>
-      <main className="px-4 md:px-8 py-8 md:py-10 space-y-6 md:space-y-8 max-w-[1600px]">
+      <main className="px-4 md:px-6 py-5 md:py-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-heading font-semibold tracking-tight">Client Care</h2>
+          <h2 className="text-xl font-heading font-semibold tracking-tight">Client Care</h2>
           <button
             onClick={() => refetch()}
             disabled={isFetching}
@@ -254,22 +254,23 @@ export default function AdminClientCare() {
         ) : error ? (
           <div className="clay-card p-6 text-sm">{(error as Error).message}</div>
         ) : data ? (
-          <>
-            <Section title="Text today" count={data.text_today.length}>
+          // Wide screens: Text today | Output side by side, then Health, then
+          // Renewals in columns — most of the page fits on one screen.
+          // Phones: Text today → Health → Output → Renewals, stacked.
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <Section title="Text today" count={data.text_today.length} className="order-1">
               <TextToday items={data.text_today} onOpen={open} />
             </Section>
-            <Section title="Health">
+            <Section title={`Output · ${data.output_rate.agency.window_days} days`} className="order-3 xl:order-2">
+              <Output output={data.output_rate} />
+            </Section>
+            <Section title="Health" className="order-2 xl:order-3 xl:col-span-2">
               <HealthBoard board={data.health_board} onOpen={open} />
             </Section>
-            <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
-              <Section title="Renewals" count={data.renewals.length}>
-                <Renewals rows={data.renewals} onOpen={open} />
-              </Section>
-              <Section title={`Output · ${data.output_rate.agency.window_days} days`}>
-                <Output output={data.output_rate} />
-              </Section>
-            </div>
-          </>
+            <Section title="Renewals" count={data.renewals.length} className="order-4 xl:col-span-2">
+              <Renewals rows={data.renewals} onOpen={open} />
+            </Section>
+          </div>
         ) : null}
       </main>
       {openClient && <ClientCarePanel clientId={openClient} onClose={close} />}

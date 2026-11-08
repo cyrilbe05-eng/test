@@ -79,25 +79,25 @@ function ContactedTick({ detail }: { detail: ClientCareDetail }) {
   }
 
   return (
-    <div className="px-5 md:px-6 py-6 border-b border-border/60">
+    <div className="px-4 md:px-5 py-4 border-b border-border/60">
       <button
         role="checkbox"
         aria-checked={checked}
         onClick={toggle}
         disabled={busy}
         className={cn(
-          'w-full min-h-[72px] rounded-2xl border-2 flex items-center gap-4 px-5 text-left transition-colors disabled:opacity-60',
+          'w-full min-h-[56px] rounded-xl border-2 flex items-center gap-3 px-4 text-left transition-colors disabled:opacity-60',
           checked ? 'border-emerald-500 bg-emerald-500/10' : 'border-border hover:border-primary/50 hover:bg-muted/50',
         )}
       >
         <span className={cn(
-          'w-10 h-10 rounded-xl border-2 flex items-center justify-center flex-shrink-0 text-xl font-bold',
+          'w-8 h-8 rounded-lg border-2 flex items-center justify-center flex-shrink-0 text-lg font-bold',
           checked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-muted-foreground/40',
         )} aria-hidden>
           {checked ? '✓' : ''}
         </span>
         <span className="min-w-0">
-          <span className="block text-lg font-semibold">Contacted</span>
+          <span className="block font-semibold">Contacted</span>
           <span className="block text-sm text-muted-foreground">
             {checked ? `Today ${format(new Date(latest!.contacted_at), 'HH:mm')}`
               : latest ? formatDistanceToNow(new Date(latest.contacted_at), { addSuffix: true })
@@ -105,7 +105,7 @@ function ContactedTick({ detail }: { detail: ClientCareDetail }) {
           </span>
         </span>
       </button>
-      <div className="flex flex-wrap gap-2 mt-4">
+      <div className="flex flex-wrap gap-2 mt-3">
         {detail.client.phone && (
           <>
             <a href={`tel:${detail.client.phone}`} className={cn(ghostBtn, 'inline-flex items-center')}>Call</a>
@@ -169,11 +169,11 @@ function Stats({ detail }: { detail: ClientCareDetail }) {
   ]
   return (
     <Block title="Stats">
-      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {items.map(([label, value]) => (
-          <div key={label} className="rounded-xl bg-muted/50 p-3 min-w-0">
+          <div key={label} className="rounded-lg bg-muted/50 px-3 py-2 min-w-0">
             <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="text-xl font-heading font-semibold tabular-nums mt-1">{value}</dd>
+            <dd className="text-lg font-heading font-semibold tabular-nums">{value}</dd>
           </div>
         ))}
       </dl>
@@ -268,15 +268,15 @@ function Contracts({ detail }: { detail: ClientCareDetail }) {
         : <button onClick={() => { setDraft(newDefaults()); setCreating(true) }} className={ghostBtn}>+ New</button>}
     >
       {creating ? (
-        <div className="space-y-4">
-          <p className="text-base font-semibold">Contract {(last?.number ?? 0) + 1}</p>
+        <div className="space-y-3">
+          <p className="text-sm font-semibold">Contract {(last?.number ?? 0) + 1}</p>
           <ContractFields form={draft} onChange={setDraft} withRenewal={false} />
           <SaveButton dirty saving={create.isPending} onClick={add} label="Create" />
         </div>
       ) : !selected || !form ? (
         <p className="text-sm text-muted-foreground">—</p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {list.length > 1 && (
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Contract">
               {list.map((c) => (
@@ -294,7 +294,7 @@ function Contracts({ detail }: { detail: ClientCareDetail }) {
             </div>
           )}
           <div>
-            <p className="text-base font-semibold">Contract {selected.number}</p>
+            <p className="text-sm font-semibold">Contract {selected.number}</p>
             <p className="text-sm text-muted-foreground tabular-nums">{fmtDate(selected.start_date)} – {fmtDate(selected.end_date)}</p>
           </div>
           <ContractFields form={form} onChange={setForm} withRenewal />
@@ -444,11 +444,11 @@ export function ClientCarePanel({ clientId, onClose }: { clientId: string; onClo
         aria-label={data ? `Client care: ${data.client.name}` : 'Client care'}
         className="relative w-full md:w-[560px] lg:w-[620px] h-full bg-background md:border-l border-border shadow-2xl flex flex-col animate-slide-in-right"
       >
-        <header className="flex items-center gap-3 px-5 md:px-6 h-[64px] border-b border-border flex-shrink-0 bg-card/80 backdrop-blur-xl">
+        <header className="flex items-center gap-3 px-4 md:px-5 h-[56px] border-b border-border flex-shrink-0 bg-card/80 backdrop-blur-xl">
           <button onClick={onClose} className="w-11 h-11 -ml-2 rounded-xl hover:bg-muted flex items-center justify-center text-muted-foreground" aria-label="Close">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
-          <h3 className="min-w-0 flex-1 text-lg font-heading font-semibold truncate">{data?.client.name ?? ''}</h3>
+          <h3 className="min-w-0 flex-1 font-heading font-semibold truncate">{data?.client.name ?? ''}</h3>
           {data && <HealthBadge health={data.health} />}
         </header>
 

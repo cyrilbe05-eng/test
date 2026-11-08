@@ -54,7 +54,7 @@ export function SopRules({ detail, miro }: { detail: ClientCareDetail; miro: Rea
           ))}
         </ul>
       )}
-      <div className="mt-5">{miro}</div>
+      <div className="mt-3">{miro}</div>
     </Block>
   )
 }
