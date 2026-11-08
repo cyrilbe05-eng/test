@@ -96,24 +96,22 @@ function ClientCard({ c, onOpen }: { c: HealthCard; onOpen: (id: string) => void
   return (
     <button
       onClick={() => onOpen(c.client_id)}
-      className="w-full text-left rounded-2xl border border-border bg-background p-4 min-h-[44px] hover:border-primary/40 hover:shadow-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="w-full text-left rounded-xl border border-border bg-background px-3 py-2 min-h-[44px] hover:border-primary/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
-      <span className="flex items-start justify-between gap-2">
-        <span className="font-semibold leading-snug break-words min-w-0">{c.name}</span>
+      <span className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold truncate min-w-0">{c.name}</span>
         {left && (
-          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full bg-muted whitespace-nowrap tabular-nums',
-            (c.days_left_on_contract ?? 99) <= 30 ? 'text-foreground ring-1 ring-amber-500/40' : 'text-muted-foreground')}>
+          <span className={cn('text-xs tabular-nums whitespace-nowrap',
+            (c.days_left_on_contract ?? 99) <= 30 ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-muted-foreground')}>
             {left}
           </span>
         )}
       </span>
       {c.instagram.length > 0 && (
-        <span className="block mt-0.5 text-xs font-medium text-pink-700 dark:text-pink-300 break-words">
-          {c.instagram.map((h) => `@${h}`).join(' · ')}
-        </span>
+        <span className="block text-xs text-pink-700 dark:text-pink-300 truncate">{c.instagram.map((h) => `@${h}`).join(' · ')}</span>
       )}
       {c.health !== 'healthy' && (
-        <span className="block mt-2 text-sm text-muted-foreground break-words">{c.reasons[0]}{c.reasons.length > 1 ? ` · +${c.reasons.length - 1}` : ''}</span>
+        <span className="block text-xs text-muted-foreground truncate">{c.reasons[0]}{c.reasons.length > 1 ? ` · +${c.reasons.length - 1}` : ''}</span>
       )}
     </button>
   )
@@ -132,7 +130,7 @@ function HealthBoard({ board, onOpen }: { board: CareOverview['health_board']; o
           </div>
           {board[h].length === 0
             ? <p className="text-sm text-muted-foreground">—</p>
-            : <div className="space-y-3">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
+            : <div className="space-y-1.5">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
         </div>
       ))}
     </div>
