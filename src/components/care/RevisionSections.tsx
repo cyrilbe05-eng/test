@@ -6,8 +6,9 @@ import { useArchiveRule, useRecategorize } from '@/hooks/useCare'
 import { Block } from '@/components/care/Block'
 import type { ClientCareDetail, RevisionCategory } from '@/types/care'
 
-// Part 3: the client's SOP rules (merged automatically from revision notes)
-// and the revision backlog (every note, with an editable category).
+// The client's SOP rules (merged automatically from revision notes) and the
+// revision backlog (every note, with an editable category). Which engine did
+// the matching is still returned by the API (sop_engine) but not displayed.
 
 const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
 const day = (d: string) => format(new Date(d), 'd MMM yyyy')
@@ -16,27 +17,17 @@ function CategoryPill({ label }: { label: string }) {
   return <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium whitespace-nowrap">{label}</span>
 }
 
-function EngineNote({ detail }: { detail: ClientCareDetail }) {
-  return (
-    <p className="text-xs text-muted-foreground mt-2">
-      {detail.sop_engine.engine === 'model'
-        ? 'Categories and merging by the local AI model (free, runs inside the app).'
-        : 'Categories and merging by word matching — the local AI model is not available on this server.'}
-    </p>
-  )
-}
-
 export function SopRules({ detail, miro }: { detail: ClientCareDetail; miro: React.ReactNode }) {
   const archive = useArchiveRule()
   const labels = Object.fromEntries(detail.revision_categories.map((c) => [c.key, c.label]))
   const remove = (id: string, text: string) => {
-    if (!confirm(`Remove this SOP rule?\n\n“${text}”\n\nIt is archived; the revision notes behind it are kept.`)) return
-    archive.mutate(id, { onSuccess: () => toast.success('SOP rule removed'), onError: (e) => toast.error(errMsg(e)) })
+    if (!confirm(`Remove “${text}”?`)) return
+    archive.mutate(id, { onError: (e) => toast.error(errMsg(e)) })
   }
   return (
-    <Block title={`Client SOPs · ${detail.sop_rules.length}`}>
+    <Block title={`SOPs · ${detail.sop_rules.length}`}>
       {detail.sop_rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No rules yet — they build up automatically from this client's revision notes.</p>
+        <p className="text-sm text-muted-foreground">—</p>
       ) : (
         <ul className="space-y-2">
           {detail.sop_rules.map((r) => (
@@ -48,8 +39,7 @@ export function SopRules({ detail, miro }: { detail: ClientCareDetail; miro: Rea
                 <span className="block text-sm break-words">{r.text}</span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-xs text-muted-foreground">
                   <CategoryPill label={labels[r.category] ?? r.category} />
-                  <span>Last seen {day(r.last_seen)}</span>
-                  {r.count > 1 && <span>· first {day(r.first_seen)}</span>}
+                  <span>{day(r.last_seen)}</span>
                 </span>
               </span>
               <button
@@ -64,8 +54,7 @@ export function SopRules({ detail, miro }: { detail: ClientCareDetail; miro: Rea
           ))}
         </ul>
       )}
-      <EngineNote detail={detail} />
-      <div className="mt-3">{miro}</div>
+      <div className="mt-5">{miro}</div>
     </Block>
   )
 }
@@ -75,25 +64,29 @@ export function RevisionBacklog({ detail }: { detail: ClientCareDetail }) {
   const [openOnly, setOpenOnly] = useState(false)
   const [all, setAll] = useState(false)
   const entries = openOnly ? detail.revision_backlog.filter((e) => e.resolved !== true) : detail.revision_backlog
-  const shown = all ? entries : entries.slice(0, 8)
-  const ruleCount = Object.fromEntries(detail.sop_rules.map((r) => [r.id, r.count]))
+  const shown = all ? entries : entries.slice(0, 5)
 
   const change = (entryId: string, category: RevisionCategory) => recategorize.mutate(
     { entryId, category },
-    { onSuccess: () => toast.success('Category updated — SOP rules re-merged'), onError: (e) => toast.error(errMsg(e)) },
+    { onError: (e) => toast.error(errMsg(e)) },
   )
 
   return (
     <Block
-      title={`Revision backlog · ${detail.revision_backlog.length}`}
+      title={`Revisions · ${detail.revision_backlog.length}`}
       action={detail.revision_backlog.length > 0 && (
-        <button onClick={() => setOpenOnly((v) => !v)} className={cn('min-h-[44px] px-3 rounded-xl text-sm border', openOnly ? 'border-primary text-primary bg-primary/5' : 'border-border hover:bg-muted')}>
-          {openOnly ? 'Showing open' : 'Show open only'}
+        <button
+          role="switch"
+          aria-checked={openOnly}
+          onClick={() => setOpenOnly((v) => !v)}
+          className={cn('min-h-[44px] px-3 rounded-xl text-sm border', openOnly ? 'border-primary text-primary bg-primary/5' : 'border-border hover:bg-muted')}
+        >
+          Open only
         </button>
       )}
     >
       {entries.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{openOnly ? 'No open revision notes.' : 'No revision notes yet.'}</p>
+        <p className="text-sm text-muted-foreground">—</p>
       ) : (
         <ul className="divide-y divide-border/60">
           {shown.map((e) => (
@@ -113,14 +106,11 @@ export function RevisionBacklog({ detail }: { detail: ClientCareDetail }) {
                   >
                     {detail.revision_categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
                   </select>
-                  <span>{!e.processed ? 'sorting…' : e.category_source === 'manual' ? 'set by you' : 'auto'}</span>
                 </label>
                 <span className="text-xs text-muted-foreground sm:ml-auto break-words">
                   {day(e.created_at)}
                   {' · '}{e.project_title}
                   {e.editor_name && ` · ${e.editor_name}`}
-                  {e.sop_rule_id && ruleCount[e.sop_rule_id] > 1 && ` · repeat ×${ruleCount[e.sop_rule_id]}`}
-                  {e.resolved === false && ' · open'}
                 </span>
               </div>
             </li>
@@ -129,7 +119,7 @@ export function RevisionBacklog({ detail }: { detail: ClientCareDetail }) {
       )}
       {entries.length > 8 && (
         <button onClick={() => setAll((a) => !a)} className="mt-1 min-h-[44px] px-3 rounded-xl text-sm text-primary hover:bg-primary/5">
-          {all ? 'Show fewer' : `Show all ${entries.length}`}
+          {all ? 'Less' : `All ${entries.length}`}
         </button>
       )}
     </Block>

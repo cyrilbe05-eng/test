@@ -307,12 +307,29 @@ for (const c of CLIENTS) {
 // now so past revision notes become revision entries, as on a real database.
 const m011 = fs.readFileSync(path.join(ROOT, 'db/migrations/011_client_care.sql'), 'utf8')
 db.exec(m011.slice(m011.indexOf('-- BACKFILL')))
+// Same for migration 013: copy each client's contract into client_contracts.
+const m013 = fs.readFileSync(path.join(ROOT, 'db/migrations/013_client_contracts.sql'), 'utf8')
+db.exec(m013.slice(m013.indexOf('-- COPY')))
+
+// Contract history + packages for the fake clients:
+//  - Bloom: an earlier, finished contract #1 (renewed) → today's becomes #2
+//  - Bloom, Nova, Saffron: full package (production plans in Part 2)
+{
+  const bloom = clientIds.healthy
+  const [cur] = db.prepare('SELECT start_date FROM client_contracts WHERE client_id = ?').all(bloom)
+  db.prepare('UPDATE client_contracts SET number = 2 WHERE client_id = ?').run(bloom)
+  const prevEnd = new Date(Date.parse(`${cur.start_date}T00:00:00Z`) - DAY)
+  const prevStart = new Date(prevEnd); prevStart.setUTCFullYear(prevStart.getUTCFullYear() - 1); prevStart.setUTCDate(prevStart.getUTCDate() + 1)
+  insert('client_contracts', { id: randomUUID(), client_id: bloom, number: 1, start_date: dateOnly(prevStart.getTime()), end_date: dateOnly(prevEnd.getTime()),
+    package: 'full_package', videos_included: 24, renewal_status: 'renewed', created_at: iso(prevStart.getTime()) })
+  for (const key of ['healthy', 'stuck', 'new']) db.prepare("UPDATE client_contracts SET package = 'full_package' WHERE client_id = ?").run(clientIds[key])
+}
 
 // ── 5. Summary ──────────────────────────────────────────────────────────────
 
 const count = (t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n
 console.log(`Local database ready: ${path.relative(ROOT, DB_FILE)}`)
-for (const t of ['profiles', 'projects', 'project_assignments', 'deadlines', 'project_files', 'status_history', 'timeline_comments', 'client_care', 'client_contacts', 'client_onboarding', 'revision_entries']) {
+for (const t of ['profiles', 'projects', 'project_assignments', 'deadlines', 'project_files', 'status_history', 'timeline_comments', 'client_care', 'client_contacts', 'client_onboarding', 'revision_entries', 'client_contracts']) {
   console.log(`  ${t.padEnd(20)} ${count(t)}`)
 }
 console.log(`\nLog in at http://localhost:5173 with admin@pingu.local / ${LOCAL_PASSWORD}`)

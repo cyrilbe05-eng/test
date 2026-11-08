@@ -42,6 +42,9 @@ export interface ClientInput {
   phone: string | null
   client_id_label: string | null
   plan_name: string | null
+  /** The current contract (migration 013); its dates/videos/renewal are also
+   *  mirrored into `care` so the rules below read them in one place. */
+  contract?: { id: string; number: number; package: 'editing_only' | 'full_package'; start_date: string; end_date: string } | null
   care: CareFields | null
   last_contact_at: string | null
   projects: ProjectInput[]

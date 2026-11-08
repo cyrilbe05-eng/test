@@ -34,8 +34,23 @@ export interface CareOverview {
     agency: OutputRate
     per_client: (OutputRate & { client_id: string; name: string })[]
   }
-  renewals: { client_id: string; name: string; contract_end: string; days_left: number | null; renewal_status: RenewalStatus }[]
+  renewals: { client_id: string; name: string; contract_end: string; contract_number: number | null; days_left: number | null; renewal_status: RenewalStatus }[]
 }
+
+export type ContractPackage = 'editing_only' | 'full_package'
+
+export interface Contract {
+  id: string
+  number: number
+  start_date: string
+  end_date: string
+  package: ContractPackage
+  videos_included: number | null
+  renewal_status: RenewalStatus
+  created_at: string
+}
+
+export type ContractBody = Partial<Pick<Contract, 'start_date' | 'end_date' | 'package' | 'videos_included' | 'renewal_status'>>
 
 export interface CareFields {
   contract_start: string | null
@@ -78,6 +93,8 @@ export interface ClientVideo {
 export interface ClientCareDetail {
   client: { id: string; name: string; email: string; phone: string | null; client_id_label: string | null; plan_name: string | null }
   instagram: string[]
+  contracts: Contract[]
+  current_contract_id: string | null
   care: CareFields
   onboarding: Record<OnboardingStep, string | null>
   health: Health
@@ -121,4 +138,4 @@ export interface RevisionEntry {
   resolved: boolean | null
 }
 
-export type CarePatchBody = Partial<CareFields> & { onboarding?: Partial<Record<OnboardingStep, string | null>> }
+export type CarePatchBody = Partial<Pick<CareFields, 'care_notes' | 'miro_url'>> & { onboarding?: Partial<Record<OnboardingStep, string | null>> }

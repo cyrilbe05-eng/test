@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
-import type { CareOverview, CarePatchBody, ClientCareDetail, RevisionCategory } from '@/types/care'
+import type { CareOverview, CarePatchBody, ClientCareDetail, ContractBody, RevisionCategory } from '@/types/care'
 import type { EditorPerformance, PerformancePeriod } from '@/types/editors'
 
 export function useEditorPerformance(period: PerformancePeriod) {
@@ -67,6 +67,18 @@ export function useArchiveRule() {
   const apiFetch = useApiFetch()
   return useCareWrite((ruleId: string) =>
     apiFetch<ClientCareDetail>(`/api/admin/care/sop-rules/${ruleId}`, { method: 'DELETE' }))
+}
+
+export function useCreateContract() {
+  const apiFetch = useApiFetch()
+  return useCareWrite(({ clientId, body }: { clientId: string; body: ContractBody }) =>
+    apiFetch<ClientCareDetail>(`/api/admin/care/clients/${clientId}/contracts`, { method: 'POST', body: JSON.stringify(body) }))
+}
+
+export function useUpdateContract() {
+  const apiFetch = useApiFetch()
+  return useCareWrite(({ contractId, body }: { contractId: string; body: ContractBody }) =>
+    apiFetch<ClientCareDetail>(`/api/admin/care/contracts/${contractId}`, { method: 'PATCH', body: JSON.stringify(body) }))
 }
 
 export function useSaveInstagram() {

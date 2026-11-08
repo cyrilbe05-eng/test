@@ -3,6 +3,7 @@
 
 import { dbQuery } from '../db.js'
 import type { CareFields, ClientInput, DeadlineRow, HistoryRow, ProjectInput } from './compute.js'
+import { loadContracts, currentContract } from './contracts.js'
 
 interface ClientRow {
   id: string; full_name: string; email: string; phone: string | null
@@ -71,6 +72,10 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
     for (const r of rows) { const k = r[key] as string; (m.get(k) ?? m.set(k, []).get(k)!).push(r) }
     return m
   }
+  // Contract fields come from the CURRENT contract (migration 013). The old
+  // contract columns on client_care are no longer read.
+  const contractsBy = await loadContracts(clientId)
+  const now = Date.now()
   const careBy = new Map(care.map((c) => [c.client_id, c]))
   const contactBy = new Map(contacts.map((c) => [c.client_id, c.last_contact_at]))
   const historyBy = group(history, 'project_id')
@@ -81,12 +86,19 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
 
   return clients.map((c) => {
     const careRow = careBy.get(c.id)
+    const contract = currentContract(contractsBy.get(c.id) ?? [], now)
     return {
       ...c,
-      care: careRow ? {
-        contract_start: careRow.contract_start, contract_end: careRow.contract_end,
-        videos_included: careRow.videos_included, renewal_status: careRow.renewal_status ?? 'not_discussed',
-        care_notes: careRow.care_notes, miro_url: careRow.miro_url,
+      contract: contract
+        ? { id: contract.id, number: contract.number, package: contract.package, start_date: contract.start_date, end_date: contract.end_date }
+        : null,
+      care: careRow || contract ? {
+        contract_start: contract?.start_date ?? null,
+        contract_end: contract?.end_date ?? null,
+        videos_included: contract?.videos_included ?? null,
+        renewal_status: contract?.renewal_status ?? 'not_discussed',
+        care_notes: careRow?.care_notes ?? null,
+        miro_url: careRow?.miro_url ?? null,
       } : null,
       last_contact_at: contactBy.get(c.id) ?? null,
       projects: (projectsBy.get(c.id) ?? []).map((p): ProjectInput => ({

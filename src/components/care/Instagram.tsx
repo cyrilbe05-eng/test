@@ -54,7 +54,6 @@ export function InstagramInput({ value, onChange, inputClassName }: { value: str
                 <input
                   value={r}
                   onChange={(e) => set(i, e.target.value)}
-                  placeholder="bloom.bakery or instagram.com/…"
                   aria-label={`Instagram account ${i + 1}`}
                   aria-invalid={invalid}
                   autoCapitalize="none"
@@ -70,13 +69,13 @@ export function InstagramInput({ value, onChange, inputClassName }: { value: str
                 </button>
               ) : null}
             </div>
-            {invalid && <p className="text-destructive text-xs mt-1">Not a valid Instagram username (letters, numbers, . and _ only)</p>}
+            {invalid && <p className="text-destructive text-xs mt-1">Invalid username</p>}
           </div>
         )
       })}
       {rows.length < MAX_INSTAGRAM_ACCOUNTS && (
         <button type="button" onClick={() => onChange([...rows, ''])} className="min-h-[44px] px-3 rounded-xl text-sm text-primary hover:bg-primary/5 font-medium">
-          + Add another account
+          + Add
         </button>
       )}
     </div>

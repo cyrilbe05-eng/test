@@ -1,17 +1,13 @@
 // Validation for PATCH /api/admin/care/clients/:id — pure, unit-tested.
 // Only fields present in the body are changed; null clears a field.
-
-import { RENEWAL_STATUSES, type RenewalStatus } from './config.js'
+// Contract fields (dates, videos, renewal) are edited per contract — see
+// contracts.ts (migration 013).
 
 export const ONBOARDING_STEPS = ['welcome_sent', 'call_done', 'brief_received', 'first_video_delivered'] as const
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number]
 
 export interface CarePatch {
   care: Partial<{
-    contract_start: string | null
-    contract_end: string | null
-    videos_included: number | null
-    renewal_status: RenewalStatus
     care_notes: string | null
     miro_url: string | null
   }>
@@ -19,6 +15,7 @@ export interface CarePatch {
 }
 
 const MAX_NOTES = 10_000
+const CONTRACT_FIELDS = ['contract_start', 'contract_end', 'videos_included', 'renewal_status']
 
 function invalid(message: string): never {
   throw Object.assign(new Error(message), { status: 400 })
@@ -36,37 +33,15 @@ function isDateOrDateTime(v: unknown): v is string {
   return isDate(v) || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && !isNaN(Date.parse(v)))
 }
 
-export function parseCarePatch(body: unknown, current?: { contract_start: string | null; contract_end: string | null }): CarePatch {
+export function parseCarePatch(body: unknown): CarePatch {
   if (!body || typeof body !== 'object' || Array.isArray(body)) invalid('Body must be a JSON object')
   const b = body as Record<string, unknown>
   const patch: CarePatch = { care: {}, onboarding: {} }
-  const known = new Set(['contract_start', 'contract_end', 'videos_included', 'renewal_status', 'care_notes', 'miro_url', 'onboarding'])
+  const movedToContracts = Object.keys(b).filter((k) => CONTRACT_FIELDS.includes(k))
+  if (movedToContracts.length) invalid(`${movedToContracts.join(', ')}: edit these on the contract (PATCH /api/admin/care/contracts/:id)`)
+  const known = new Set(['care_notes', 'miro_url', 'onboarding'])
   const unknown = Object.keys(b).filter((k) => !known.has(k))
   if (unknown.length) invalid(`Unknown field(s): ${unknown.join(', ')}`)
-
-  for (const k of ['contract_start', 'contract_end'] as const) {
-    if (b[k] === undefined) continue
-    if (b[k] !== null && !isDate(b[k])) invalid(`${k} must be a date (YYYY-MM-DD) or null`)
-    patch.care[k] = b[k] as string | null
-  }
-  const start = patch.care.contract_start !== undefined ? patch.care.contract_start : current?.contract_start ?? null
-  const end = patch.care.contract_end !== undefined ? patch.care.contract_end : current?.contract_end ?? null
-  if (start && end && end < start) invalid('contract_end cannot be before contract_start')
-
-  if (b.videos_included !== undefined) {
-    const v = b.videos_included
-    if (v !== null && !(typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 10_000)) {
-      invalid('videos_included must be a whole number (0 or more) or null')
-    }
-    patch.care.videos_included = v as number | null
-  }
-
-  if (b.renewal_status !== undefined) {
-    if (!(RENEWAL_STATUSES as readonly unknown[]).includes(b.renewal_status)) {
-      invalid(`renewal_status must be one of ${RENEWAL_STATUSES.join(', ')}`)
-    }
-    patch.care.renewal_status = b.renewal_status as RenewalStatus
-  }
 
   if (b.care_notes !== undefined) {
     if (b.care_notes !== null && typeof b.care_notes !== 'string') invalid('care_notes must be text or null')
