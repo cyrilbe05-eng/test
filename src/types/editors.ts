@@ -26,4 +26,9 @@ export interface EditorPerformance {
     totals: PerfStats
     clients: (PerfStats & { client_id: string; name: string })[]
   }[]
+  /** Client-first view: who edited each client's videos (shares add to 100%). */
+  client_split: {
+    legend: { key: string; name: string; color_index: number }[]
+    clients: { client_id: string; name: string; videos: number; split: { key: string; videos: number; share: number }[] }[]
+  }
 }

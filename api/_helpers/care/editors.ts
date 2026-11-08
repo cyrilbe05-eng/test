@@ -11,6 +11,9 @@
 //   categories          what the client revision notes on their videos were
 //                       about (from Client Care's revision entries)
 // Same definitions as Client Care, so the numbers agree across pages.
+//
+// client_split — per client: delivered videos in the period and the share
+// edited by each editor (adds up to 100%; shared videos split evenly).
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { dbQuery } from '../db.js'
@@ -123,6 +126,74 @@ export function aggregateEditorPerformance(
   return rows
 }
 
+/** Integer percentages that always add up to exactly 100 (largest remainder). */
+export function percentages(values: number[]): number[] {
+  const total = values.reduce((a, b) => a + b, 0)
+  if (!total) return values.map(() => 0)
+  const raw = values.map((v) => (v / total) * 100)
+  const out = raw.map(Math.floor)
+  let left = 100 - out.reduce((a, b) => a + b, 0)
+  raw.map((r, i) => [r - Math.floor(r), i] as const).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (left-- > 0) out[i]++ })
+  return out
+}
+
+const MAX_LEGEND = 8   // categorical colours available; extra editors fold into "Other"
+
+/** Per client: delivered videos in the period and who edited them, as shares
+ *  that add up to 100%. A video edited by two editors counts half for each;
+ *  a video with no assigned editor shows as "No editor". Pure (unit-tested). */
+export function aggregateClientSplit(clients: ClientInput[], editors: EditorInfo[], now: number, days: number | null) {
+  const from = days == null ? -Infinity : now - days * DAY
+  const names = new Map(editors.map((e) => [e.id, e.full_name]))
+  const perClient = clients.map((client) => {
+    const credit = new Map<string, number>()
+    let videos = 0
+    for (const p of client.projects) {
+      const f = projectFacts(p, now)
+      const t = f.delivered_at ? new Date(f.delivered_at).getTime() : NaN
+      if (!(t >= from && t <= now)) continue
+      videos++
+      const eds = [...new Set(p.editor_ids)]
+      if (!eds.length) credit.set('unassigned', (credit.get('unassigned') ?? 0) + 1)
+      for (const e of eds) credit.set(e, (credit.get(e) ?? 0) + 1 / eds.length)
+    }
+    return { client, videos, credit }
+  }).filter((c) => c.videos > 0)
+
+  // Legend: editors with work in the period, in a STABLE order (by name) so
+  // an editor keeps the same colour whatever the period or filter.
+  const totals = new Map<string, number>()
+  for (const c of perClient) for (const [k, v] of c.credit) if (k !== 'unassigned') totals.set(k, (totals.get(k) ?? 0) + v)
+  let keep = [...totals.keys()]
+  if (keep.length > MAX_LEGEND) keep = keep.sort((a, b) => totals.get(b)! - totals.get(a)!).slice(0, MAX_LEGEND - 1)
+  const legendKeys = keep.sort((a, b) => (names.get(a) ?? a).localeCompare(names.get(b) ?? b))
+  const folded = totals.size > legendKeys.length
+  const legend = [
+    ...legendKeys.map((k, i) => ({ key: k, name: names.get(k) ?? 'Unknown editor', color_index: i })),
+    ...(folded ? [{ key: 'other', name: 'Other editors', color_index: -1 }] : []),
+    ...(perClient.some((c) => c.credit.has('unassigned')) ? [{ key: 'unassigned', name: 'No editor', color_index: -1 }] : []),
+  ]
+  const order = new Map(legend.map((l, i) => [l.key, i]))
+
+  const rows = perClient.map(({ client, videos, credit }) => {
+    const grouped = new Map<string, number>()
+    for (const [k, v] of credit) {
+      const key = k === 'unassigned' || legendKeys.includes(k) ? k : 'other'
+      grouped.set(key, (grouped.get(key) ?? 0) + v)
+    }
+    const entries = [...grouped.entries()].sort((a, b) => b[1] - a[1] || order.get(a[0])! - order.get(b[0])!)
+    const shares = percentages(entries.map(([, v]) => v))
+    return {
+      client_id: client.id,
+      name: client.full_name,
+      videos,
+      split: entries.map(([key, v], i) => ({ key, videos: Math.round(v * 10) / 10, share: shares[i] })),
+    }
+  }).sort((a, b) => b.videos - a.videos || a.name.localeCompare(b.name))
+
+  return { legend, clients: rows }
+}
+
 async function handlePerformance(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
@@ -152,6 +223,8 @@ async function handlePerformance(req: VercelRequest, res: VercelResponse) {
       period: key,
       categories: REVISION_CATEGORY_KEYS.map((k) => ({ key: k, label: REVISION_CATEGORIES[k].label })),
       editors: rows,
+      // Client-first view: each client's videos and who edited them (%).
+      client_split: aggregateClientSplit(clients, editors, now, days),
     })
   } catch (e) {
     sendError(res, e)

@@ -16,8 +16,25 @@ const PERIODS: { key: PerformancePeriod; label: string }[] = [
   { key: 'all', label: 'All time' },
 ]
 
+// Editor colours: validated categorical palette (colour-blind safe, light and
+// dark steps). Assigned by the API's stable legend order, so an editor keeps
+// the same colour on every row and every period. Names + % are always written
+// next to the bar, so colour is never the only cue.
+const EDITOR_COLORS = [
+  'bg-[#2a78d6] dark:bg-[#3987e5]',
+  'bg-[#eb6834] dark:bg-[#d95926]',
+  'bg-[#1baf7a] dark:bg-[#199e70]',
+  'bg-[#eda100] dark:bg-[#c98500]',
+  'bg-[#e87ba4] dark:bg-[#d55181]',
+  'bg-[#008300] dark:bg-[#008300]',
+  'bg-[#6250d6] dark:bg-[#9085e9]',
+  'bg-[#e34948] dark:bg-[#e66767]',
+]
+const NEUTRAL = { other: 'bg-zinc-400 dark:bg-zinc-500', unassigned: 'bg-zinc-300 dark:bg-zinc-600' }
+
 const fmt = (n: number | null, suffix = '') => (n == null ? '—' : `${n}${suffix}`)
 type Editor = EditorPerformance['editors'][number]
+type Split = EditorPerformance['client_split']
 
 function PeriodPicker({ value, onChange }: { value: PerformancePeriod; onChange: (p: PerformancePeriod) => void }) {
   return (
@@ -65,14 +82,15 @@ function CategoryBars({ stats, labels }: { stats: PerfStats; labels: Record<stri
   )
 }
 
-function EditorCard({ e, labels }: { e: Editor; labels: Record<string, string> }) {
+function EditorCard({ e, labels, colorClass }: { e: Editor; labels: Record<string, string>; colorClass?: string }) {
   const t = e.totals
   return (
     <section className="clay-card p-4 md:p-5 min-w-0">
       <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h3 className="font-heading font-semibold break-words">
+        <h3 className="font-heading font-semibold break-words flex items-center gap-2">
+          {colorClass && <span className={cn('w-3 h-3 rounded-full flex-shrink-0 self-center', colorClass)} aria-hidden />}
           {e.name}
-          {e.disabled && <span className="ml-2 text-xs font-medium text-muted-foreground">(disabled)</span>}
+          {e.disabled && <span className="text-xs font-medium text-muted-foreground">(disabled)</span>}
         </h3>
         <span className="text-xs text-muted-foreground capitalize whitespace-nowrap">{e.team_role}</span>
       </div>
@@ -91,93 +109,69 @@ function EditorCard({ e, labels }: { e: Editor; labels: Record<string, string> }
   )
 }
 
-function topLine(s: PerfStats, labels: Record<string, string>) {
-  return s.top_categories.slice(0, 2).map((c) => `${labels[c.category] ?? c.category} ${c.count}`).join(', ') || '—'
+// ── Who edits each client (client-first percentage bars) ────────────────────
+
+function colorFor(key: string, legend: Split['legend']): string {
+  if (key === 'other') return NEUTRAL.other
+  if (key === 'unassigned') return NEUTRAL.unassigned
+  const i = legend.find((l) => l.key === key)?.color_index ?? -1
+  return i >= 0 ? EDITOR_COLORS[i % EDITOR_COLORS.length] : NEUTRAL.other
 }
 
-/** Desktop: one table, editor name spanning their client rows. */
-function MatrixTable({ editors, labels }: { editors: Editor[]; labels: Record<string, string> }) {
+function ClientSplit({ split }: { split: Split }) {
+  const [all, setAll] = useState(false)
+  const names = Object.fromEntries(split.legend.map((l) => [l.key, l.name]))
+  if (!split.clients.length) return <p className="text-sm text-muted-foreground">No delivered videos in this period.</p>
+  const shown = all ? split.clients : split.clients.slice(0, 10)
   return (
-    <table className="hidden md:table w-full text-sm">
-      <thead>
-        <tr className="text-left text-xs text-muted-foreground border-b border-border">
-          <th className="py-2 pr-3 font-medium">Editor</th>
-          <th className="py-2 px-3 font-medium">Client</th>
-          <th className="py-2 px-3 font-medium text-right">Videos</th>
-          <th className="py-2 px-3 font-medium text-right">Revisions / video</th>
-          <th className="py-2 px-3 font-medium text-right">Avg turnaround</th>
-          <th className="py-2 px-3 font-medium text-right">On time</th>
-          <th className="py-2 pl-3 font-medium">Top revision categories</th>
-        </tr>
-      </thead>
-      {editors.map((e) => (
-        <tbody key={e.editor_id} className="border-b border-border last:border-0">
-          {e.clients.length === 0 ? (
-            <tr>
-              <td className="py-2.5 pr-3 font-semibold align-top">{e.name}</td>
-              <td colSpan={6} className="py-2.5 px-3 text-muted-foreground">No delivered videos in this period</td>
-            </tr>
-          ) : e.clients.map((c, i) => (
-            <tr key={c.client_id} className={cn(i > 0 && 'border-t border-border/40')}>
-              {i === 0 && <td rowSpan={e.clients.length} className="py-2.5 pr-3 font-semibold align-top">{e.name}</td>}
-              <td className="py-2.5 px-3">{c.name}</td>
-              <td className="py-2.5 px-3 text-right tabular-nums">{c.videos}</td>
-              <td className="py-2.5 px-3 text-right tabular-nums">{fmt(c.revisions_per_video)}</td>
-              <td className="py-2.5 px-3 text-right tabular-nums">{fmt(c.avg_turnaround_days, ' d')}</td>
-              <td className="py-2.5 px-3 text-right tabular-nums">{fmt(c.on_time_pct, '%')}</td>
-              <td className="py-2.5 pl-3 text-muted-foreground">{topLine(c, labels)}</td>
-            </tr>
-          ))}
-        </tbody>
-      ))}
-    </table>
-  )
-}
+    <>
+      {/* Legend: same colour per editor on every row. */}
+      <ul className="flex flex-wrap gap-x-4 gap-y-1.5 mb-4 text-sm">
+        {split.legend.map((l) => (
+          <li key={l.key} className="flex items-center gap-1.5">
+            <span className={cn('w-3 h-3 rounded-sm', colorFor(l.key, split.legend))} aria-hidden />{l.name}
+          </li>
+        ))}
+      </ul>
 
-/** Phone: per editor, compact client cards — top 3 first, "Show all" for the
- *  rest — so the list stays short (and never scrolls sideways). */
-function MatrixCards({ editors, labels }: { editors: Editor[]; labels: Record<string, string> }) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  return (
-    <div className="md:hidden space-y-5">
-      {editors.map((e) => {
-        const all = !!expanded[e.editor_id]
-        const shown = all ? e.clients : e.clients.slice(0, 3)
-        return (
-        <div key={e.editor_id}>
-          <h4 className="font-semibold mb-2">{e.name}</h4>
-          {e.clients.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No delivered videos in this period</p>
-          ) : (
-            <>
-            <ul className="space-y-2">
-              {shown.map((c) => (
-                <li key={c.client_id} className="rounded-xl border border-border p-3">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="font-medium break-words min-w-0">{c.name}</span>
-                    <span className="text-sm tabular-nums whitespace-nowrap">{c.videos} video{c.videos === 1 ? '' : 's'}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground tabular-nums mt-1">
-                    {fmt(c.revisions_per_video)} revisions/video · {fmt(c.avg_turnaround_days, ' d')} turnaround · on time {fmt(c.on_time_pct, '%')}
-                  </p>
-                  {c.top_categories.length > 0 && <p className="text-xs text-muted-foreground mt-0.5">Top: {topLine(c, labels)}</p>}
-                </li>
-              ))}
-            </ul>
-            {e.clients.length > 3 && (
-              <button
-                onClick={() => setExpanded((x) => ({ ...x, [e.editor_id]: !all }))}
-                className="mt-1 min-h-[44px] px-3 rounded-xl text-sm text-primary hover:bg-primary/5 font-medium"
-              >
-                {all ? 'Show fewer' : `Show all ${e.clients.length} clients`}
-              </button>
-            )}
-            </>
-          )}
-        </div>
-        )
-      })}
-    </div>
+      <ul className="grid gap-x-10 gap-y-4 lg:grid-cols-2">
+        {shown.map((c) => {
+          const label = c.split.map((s) => `${names[s.key]} ${s.share}%`).join(', ')
+          return (
+            <li key={c.client_id} className="min-w-0">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-semibold break-words min-w-0">{c.name}</span>
+                <span className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{c.videos} video{c.videos === 1 ? '' : 's'}</span>
+              </div>
+              {/* 100% stacked bar; 2px surface gap between segments. */}
+              <div className="flex h-3.5 gap-[2px] rounded-full overflow-hidden mt-1.5 bg-muted" role="img" aria-label={`${c.name}: ${label}`}>
+                {c.split.filter((s) => s.share > 0).map((s) => (
+                  <span
+                    key={s.key}
+                    className={cn('h-full first:rounded-l-full last:rounded-r-full', colorFor(s.key, split.legend))}
+                    style={{ width: `${s.share}%` }}
+                    title={`${names[s.key]}: ${s.videos} of ${c.videos} video${c.videos === 1 ? '' : 's'} (${s.share}%)`}
+                  />
+                ))}
+              </div>
+              <p className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-muted-foreground">
+                {c.split.map((s) => (
+                  <span key={s.key} className="flex items-center gap-1 tabular-nums">
+                    <span className={cn('w-2 h-2 rounded-full', colorFor(s.key, split.legend))} aria-hidden />
+                    <span className="text-foreground">{names[s.key]}</span> {s.share}%
+                  </span>
+                ))}
+              </p>
+            </li>
+          )
+        })}
+      </ul>
+      {split.clients.length > 10 && (
+        <button onClick={() => setAll((a) => !a)} className="mt-3 min-h-[44px] px-3 rounded-xl text-sm text-primary hover:bg-primary/5 font-medium">
+          {all ? 'Show fewer' : `Show all ${split.clients.length} clients`}
+        </button>
+      )}
+    </>
   )
 }
 
@@ -214,12 +208,17 @@ export default function AdminEditorPerformance() {
         ) : data ? (
           <>
             <div className="grid gap-4 md:gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {data.editors.map((e) => <EditorCard key={e.editor_id} e={e} labels={labels} />)}
+              {data.editors.map((e) => {
+                const inLegend = data.client_split.legend.find((l) => l.key === e.editor_id)
+                return <EditorCard key={e.editor_id} e={e} labels={labels} colorClass={inLegend ? colorFor(e.editor_id, data.client_split.legend) : undefined} />
+              })}
             </div>
             <section className="clay-card p-4 md:p-5 min-w-0">
-              <h3 className="font-heading font-semibold mb-3">Editor × client</h3>
-              <MatrixTable editors={data.editors} labels={labels} />
-              <MatrixCards editors={data.editors} labels={labels} />
+              <div className="flex items-baseline justify-between gap-3 mb-3">
+                <h3 className="font-heading font-semibold">Who edits each client</h3>
+                <span className="text-xs text-muted-foreground text-right">Share of each client's delivered videos · shared videos count half each</span>
+              </div>
+              <ClientSplit split={data.client_split} />
             </section>
           </>
         ) : null}
