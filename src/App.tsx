@@ -49,6 +49,7 @@ import AdminMessages from '@/pages/admin/AdminMessages'
 import AdminCalendar from '@/pages/admin/AdminCalendar'
 import AdminClientCare from '@/pages/admin/AdminClientCare'
 import AdminEditorPerformance from '@/pages/admin/AdminEditorPerformance'
+import ClientDashboard from '@/pages/workspace/ClientDashboard'
 import TeamPlans from '@/pages/team/TeamPlans'
 import TeamPlan from '@/pages/team/TeamPlan'
 import TeamGallery from '@/pages/team/TeamGallery'
@@ -151,7 +152,9 @@ function ProductionApp() {
           <Route path="/admin/care" element={<ProtectedRoute allowedRoles={['admin']}><AdminClientCare /></ProtectedRoute>} />
           <Route path="/admin/editors" element={<ProtectedRoute allowedRoles={['admin']}><AdminEditorPerformance /></ProtectedRoute>} />
 
-          <Route path="/workspace" element={<ProtectedRoute allowedRoles={['client']}><ClientWorkspace /></ProtectedRoute>} />
+          {/* Client home = dashboard; the video list (unchanged page) lives at /workspace/videos. */}
+          <Route path="/workspace" element={<ProtectedRoute allowedRoles={['client']}><ClientDashboard /></ProtectedRoute>} />
+          <Route path="/workspace/videos" element={<ProtectedRoute allowedRoles={['client']}><ClientWorkspace /></ProtectedRoute>} />
           <Route path="/workspace/new" element={<ProtectedRoute allowedRoles={['client']}><ClientNewProject /></ProtectedRoute>} />
           <Route path="/workspace/projects/:id" element={<ProtectedRoute allowedRoles={['client']}><ClientProjectDetail /></ProtectedRoute>} />
           <Route path="/workspace/gallery" element={<ProtectedRoute allowedRoles={['client']}><ClientGallery /></ProtectedRoute>} />

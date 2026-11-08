@@ -68,8 +68,8 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
        FROM project_assignments pa JOIN projects pr ON pr.id = pa.project_id
        WHERE pr.client_id IN (${clientScope})`, args),
     // Footage the CLIENT uploaded (drives "record + upload" plan auto ticks).
-    dbQuery<{ client_id: string; created_at: string }>(
-      `SELECT pr.client_id, pf.created_at
+    dbQuery<{ client_id: string; project_id: string; created_at: string }>(
+      `SELECT pr.client_id, pf.project_id, pf.created_at
        FROM project_files pf JOIN projects pr ON pr.id = pf.project_id
        WHERE pf.file_type = 'source_video' AND pf.uploader_id = pr.client_id
          AND pr.client_id IN (${clientScope})`, args),
@@ -92,6 +92,7 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
   const editorsBy = group(assignments, 'project_id')
   const projectsBy = group(projects, 'client_id')
   const footageBy = group(footage, 'client_id')
+  const projectsWithFootage = new Set(footage.map((f) => f.project_id))
 
   const result: ClientInput[] = clients.map((c) => {
     const careRow = careBy.get(c.id)
@@ -117,6 +118,7 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
         first_deliverable_at: deliverableBy.get(p.id) ?? null,
         deadlines: (deadlinesBy.get(p.id) ?? []).map(({ team_member_id, due_at, status, created_at }) => ({ team_member_id, due_at, status, created_at })),
         editor_ids: (editorsBy.get(p.id) ?? []).map((a) => a.team_member_id),
+        has_footage: projectsWithFootage.has(p.id),
       })),
     }
   })

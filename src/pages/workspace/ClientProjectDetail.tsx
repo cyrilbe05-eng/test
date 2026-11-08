@@ -241,7 +241,7 @@ export default function ClientProjectDetail() {
       <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-20" style={{ height: '52px' }}>
         <div className="h-full flex items-center px-4 gap-3">
           <Link
-            to="/workspace"
+            to="/workspace/videos"
             className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors"
           >
             <IconArrowLeft />

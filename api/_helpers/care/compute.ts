@@ -25,6 +25,8 @@ export interface ProjectInput {
   first_deliverable_at: string | null
   deadlines: DeadlineRow[]
   editor_ids: string[]
+  /** The client has uploaded footage for this request. */
+  has_footage?: boolean
 }
 
 export interface CareFields {

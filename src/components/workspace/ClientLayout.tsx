@@ -13,6 +13,9 @@ import { cn } from '@/lib/utils'
 import type { Project } from '@/types'
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
+function IconHome() {
+  return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+}
 function IconVideo() {
   return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg>
 }
@@ -70,9 +73,10 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     exact ? pathname === to : pathname.startsWith(to)
 
   // Bottom nav items for mobile (most important 5)
+  // Home = dashboard; Videos = the project list (moved to /workspace/videos).
   const bottomNav = [
-    { to: '/workspace', label: 'Projects', icon: <IconVideo />, exact: true },
-    { to: '/workspace/gallery', label: 'Gallery', icon: <IconFolder /> },
+    { to: '/workspace', label: 'Home', icon: <IconHome />, exact: true },
+    { to: '/workspace/videos', label: 'Videos', icon: <IconVideo /> },
     { to: '/workspace/messages', label: 'Messages', icon: <IconChat /> },
     { to: '/workspace/calendar', label: 'Calendar', icon: <IconCalendar /> },
     { to: '/workspace/new', label: 'New', icon: <IconPlus /> },
@@ -97,20 +101,28 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
       {/* Projects nav */}
       <nav className="px-2 space-y-0.5">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-2">Projects</p>
         <Link
           to="/workspace"
           onClick={onClick}
-          className={cn('sidebar-item w-full', isActive('/workspace', true) && 'active')}
+          className={cn('sidebar-item w-full mt-2', isActive('/workspace', true) && 'active')}
+        >
+          <IconHome />
+          <span>Home</span>
+        </Link>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-2">Projects</p>
+        <Link
+          to="/workspace/videos"
+          onClick={onClick}
+          className={cn('sidebar-item w-full', pathname === '/workspace/videos' && new URLSearchParams(window.location.search).get('tab') !== 'completed' && 'active')}
         >
           <IconVideo />
           <span>Active</span>
           <span className="ml-auto text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-medium">{active.length}</span>
         </Link>
         <Link
-          to="/workspace?tab=completed"
+          to="/workspace/videos?tab=completed"
           onClick={onClick}
-          className={cn('sidebar-item w-full', pathname === '/workspace' && new URLSearchParams(window.location.search).get('tab') === 'completed' && 'active')}
+          className={cn('sidebar-item w-full', pathname === '/workspace/videos' && new URLSearchParams(window.location.search).get('tab') === 'completed' && 'active')}
         >
           <IconCheck />
           <span>Completed</span>
@@ -246,7 +258,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             </div>
             <div className="w-full h-px bg-border/60 mb-1" />
             {[
-              { to: '/workspace', icon: <IconVideo />, label: 'Active', exact: true },
+              { to: '/workspace', icon: <IconHome />, label: 'Home', exact: true },
+              { to: '/workspace/videos', icon: <IconVideo />, label: 'Videos' },
               { to: '/workspace/gallery', icon: <IconFolder />, label: 'Gallery' },
               { to: '/workspace/messages', icon: <IconChat />, label: 'Messages' },
               { to: '/workspace/calendar', icon: <IconCalendar />, label: 'Calendar' },

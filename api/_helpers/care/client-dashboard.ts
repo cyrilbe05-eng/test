@@ -1,0 +1,109 @@
+// Client dashboard (the client's own data only). Mounted under /api/client.
+//
+//   GET  /api/client/dashboard                 everything for the home page
+//   POST /api/client/plan-items/:id/done       { done?: boolean } — client steps only
+//
+// Built from the same loadClients() as Client Care and the copywriter page,
+// so plan auto ticks / overdue steps are identical everywhere.
+
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { requireAuth } from '../auth.js'
+import { dbQuery, dbExecute, nowIso } from '../db.js'
+import { sendError, processRevisionsSafely } from './access.js'
+import { loadClients } from './data.js'
+import { daysUntilDate, type ClientInput } from './compute.js'
+import { overdueClientSteps, planWithState } from './plans.js'
+import { loadClientRevisions } from './sop.js'
+
+const DAY = 86_400_000
+const toMs = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))
+
+export type NeedItem =
+  | { type: 'plan_step'; id: string; title: string; date: string; days_late: number }
+  | { type: 'review'; project_id: string; title: string }
+  | { type: 'footage'; project_id: string; title: string }
+
+/** Pure: the whole dashboard for one client (unit-tested). */
+export function buildDashboard(client: ClientInput, styleRules: { text: string; count: number }[], now: number) {
+  const k = client.contract ?? null
+  let contract = null
+  if (k) {
+    const total = Math.round((toMs(k.end_date) - toMs(k.start_date)) / DAY) + 1
+    const today = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), new Date(now).getUTCDate())
+    const day = Math.min(total, Math.max(1, Math.round((today - toMs(k.start_date)) / DAY) + 1))
+    contract = {
+      number: k.number,
+      package: k.package,
+      start_date: k.start_date,
+      end_date: k.end_date,
+      day,
+      total_days: total,
+      days_left: Math.max(0, daysUntilDate(k.end_date, now)),
+      progress: Math.round((day / total) * 100),
+    }
+  }
+
+  const plan = client.plan ?? []
+  const needs: NeedItem[] = [
+    ...overdueClientSteps(plan, now).map((s) => ({ type: 'plan_step' as const, id: s.id, title: s.title, date: s.date, days_late: s.days_late })),
+    ...client.projects.filter((p) => p.status === 'client_reviewing')
+      .map((p) => ({ type: 'review' as const, project_id: p.id, title: p.title })),
+    ...client.projects.filter((p) => (p.status === 'pending_assignment' || p.status === 'in_progress') && !p.has_footage)
+      .map((p) => ({ type: 'footage' as const, project_id: p.id, title: p.title })),
+  ]
+
+  return {
+    name: client.full_name,
+    contract,
+    needs,
+    plan: planWithState(plan, now).map((i) => ({
+      id: i.id, date: i.date, title: i.title, owner: i.owner, done: i.done, state: i.state,
+      can_tick: i.owner !== 'pingu',
+    })),
+    style: [...styleRules].sort((a, b) => b.count - a.count).map((r) => r.text),
+  }
+}
+
+async function requireClient(req: VercelRequest) {
+  const { profile } = await requireAuth(req)
+  if (profile.role !== 'client') throw Object.assign(new Error('Forbidden'), { status: 403 })
+  return profile
+}
+
+async function dashboardFor(clientId: string) {
+  await processRevisionsSafely(clientId)
+  const [client] = await loadClients(clientId)
+  if (!client) throw Object.assign(new Error('Not found'), { status: 404 })
+  const { sop_rules } = await loadClientRevisions(clientId).catch(() => ({ sop_rules: [] as { text: string; count: number }[] }))
+  return buildDashboard(client, sop_rules, Date.now())
+}
+
+/** Router entry. `rest` = path after /api/client. */
+export async function handleClientRoute(req: VercelRequest, res: VercelResponse, rest: string[]) {
+  try {
+    const profile = await requireClient(req)
+
+    if (rest.length === 1 && rest[0] === 'dashboard') {
+      if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
+      res.json(await dashboardFor(profile.id)); return
+    }
+
+    if (rest.length === 3 && rest[0] === 'plan-items' && rest[2] === 'done') {
+      if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
+      const [item] = await dbQuery<{ id: string; client_id: string; owner: string }>(
+        'SELECT id, client_id, owner FROM production_plan_items WHERE id = ?', [rest[1]])
+      // Their own plan only, and only steps that are theirs (client / both).
+      if (!item || item.client_id !== profile.id) { res.status(404).json({ error: 'Step not found' }); return }
+      if (item.owner === 'pingu') { res.status(403).json({ error: 'This step is ticked by Pingu' }); return }
+      const done = (req.body ?? {}).done ?? true
+      if (typeof done !== 'boolean') { res.status(400).json({ error: 'done must be true or false' }); return }
+      await dbExecute('UPDATE production_plan_items SET done = ?, done_at = ?, done_by = ? WHERE id = ?',
+        [done ? 1 : 0, done ? nowIso() : null, profile.id, item.id])
+      res.json(await dashboardFor(profile.id)); return
+    }
+
+    res.status(404).json({ error: 'Not found' })
+  } catch (e) {
+    sendError(res, e)
+  }
+}

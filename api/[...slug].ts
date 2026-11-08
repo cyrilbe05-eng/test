@@ -22,6 +22,7 @@ import { recordRevisionEntries } from './_helpers/care/sop.js'
 import { handleInstagramRoute } from './_helpers/care/instagram.js'
 import { handleEditorsRoute } from './_helpers/care/editors.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
+import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
 // Signed-URL lifetimes. Downloads get 5 h: on slow routes (e.g. the Mumbai
@@ -4529,6 +4530,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ── team (copywriters' production plans) — see care/plan-routes.ts ─────────
   if (slug[0] === 'team') {
     return handleTeamRoute(req, res, slug.slice(1))
+  }
+
+  // ── client (the client's own dashboard) — see care/client-dashboard.ts ─────
+  if (slug[0] === 'client') {
+    return handleClientRoute(req, res, slug.slice(1))
   }
 
   res.status(404).json({ error: 'Not found' })

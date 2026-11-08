@@ -193,8 +193,9 @@ function makeProject(clientId, createdMs, target, opts = {}) {
     for (const [s, ms] of events) { addHistory(id, prev, s, ms, s === 'in_progress' || s === 'in_review' ? editor : admin); prev = s }
   }
 
-  // Source video from the client, one deliverable per review round.
-  insert('project_files', { id: randomUUID(), project_id: id, uploader_id: clientId, file_type: 'source_video',
+  // Source video from the client (unless this request is still waiting for
+  // footage), one deliverable per review round.
+  if (!opts.noFootage) insert('project_files', { id: randomUUID(), project_id: id, uploader_id: clientId, file_type: 'source_video',
     storage_key: `projects/${id}/source_video/${createdMs}-raw.mp4`, file_name: 'raw-footage.mp4', file_size: 850_000_000,
     mime_type: 'video/mp4', approved: 0, created_at: iso(createdMs + 600_000) })
   let version = 0
@@ -242,7 +243,7 @@ for (const c of CLIENTS) {
   // Current work, shaped per scenario.
   switch (c.key) {
     case 'healthy':
-      makeProject(id, daysAgo(1), 'pending_assignment')
+      makeProject(id, daysAgo(1), 'pending_assignment', { noFootage: true })
       makeProject(id, daysAgo(4), 'client_reviewing', { favouriteCategory: fav })
       break
     case 'nocontact':
