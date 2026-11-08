@@ -86,6 +86,37 @@ export interface ClientCareDetail {
   last_contact_at: string | null
   contacts: { id: string; contacted_at: string; contacted_by: string | null; contacted_by_name: string | null }[]
   projects: ClientVideo[]
+  sop_rules: SopRule[]
+  revision_backlog: RevisionEntry[]
+  sop_engine: { engine: 'model' | 'words'; note: string | null }
+  revision_categories: { key: RevisionCategory; label: string }[]
+}
+
+export type RevisionCategory = 'pacing' | 'captions' | 'hook' | 'music' | 'colour' | 'b-roll' | 'branding' | 'other'
+
+export interface SopRule {
+  id: string
+  category: RevisionCategory
+  text: string
+  count: number
+  first_seen: string
+  last_seen: string
+}
+
+export interface RevisionEntry {
+  id: string
+  project_id: string
+  project_title: string
+  editor_id: string | null
+  editor_name: string | null
+  category: RevisionCategory
+  category_source: 'auto' | 'manual'
+  note: string
+  created_at: string
+  sop_rule_id: string | null
+  processed: boolean
+  /** The note's tick in the existing revision checklist (null = unknown). */
+  resolved: boolean | null
 }
 
 export type CarePatchBody = Partial<CareFields> & { onboarding?: Partial<Record<OnboardingStep, string | null>> }

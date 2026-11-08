@@ -6,12 +6,24 @@
 //   PATCH  /api/admin/care/clients/:id            contract, renewal, notes, Miro, onboarding
 //   POST   /api/admin/care/clients/:id/contacted  "Contacted" tick
 //   DELETE /api/admin/care/contacts/:contactId    undo a tick
+//   PATCH  /api/admin/care/revision-entries/:id   correct a note's category
+//   DELETE /api/admin/care/sop-rules/:id          archive an SOP rule
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAuth, requireRole } from '../auth.js'
 import { dbQuery, dbExecute, newId, nowIso } from '../db.js'
-import { CARE_CONFIG } from './config.js'
+import { CARE_CONFIG, REVISION_CATEGORIES, REVISION_CATEGORY_KEYS, type RevisionCategory } from './config.js'
 import { parseCarePatch, type CarePatch, type OnboardingStep } from './validate.js'
+import { processPendingRevisions, recategorizeEntry, archiveRule, loadClientRevisions } from './sop.js'
+import { getMatcher, lastModelError } from './similarity.js'
+
+/** Categorise/merge any new revision notes before showing data. Best-effort:
+ *  a failure here is logged and never stops the Client Care pages. */
+async function processRevisionsSafely(clientId?: string) {
+  try { await processPendingRevisions({ clientId }) } catch (e: any) {
+    console.warn('[care] revision processing skipped:', e?.message)
+  }
+}
 import { evaluateClient, computeOutputRate, urgencyCompare, type ClientCare } from './compute.js'
 import { loadClients, loadOnboarding, loadRecentContacts, loadEditorNames } from './data.js'
 
@@ -50,6 +62,7 @@ async function handleOverview(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     await requireCareAdmin(req)
+    await processRevisionsSafely()
     const now = Date.now()
     const clients = await loadClients()
     const evaluated = clients.map((c) => evaluateClient(c, now)).sort(urgencyCompare)
@@ -109,35 +122,42 @@ async function handleOverview(req: VercelRequest, res: VercelResponse) {
 /** Everything for one client — returned by GET and by every write, so the
  *  caller always gets the fresh state back in one round trip. */
 async function buildClientDetail(clientId: string) {
+  await processRevisionsSafely(clientId)
   const now = Date.now()
   const [client] = await loadClients(clientId)
   if (!client) return null
-  const [onboarding, contacts, editorNames] = await Promise.all([
+  const [onboarding, contacts, editorNames, revisions, matcher] = await Promise.all([
     loadOnboarding(clientId), loadRecentContacts(clientId), loadEditorNames(),
+    loadClientRevisions(clientId).catch(() => ({ sop_rules: [], revision_backlog: [] })),
+    getMatcher(),
   ])
   const ev = evaluateClient(client, now)
 
   return {
-      client: {
-        id: client.id, name: client.full_name, email: client.email, phone: client.phone,
-        client_id_label: client.client_id_label, plan_name: client.plan_name,
-      },
-      care: client.care ?? {
-        contract_start: null, contract_end: null, videos_included: null,
-        renewal_status: 'not_discussed', care_notes: null, miro_url: null,
-      },
-      onboarding: onboarding ?? { welcome_sent: null, call_done: null, brief_received: null, first_video_delivered: null },
-      health: ev.health,
-      reasons: ev.reasons,
-      alerts: ev.alerts,
-      stats: ev.stats,
-      output: ev.output,
-      last_contact_at: client.last_contact_at,
-      contacts,
-      projects: ev.facts
-        .slice()
-        .sort((a, b) => b.created_at.localeCompare(a.created_at))
-        .map((f) => ({ ...f, editors: f.editor_ids.map((id) => ({ id, name: editorNames.get(id) ?? 'Unknown editor' })) })),
+    client: {
+      id: client.id, name: client.full_name, email: client.email, phone: client.phone,
+      client_id_label: client.client_id_label, plan_name: client.plan_name,
+    },
+    care: client.care ?? {
+      contract_start: null, contract_end: null, videos_included: null,
+      renewal_status: 'not_discussed', care_notes: null, miro_url: null,
+    },
+    onboarding: onboarding ?? { welcome_sent: null, call_done: null, brief_received: null, first_video_delivered: null },
+    health: ev.health,
+    reasons: ev.reasons,
+    alerts: ev.alerts,
+    stats: ev.stats,
+    output: ev.output,
+    last_contact_at: client.last_contact_at,
+    contacts,
+    projects: ev.facts
+      .slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map((f) => ({ ...f, editors: f.editor_ids.map((id) => ({ id, name: editorNames.get(id) ?? 'Unknown editor' })) })),
+    // Part 3: SOP rules + revision backlog, and which matching engine ran.
+    ...revisions,
+    sop_engine: { engine: matcher.engine, note: matcher.engine === 'model' ? null : lastModelError() },
+    revision_categories: REVISION_CATEGORY_KEYS.map((k) => ({ key: k, label: REVISION_CATEGORIES[k].label })),
   }
 }
 
@@ -218,8 +238,37 @@ async function handleDeleteContact(req: VercelRequest, res: VercelResponse, cont
   }
 }
 
+/** PATCH — the admin corrects a note's category; it is re-merged at once. */
+async function handleRevisionEntry(req: VercelRequest, res: VercelResponse, entryId: string) {
+  if (req.method !== 'PATCH') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    await requireCareAdmin(req)
+    const category = (req.body ?? {}).category as RevisionCategory
+    const clientId = await recategorizeEntry(entryId, category)
+    if (!clientId) { res.status(404).json({ error: 'Revision entry not found' }); return }
+    res.json(await buildClientDetail(clientId))
+  } catch (e) {
+    sendError(res, e)
+  }
+}
+
+/** DELETE — archive an SOP rule (removed from the list; history kept). */
+async function handleSopRule(req: VercelRequest, res: VercelResponse, ruleId: string) {
+  if (req.method !== 'DELETE') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    await requireCareAdmin(req)
+    const clientId = await archiveRule(ruleId)
+    if (!clientId) { res.status(404).json({ error: 'SOP rule not found' }); return }
+    res.json(await buildClientDetail(clientId))
+  } catch (e) {
+    sendError(res, e)
+  }
+}
+
 /** Entry point from the main router. `rest` = path after /api/admin/care. */
 export async function handleCareRoute(req: VercelRequest, res: VercelResponse, rest: string[]) {
+  if (rest.length === 2 && rest[0] === 'revision-entries') return handleRevisionEntry(req, res, rest[1])
+  if (rest.length === 2 && rest[0] === 'sop-rules') return handleSopRule(req, res, rest[1])
   if (rest.length === 1 && rest[0] === 'overview') return handleOverview(req, res)
   if (rest.length === 2 && rest[0] === 'clients') return handleClient(req, res, rest[1])
   if (rest.length === 3 && rest[0] === 'clients' && rest[2] === 'contacted') return handleContacted(req, res, rest[1])

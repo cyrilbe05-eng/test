@@ -79,8 +79,29 @@ CREATE TABLE IF NOT EXISTS revision_entries (
   note             TEXT NOT NULL,
   comment_id       TEXT UNIQUE,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-  sop_rule_id      TEXT REFERENCES client_sop_rules(id) ON DELETE SET NULL
+  sop_rule_id      TEXT REFERENCES client_sop_rules(id) ON DELETE SET NULL,
+  -- NULL = not yet categorised / merged into SOP rules. Entries are created
+  -- instantly when a client requests a revision; the (model-based) processing
+  -- runs later, server-side, so the client's request is never slowed down.
+  processed_at     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_revision_entries_client  ON revision_entries(client_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_revision_entries_project ON revision_entries(project_id);
 CREATE INDEX IF NOT EXISTS idx_revision_entries_editor  ON revision_entries(editor_id);
+CREATE INDEX IF NOT EXISTS idx_revision_entries_pending ON revision_entries(processed_at);
+
+-- BACKFILL (one-time): turn every PAST client revision note into a revision
+-- entry, so SOP rules start from history instead of empty. A note counts when
+-- the client actually submitted that round (round <= the project's revision
+-- count). Editor = the editor assigned most recently. Safe to re-run
+-- (comment_id is UNIQUE → already-imported notes are skipped).
+INSERT OR IGNORE INTO revision_entries (id, project_id, client_id, editor_id, note, comment_id, created_at)
+SELECT lower(hex(randomblob(16))), tc.project_id, p.client_id,
+       (SELECT pa.team_member_id FROM project_assignments pa
+        WHERE pa.project_id = tc.project_id ORDER BY pa.assigned_at DESC LIMIT 1),
+       tc.comment_text, tc.id, tc.created_at
+FROM timeline_comments tc
+JOIN projects p ON p.id = tc.project_id
+WHERE tc.author_role = 'client'
+  AND tc.author_id = p.client_id
+  AND tc.revision_round <= p.client_revision_count;

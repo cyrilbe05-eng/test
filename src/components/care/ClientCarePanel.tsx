@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useCareClient, useMarkContacted, useUndoContact, useUpdateCare } from '@/hooks/useCare'
 import { HealthBadge } from '@/components/care/HealthBadge'
+import { Block } from '@/components/care/Block'
+import { SopRules, RevisionBacklog } from '@/components/care/RevisionSections'
 import type { CareFields, ClientCareDetail, OnboardingStep, RenewalStatus } from '@/types/care'
 
 // Client detail: side panel on desktop, full screen on phones. All numbers
@@ -37,18 +39,6 @@ const STATUS_LABELS: Record<string, string> = {
 const inputCls = 'w-full min-h-[44px] rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30'
 const fmtDate = (d: string | null) => (d ? format(new Date(d.length === 10 ? `${d}T12:00:00Z` : d), 'd MMM yyyy') : '—')
 const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
-
-function Block({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <section className="px-4 md:px-5 py-4 border-b border-border/60">
-      <div className="flex items-center justify-between gap-3 mb-2.5">
-        <h4 className="text-sm font-semibold">{title}</h4>
-        {action}
-      </div>
-      {children}
-    </section>
-  )
-}
 
 function SaveButton({ dirty, saving, onClick }: { dirty: boolean; saving: boolean; onClick: () => void }) {
   return (
@@ -242,10 +232,15 @@ function MiroForm({ detail }: { detail: ClientCareDetail }) {
   const dirty = url.trim() !== (detail.care.miro_url ?? '')
   const save = () => update.mutate({ clientId: detail.client.id, body: { miro_url: url } },
     { onSuccess: () => toast.success('Miro link saved'), onError: (e) => toast.error(errMsg(e)) })
+  // Shown inside the Client SOPs section (the board holds the client's SOPs).
   return (
-    <Block title="Miro board" action={<SaveButton dirty={dirty} saving={update.isPending} onClick={save} />}>
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-1.5">
+        <span className="text-sm font-medium">Miro board</span>
+        <SaveButton dirty={dirty} saving={update.isPending} onClick={save} />
+      </div>
       <div className="flex flex-col sm:flex-row gap-2">
-        <input type="url" inputMode="url" placeholder="https://miro.com/app/board/…" className={inputCls} value={url} onChange={(e) => setUrl(e.target.value)} />
+        <input type="url" inputMode="url" placeholder="https://miro.com/app/board/…" aria-label="Miro board link" className={inputCls} value={url} onChange={(e) => setUrl(e.target.value)} />
         {detail.care.miro_url && (
           <a href={detail.care.miro_url} target="_blank" rel="noopener noreferrer"
             className="min-h-[44px] inline-flex items-center justify-center px-4 rounded-xl border border-border text-sm font-medium hover:bg-muted whitespace-nowrap">
@@ -253,7 +248,7 @@ function MiroForm({ detail }: { detail: ClientCareDetail }) {
           </a>
         )}
       </div>
-    </Block>
+    </div>
   )
 }
 
@@ -384,9 +379,10 @@ export function ClientCarePanel({ clientId, onClose }: { clientId: string; onClo
                 </ul>
               </Block>
               <Stats detail={data} />
+              <SopRules detail={data} miro={<MiroForm detail={data} />} />
+              <RevisionBacklog detail={data} />
               <ContractForm detail={data} />
               <NotesForm detail={data} />
-              <MiroForm detail={data} />
               <Onboarding detail={data} />
               <Videos detail={data} />
             </>

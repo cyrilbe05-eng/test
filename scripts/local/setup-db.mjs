@@ -298,11 +298,16 @@ for (const c of CLIENTS) {
   }
 }
 
+// Migration 011's one-time backfill ran before any data existed; run it again
+// now so past revision notes become revision entries, as on a real database.
+const m011 = fs.readFileSync(path.join(ROOT, 'db/migrations/011_client_care.sql'), 'utf8')
+db.exec(m011.slice(m011.indexOf('-- BACKFILL')))
+
 // ── 5. Summary ──────────────────────────────────────────────────────────────
 
 const count = (t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n
 console.log(`Local database ready: ${path.relative(ROOT, DB_FILE)}`)
-for (const t of ['profiles', 'projects', 'project_assignments', 'deadlines', 'project_files', 'status_history', 'timeline_comments', 'client_care', 'client_contacts', 'client_onboarding']) {
+for (const t of ['profiles', 'projects', 'project_assignments', 'deadlines', 'project_files', 'status_history', 'timeline_comments', 'client_care', 'client_contacts', 'client_onboarding', 'revision_entries']) {
   console.log(`  ${t.padEnd(20)} ${count(t)}`)
 }
 console.log(`\nLog in at http://localhost:5173 with admin@pingu.local / ${LOCAL_PASSWORD}`)

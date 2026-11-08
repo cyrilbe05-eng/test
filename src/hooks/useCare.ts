@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
-import type { CareOverview, CarePatchBody, ClientCareDetail } from '@/types/care'
+import type { CareOverview, CarePatchBody, ClientCareDetail, RevisionCategory } from '@/types/care'
 
 export function useCareOverview() {
   const apiFetch = useApiFetch()
@@ -45,6 +45,18 @@ export function useUndoContact() {
   const apiFetch = useApiFetch()
   return useCareWrite((contactId: string) =>
     apiFetch<ClientCareDetail>(`/api/admin/care/contacts/${contactId}`, { method: 'DELETE' }))
+}
+
+export function useRecategorize() {
+  const apiFetch = useApiFetch()
+  return useCareWrite(({ entryId, category }: { entryId: string; category: RevisionCategory }) =>
+    apiFetch<ClientCareDetail>(`/api/admin/care/revision-entries/${entryId}`, { method: 'PATCH', body: JSON.stringify({ category }) }))
+}
+
+export function useArchiveRule() {
+  const apiFetch = useApiFetch()
+  return useCareWrite((ruleId: string) =>
+    apiFetch<ClientCareDetail>(`/api/admin/care/sop-rules/${ruleId}`, { method: 'DELETE' }))
 }
 
 export function useUpdateCare() {

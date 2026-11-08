@@ -18,6 +18,7 @@ import { inferMimeType, inferPlaybackMimeType } from './_helpers/mime.js'
 import { sanitizeFileName } from '../src/lib/utils.js'
 import { sendEmailNotifications, sendEmailNotification, projectUrl } from './_helpers/email.js'
 import { handleCareRoute } from './_helpers/care/routes.js'
+import { recordRevisionEntries } from './_helpers/care/sop.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
 // Signed-URL lifetimes. Downloads get 5 h: on slow routes (e.g. the Mumbai
@@ -3868,6 +3869,9 @@ async function handleSubmitRevision(req: VercelRequest, res: VercelResponse) {
       ['revision_requested', project.client_revision_count + 1, now, project_id]
     )
     await recordStatusChange(project_id, project.status, 'revision_requested', clerkUserId)
+    // Client Care (admin-only): copy this round's notes into revision entries.
+    // Never throws — the revision above has already succeeded.
+    await recordRevisionEntries(project_id, clerkUserId, project.client_revision_count + 1)
 
     const admins = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
     const assignments = await dbQuery<{ team_member_id: string }>(
