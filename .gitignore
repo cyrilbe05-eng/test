@@ -13,6 +13,9 @@ api/\[...slug\].mjs
 dist-ssr/
 *.local
 
+# Local test database + any production copy — may contain personal data
+.local-data/
+
 # Environment variables — never commit secrets
 .env
 .env.server

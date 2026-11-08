@@ -41,6 +41,12 @@ const NAV_LINKS = [
 // Bottom nav shows the 5 most important links for admin mobile
 const BOTTOM_NAV = NAV_LINKS.slice(0, 5)
 
+// Full-admin-only pages (hidden from managers). Kept separate and appended
+// after NAV_LINKS so the existing menu and mobile bottom nav are unchanged.
+const FULL_ADMIN_LINKS = [
+  { to: '/admin/care', label: 'Client Care', exact: false, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg> },
+]
+
 interface AdminLayoutProps {
   children: React.ReactNode
 }
@@ -81,7 +87,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-1 whitespace-nowrap">
           Admin
         </p>
-        {NAV_LINKS.map(({ to, label, icon, exact }) => (
+        {[...NAV_LINKS, ...(profile?.admin_role === 'manager' ? [] : FULL_ADMIN_LINKS)].map(({ to, label, icon, exact }) => (
           <Link
             key={to}
             to={to}

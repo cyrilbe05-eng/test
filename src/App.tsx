@@ -47,6 +47,7 @@ import TeamProjectDetail from '@/pages/team/TeamProjectDetail'
 import AdminGallery from '@/pages/admin/AdminGallery'
 import AdminMessages from '@/pages/admin/AdminMessages'
 import AdminCalendar from '@/pages/admin/AdminCalendar'
+import AdminClientCare from '@/pages/admin/AdminClientCare'
 import TeamGallery from '@/pages/team/TeamGallery'
 import TeamMessages from '@/pages/team/TeamMessages'
 import TeamCalendar from '@/pages/team/TeamCalendar'
@@ -144,6 +145,7 @@ function ProductionApp() {
           <Route path="/admin/gallery" element={<ProtectedRoute allowedRoles={['admin']}><AdminGallery /></ProtectedRoute>} />
           <Route path="/admin/messages" element={<ProtectedRoute allowedRoles={['admin']}><AdminMessages /></ProtectedRoute>} />
           <Route path="/admin/calendar" element={<ProtectedRoute allowedRoles={['admin']}><AdminCalendar /></ProtectedRoute>} />
+          <Route path="/admin/care" element={<ProtectedRoute allowedRoles={['admin']}><AdminClientCare /></ProtectedRoute>} />
 
           <Route path="/workspace" element={<ProtectedRoute allowedRoles={['client']}><ClientWorkspace /></ProtectedRoute>} />
           <Route path="/workspace/new" element={<ProtectedRoute allowedRoles={['client']}><ClientNewProject /></ProtectedRoute>} />

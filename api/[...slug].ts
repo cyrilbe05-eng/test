@@ -17,6 +17,7 @@ import { ok, err, handleError } from './_helpers/respond.js'
 import { inferMimeType, inferPlaybackMimeType } from './_helpers/mime.js'
 import { sanitizeFileName } from '../src/lib/utils.js'
 import { sendEmailNotifications, sendEmailNotification, projectUrl } from './_helpers/email.js'
+import { handleCareRoute } from './_helpers/care/routes.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
 // Signed-URL lifetimes. Downloads get 5 h: on slow routes (e.g. the Mumbai
@@ -4501,6 +4502,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (slug[0] === 'admin') {
     if (slug[1] === 'library' && slug.length === 2) {
       return handleAdminLibrary(req, res)
+    }
+    // Client Care (admin-only) — see api/_helpers/care/routes.ts
+    if (slug[1] === 'care') {
+      return handleCareRoute(req, res, slug.slice(2))
     }
     res.status(404).json({ error: 'Not found' }); return
   }

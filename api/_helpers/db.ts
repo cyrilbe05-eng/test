@@ -19,6 +19,13 @@ interface D1Response<T> {
 }
 
 export async function dbQuery<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+  // Local development only: when LOCAL_DB_FILE is set (never on Vercel), run
+  // against a local SQLite copy instead of Cloudflare. See scripts/local/.
+  if (process.env.LOCAL_DB_FILE) {
+    const { localQuery } = await import('./local-db.js')
+    return localQuery<T>(process.env.LOCAL_DB_FILE, sql, params)
+  }
+
   const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/d1/database/${CF_D1_DATABASE_ID}/query`
 
   const res = await fetch(url, {
