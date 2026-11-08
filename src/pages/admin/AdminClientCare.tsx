@@ -108,6 +108,11 @@ function ClientCard({ c, onOpen }: { c: HealthCard; onOpen: (id: string) => void
           </span>
         )}
       </span>
+      {c.instagram.length > 0 && (
+        <span className="block mt-0.5 text-xs font-medium text-pink-700 dark:text-pink-300 break-words">
+          {c.instagram.map((h) => `@${h}`).join(' · ')}
+        </span>
+      )}
       <span className="block mt-1.5 space-y-0.5 text-sm text-muted-foreground">
         {shown.map((r) => <span key={r} className="block break-words">{r}</span>)}
         {c.reasons.length > shown.length && <span className="block text-xs">+{c.reasons.length - shown.length} more</span>}

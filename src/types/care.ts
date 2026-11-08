@@ -7,6 +7,7 @@ export type RenewalStatus = 'not_discussed' | 'discussed' | 'renewed' | 'decline
 export interface HealthCard {
   client_id: string
   name: string
+  instagram: string[]
   health: Health
   reasons: string[]
   alerts_count: number
@@ -76,6 +77,7 @@ export interface ClientVideo {
 
 export interface ClientCareDetail {
   client: { id: string; name: string; email: string; phone: string | null; client_id_label: string | null; plan_name: string | null }
+  instagram: string[]
   care: CareFields
   onboarding: Record<OnboardingStep, string | null>
   health: Health

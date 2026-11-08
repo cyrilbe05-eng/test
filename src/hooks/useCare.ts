@@ -59,6 +59,12 @@ export function useArchiveRule() {
     apiFetch<ClientCareDetail>(`/api/admin/care/sop-rules/${ruleId}`, { method: 'DELETE' }))
 }
 
+export function useSaveInstagram() {
+  const apiFetch = useApiFetch()
+  return useCareWrite(({ clientId, handles }: { clientId: string; handles: string[] }) =>
+    apiFetch<ClientCareDetail>(`/api/admin/care/clients/${clientId}/instagram`, { method: 'PUT', body: JSON.stringify({ handles }) }))
+}
+
 export function useUpdateCare() {
   const apiFetch = useApiFetch()
   return useCareWrite(({ clientId, body }: { clientId: string; body: CarePatchBody }) =>

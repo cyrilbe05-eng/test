@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import { format, formatDistanceToNow, isToday } from 'date-fns'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { useCareClient, useMarkContacted, useUndoContact, useUpdateCare } from '@/hooks/useCare'
+import { useCareClient, useMarkContacted, useUndoContact, useUpdateCare, useSaveInstagram } from '@/hooks/useCare'
+import { InstagramInput, InstagramLinks } from '@/components/care/Instagram'
+import { parseInstagramList } from '@/lib/instagram'
 import { HealthBadge } from '@/components/care/HealthBadge'
 import { Block } from '@/components/care/Block'
 import { SopRules, RevisionBacklog } from '@/components/care/RevisionSections'
@@ -114,6 +116,44 @@ function ContactedTick({ detail }: { detail: ClientCareDetail }) {
         <a href={`mailto:${detail.client.email}`} className="min-h-[44px] inline-flex items-center px-3 rounded-xl border border-border text-sm hover:bg-muted break-all">{detail.client.email}</a>
       </div>
     </div>
+  )
+}
+
+// ── Instagram ───────────────────────────────────────────────────────────────
+
+function InstagramSection({ detail }: { detail: ClientCareDetail }) {
+  const save = useSaveInstagram()
+  const [editing, setEditing] = useState(false)
+  const [rows, setRows] = useState<string[]>(detail.instagram)
+  const start = () => { setRows(detail.instagram.length ? detail.instagram : ['']); setEditing(true) }
+  const submit = () => {
+    const { handles, invalid } = parseInstagramList(rows)
+    if (invalid.length) { toast.error(`Not a valid Instagram username: ${invalid.join(', ')}`); return }
+    save.mutate({ clientId: detail.client.id, handles }, {
+      onSuccess: () => { toast.success('Instagram accounts saved'); setEditing(false) },
+      onError: (e) => toast.error(errMsg(e)),
+    })
+  }
+  return (
+    <Block
+      title="Instagram"
+      action={editing ? (
+        <span className="flex gap-2">
+          <button onClick={() => setEditing(false)} className="min-h-[44px] px-3 rounded-xl border border-border text-sm hover:bg-muted">Cancel</button>
+          <SaveButton dirty saving={save.isPending} onClick={submit} />
+        </span>
+      ) : (
+        <button onClick={start} className="min-h-[44px] px-3 rounded-xl border border-border text-sm hover:bg-muted">
+          {detail.instagram.length ? 'Edit' : '+ Add'}
+        </button>
+      )}
+    >
+      {editing
+        ? <InstagramInput value={rows} onChange={setRows} inputClassName={inputCls} />
+        : detail.instagram.length
+          ? <InstagramLinks handles={detail.instagram} />
+          : <p className="text-sm text-muted-foreground">No Instagram account linked yet.</p>}
+    </Block>
   )
 }
 
@@ -373,6 +413,7 @@ export function ClientCarePanel({ clientId, onClose }: { clientId: string; onClo
           ) : data ? (
             <>
               <ContactedTick detail={data} />
+              <InstagramSection detail={data} />
               <Block title="Why">
                 <ul className="space-y-1 text-sm">
                   {data.reasons.map((r) => <li key={r} className="flex gap-2"><span aria-hidden className="text-muted-foreground">–</span><span className="break-words">{r}</span></li>)}

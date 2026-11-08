@@ -19,6 +19,7 @@ import { sanitizeFileName } from '../src/lib/utils.js'
 import { sendEmailNotifications, sendEmailNotification, projectUrl } from './_helpers/email.js'
 import { handleCareRoute } from './_helpers/care/routes.js'
 import { recordRevisionEntries } from './_helpers/care/sop.js'
+import { handleInstagramRoute } from './_helpers/care/instagram.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
 // Signed-URL lifetimes. Downloads get 5 h: on slow routes (e.g. the Mumbai
@@ -4512,6 +4513,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return handleCareRoute(req, res, slug.slice(2))
     }
     res.status(404).json({ error: 'Not found' }); return
+  }
+
+  // ── instagram (read-only: admins + editors) ────────────────────────────────
+  if (slug[0] === 'instagram') {
+    return handleInstagramRoute(req, res, slug.slice(1))
   }
 
   res.status(404).json({ error: 'Not found' })

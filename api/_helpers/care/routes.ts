@@ -8,6 +8,7 @@
 //   DELETE /api/admin/care/contacts/:contactId    undo a tick
 //   PATCH  /api/admin/care/revision-entries/:id   correct a note's category
 //   DELETE /api/admin/care/sop-rules/:id          archive an SOP rule
+//   PUT    /api/admin/care/clients/:id/instagram  replace Instagram accounts
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAuth, requireRole } from '../auth.js'
@@ -16,6 +17,7 @@ import { CARE_CONFIG, REVISION_CATEGORIES, REVISION_CATEGORY_KEYS, type Revision
 import { parseCarePatch, type CarePatch, type OnboardingStep } from './validate.js'
 import { processPendingRevisions, recategorizeEntry, archiveRule, loadClientRevisions } from './sop.js'
 import { getMatcher, lastModelError } from './similarity.js'
+import { loadInstagramHandles, replaceInstagramHandles } from './instagram.js'
 
 /** Categorise/merge any new revision notes before showing data. Best-effort:
  *  a failure here is logged and never stops the Client Care pages. */
@@ -46,10 +48,11 @@ function sendError(res: VercelResponse, e: any) {
   res.status(e?.status ?? 500).json({ error: msg })
 }
 
-function card(c: ClientCare) {
+function card(c: ClientCare, instagram: Map<string, string[]>) {
   return {
     client_id: c.client_id,
     name: c.name,
+    instagram: instagram.get(c.client_id) ?? [],
     health: c.health,
     reasons: c.reasons,
     alerts_count: c.alerts.length,
@@ -64,8 +67,9 @@ async function handleOverview(req: VercelRequest, res: VercelResponse) {
     await requireCareAdmin(req)
     await processRevisionsSafely()
     const now = Date.now()
-    const clients = await loadClients()
+    const [clients, instagram] = await Promise.all([loadClients(), loadInstagramHandles()])
     const evaluated = clients.map((c) => evaluateClient(c, now)).sort(urgencyCompare)
+    const toCard = (c: ClientCare) => card(c, instagram)
 
     const textToday = evaluated
       .filter((c) => c.health === 'at_risk' || c.alerts.length > 0)
@@ -102,9 +106,9 @@ async function handleOverview(req: VercelRequest, res: VercelResponse) {
       thresholds: CARE_CONFIG,
       text_today: textToday,
       health_board: {
-        at_risk: evaluated.filter((c) => c.health === 'at_risk').map(card),
-        needs_attention: evaluated.filter((c) => c.health === 'needs_attention').map(card),
-        healthy: evaluated.filter((c) => c.health === 'healthy').map(card),
+        at_risk: evaluated.filter((c) => c.health === 'at_risk').map(toCard),
+        needs_attention: evaluated.filter((c) => c.health === 'needs_attention').map(toCard),
+        healthy: evaluated.filter((c) => c.health === 'healthy').map(toCard),
       },
       output_rate: {
         agency: computeOutputRate(allFacts, allDeadlines, now),
@@ -126,10 +130,11 @@ async function buildClientDetail(clientId: string) {
   const now = Date.now()
   const [client] = await loadClients(clientId)
   if (!client) return null
-  const [onboarding, contacts, editorNames, revisions, matcher] = await Promise.all([
+  const [onboarding, contacts, editorNames, revisions, matcher, instagram] = await Promise.all([
     loadOnboarding(clientId), loadRecentContacts(clientId), loadEditorNames(),
     loadClientRevisions(clientId).catch(() => ({ sop_rules: [], revision_backlog: [] })),
     getMatcher(),
+    loadInstagramHandles(clientId),
   ])
   const ev = evaluateClient(client, now)
 
@@ -138,6 +143,7 @@ async function buildClientDetail(clientId: string) {
       id: client.id, name: client.full_name, email: client.email, phone: client.phone,
       client_id_label: client.client_id_label, plan_name: client.plan_name,
     },
+    instagram: instagram.get(clientId) ?? [],
     care: client.care ?? {
       contract_start: null, contract_end: null, videos_included: null,
       renewal_status: 'not_discussed', care_notes: null, miro_url: null,
@@ -238,6 +244,22 @@ async function handleDeleteContact(req: VercelRequest, res: VercelResponse, cont
   }
 }
 
+/** PUT — replace a client's Instagram accounts (Create user form + panel). */
+async function handleClientInstagram(req: VercelRequest, res: VercelResponse, clientId: string) {
+  if (req.method !== 'PUT') { res.status(405).json({ error: 'Method not allowed' }); return }
+  try {
+    await requireCareAdmin(req)
+    await requireActiveClient(clientId)
+    await replaceInstagramHandles(clientId, req.body)
+    res.json(await buildClientDetail(clientId))
+  } catch (e: any) {
+    if (/no such table/i.test(String(e?.message))) {
+      res.status(500).json({ error: 'Instagram accounts need database migration 012 — run db/migrations/012_client_instagram.sql' }); return
+    }
+    sendError(res, e)
+  }
+}
+
 /** PATCH — the admin corrects a note's category; it is re-merged at once. */
 async function handleRevisionEntry(req: VercelRequest, res: VercelResponse, entryId: string) {
   if (req.method !== 'PATCH') { res.status(405).json({ error: 'Method not allowed' }); return }
@@ -272,6 +294,7 @@ export async function handleCareRoute(req: VercelRequest, res: VercelResponse, r
   if (rest.length === 1 && rest[0] === 'overview') return handleOverview(req, res)
   if (rest.length === 2 && rest[0] === 'clients') return handleClient(req, res, rest[1])
   if (rest.length === 3 && rest[0] === 'clients' && rest[2] === 'contacted') return handleContacted(req, res, rest[1])
+  if (rest.length === 3 && rest[0] === 'clients' && rest[2] === 'instagram') return handleClientInstagram(req, res, rest[1])
   if (rest.length === 2 && rest[0] === 'contacts') return handleDeleteContact(req, res, rest[1])
   res.status(404).json({ error: 'Not found' })
 }

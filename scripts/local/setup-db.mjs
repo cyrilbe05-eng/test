@@ -290,6 +290,11 @@ for (const c of CLIENTS) {
     brief_received: c.isNew ? null : iso(createdMs + 3 * DAY),
     first_video_delivered: c.isNew ? null : iso(createdMs + 8 * DAY),
   })
+  // Instagram accounts (migration 012): most clients one, Bloom two, the
+  // brand-new client none (to show the empty state).
+  const igHandles = c.key === 'new' ? [] : c.key === 'healthy' ? ['bloom.bakery', 'bloom.cafe.paris'] : [c.email.split('@')[0] + '.official']
+  igHandles.forEach((h, i) => insert('client_instagram_accounts', { id: randomUUID(), client_id: id, handle: h, position: i, created_at: iso(createdMs) }))
+
   // Contacts log: a few older ticks, the latest one sets "days since contact".
   if (c.contactDays != null) {
     for (const d of [c.contactDays + 9, c.contactDays + 4, c.contactDays]) {

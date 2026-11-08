@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
+import { parseInstagramList } from '@/lib/instagram'
+import { InstagramInput } from '@/components/care/Instagram'
 import type { Plan } from '@/types'
 
 const schema = z.object({
@@ -34,6 +36,8 @@ interface Props {
 export function CreateUserModal({ onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false)
   const [credentials, setCredentials] = useState<CreatedCredentials | null>(null)
+  // Client Instagram accounts (migration 012) — saved right after creation.
+  const [instagram, setInstagram] = useState<string[]>([''])
   const apiFetch = useApiFetch()
   const { data: plans } = useQuery({
     queryKey: ['plans'],
@@ -47,6 +51,13 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
   const role = watch('role')
 
   const onSubmit = async (data: FormData) => {
+    // Check Instagram handles BEFORE creating, so a typo never leaves a
+    // half-finished account behind.
+    const ig = data.role === 'client' ? parseInstagramList(instagram) : { handles: [], invalid: [] }
+    if (ig.invalid.length) {
+      toast.error(`Not a valid Instagram username: ${ig.invalid.join(', ')}`)
+      return
+    }
     setLoading(true)
     try {
       const payload = { ...data }
@@ -56,6 +67,17 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
         method: 'POST',
         body: JSON.stringify(payload),
       })
+      if (ig.handles.length) {
+        try {
+          await apiFetch(`/api/admin/care/clients/${result.id}/instagram`, {
+            method: 'PUT',
+            body: JSON.stringify({ handles: ig.handles }),
+          })
+        } catch (e) {
+          // The account exists either way; the handles can be added later.
+          toast.warning(`Account created, but the Instagram accounts weren't saved (${(e as Error).message}). Add them in Client Care.`)
+        }
+      }
       onCreated()
       setCredentials({
         name: data.full_name,
@@ -82,7 +104,7 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative clay-card w-full max-w-md shadow-xl animate-scale-in">
+      <div className="relative clay-card w-full max-w-md shadow-xl animate-scale-in max-h-[calc(100dvh-2rem)] overflow-y-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -188,6 +210,12 @@ export function CreateUserModal({ onClose, onCreated }: Props) {
                     )
                   })}
                 </select>
+              </Field>
+            )}
+
+            {role === 'client' && (
+              <Field label="Instagram accounts (optional)">
+                <InstagramInput value={instagram} onChange={setInstagram} inputClassName={inputCls} />
               </Field>
             )}
 

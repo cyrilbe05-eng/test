@@ -11,6 +11,7 @@ import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
 import { FileUploader } from '@/components/project/FileUploader'
 import { ReviewCopyControl } from '@/components/project/ReviewCopyControl'
+import { ProjectInstagram } from '@/components/care/ProjectInstagram'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn, projectTimeLabel } from '@/lib/utils'
 
@@ -256,6 +257,7 @@ export default function TeamProjectDetail() {
                     {clientName}
                   </span>
                 )}
+                <ProjectInstagram projectId={project.id} />
                 {project.inspiration_url && (
                   <a
                     href={project.inspiration_url}
