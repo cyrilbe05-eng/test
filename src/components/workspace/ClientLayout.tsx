@@ -43,9 +43,6 @@ function IconPlus() {
 function IconLogout() {
   return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
 }
-function IconChevronRight() {
-  return <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-}
 function IconMenu() {
   return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
 }
@@ -153,33 +150,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         </Link>
       </nav>
 
-      <div className="px-3 py-3"><div className="h-px bg-border/60" /></div>
-
-      {/* Project list */}
-      <div className="px-2 flex-1 overflow-y-auto">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">My Projects</p>
-        {(projects as Project[]).length === 0 ? (
-          <p className="text-xs text-muted-foreground px-2 py-2">None yet</p>
-        ) : (
-          <div className="space-y-0.5">
-            {(projects as Project[]).map((p, i) => (
-              <Link
-                key={p.id}
-                to={`/workspace/projects/${p.id}`}
-                onClick={onClick}
-                className={cn(
-                  'sidebar-item w-full text-left animate-slide-up',
-                  isActive(`/workspace/projects/${p.id}`) && 'active',
-                  `stagger-${Math.min(i + 1, 7)}`,
-                )}
-              >
-                <span className="truncate flex-1 text-xs">{p.title}</span>
-                <IconChevronRight />
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Videos live on Home (active) and Completed — no list here. */}
+      <div className="flex-1" />
 
       <div className="p-3 border-t border-border/60">
         <Link
