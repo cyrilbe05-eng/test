@@ -40,7 +40,7 @@ import AdminAnalytics from '@/pages/admin/AdminAnalytics'
 import AdminLibrary from '@/pages/admin/AdminLibrary'
 import AdminPlans from '@/pages/admin/AdminPlans'
 import ClientWorkspace from '@/pages/workspace/ClientWorkspace'
-import ClientNewProject from '@/pages/workspace/ClientNewProject'
+import ClientUpload from '@/pages/workspace/ClientUpload'
 import ClientProjectDetail from '@/pages/workspace/ClientProjectDetail'
 import TeamDashboard from '@/pages/team/TeamDashboard'
 import TeamProjectDetail from '@/pages/team/TeamProjectDetail'
@@ -160,7 +160,8 @@ function ProductionApp() {
           <Route path="/workspace" element={<ProtectedRoute allowedRoles={['client']}><ClientDashboard /></ProtectedRoute>} />
           <Route path="/workspace/videos" element={<ProtectedRoute allowedRoles={['client']}><ClientWorkspace /></ProtectedRoute>} />
           <Route path="/workspace/onboarding" element={<ProtectedRoute allowedRoles={['client']}><ClientOnboarding /></ProtectedRoute>} />
-          <Route path="/workspace/new" element={<ProtectedRoute allowedRoles={['client']}><ClientNewProject /></ProtectedRoute>} />
+          {/* One-step upload (Part 4). The old form, ClientNewProject, stays in the code unused. */}
+          <Route path="/workspace/new" element={<ProtectedRoute allowedRoles={['client']}><ClientUpload /></ProtectedRoute>} />
           <Route path="/workspace/projects/:id" element={<ProtectedRoute allowedRoles={['client']}><ClientProjectDetail /></ProtectedRoute>} />
           <Route path="/workspace/gallery" element={<ProtectedRoute allowedRoles={['client']}><ClientGallery /></ProtectedRoute>} />
           <Route path="/workspace/messages" element={<ProtectedRoute allowedRoles={['client']}><ClientMessages /></ProtectedRoute>} />

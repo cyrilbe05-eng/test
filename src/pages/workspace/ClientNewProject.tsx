@@ -142,7 +142,7 @@ function GalleryFileRow({
 }
 
 // ── Gallery picker modal ───────────────────────────────────────────────────────
-function GalleryPickerModal({
+export function GalleryPickerModal({
   ownerId,
   alreadySelected,
   onSelect,
