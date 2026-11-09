@@ -21,6 +21,7 @@ import { handleCareRoute } from './_helpers/care/routes.js'
 import { recordRevisionEntries } from './_helpers/care/sop.js'
 import { handleInstagramRoute } from './_helpers/care/instagram.js'
 import { handleEditorsRoute } from './_helpers/care/editors.js'
+import { mayTake, markUsed, handleRequestUrgent, handleEditorLimit, handleUrgentAdmin } from './_helpers/care/urgent.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
@@ -804,7 +805,13 @@ async function handleClaimProject(req: VercelRequest, res: VercelResponse) {
     const [project] = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [projectId])
     if (!project) { res.status(404).json({ error: 'Project not found' }); return }
 
+    // Editors at their active-project limit need an approved urgent request.
+    const mine = await dbQuery<{ id: string }>('SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?', [projectId, clerkUserId])
+    const may = mine.length ? { ok: true } as { ok: boolean; requestId?: string } : await mayTake(profile, clerkUserId, projectId)
+    if (!may.ok) { res.status(403).json({ error: 'editor_limit_reached' }); return }
+
     const assigned = await selfAssign(project, clerkUserId, profile)
+    if (assigned) await markUsed(may.requestId)
 
     res.json({ ok: true, alreadyAssigned: !assigned })
   } catch (e: any) {
@@ -1795,8 +1802,11 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
           'SELECT COUNT(*) AS n FROM project_assignments WHERE project_id = ? AND team_member_id != ?',
           [file.project_id, clerkUserId]
         )
-        if (!(others[0]?.n > 0)) {
-          await selfAssign(project, clerkUserId, profile)
+        // At their active-project limit the download still works, it just
+        // doesn't assign them (they claim or request urgent instead).
+        const may = others[0]?.n > 0 ? { ok: false } as { ok: boolean; requestId?: string } : await mayTake(profile, clerkUserId, file.project_id)
+        if (may.ok) {
+          if (await selfAssign(project, clerkUserId, profile)) await markUsed(may.requestId)
           await dbExecute(
             'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',
             ['in_progress', nowIso(), file.project_id]
@@ -4262,6 +4272,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleProjectPosted(req, res)
     }
+    if (slug.length === 3 && slug[2] === 'urgent') {
+      return handleRequestUrgent(req, res, slug[1])
+    }
     if (slug.length === 3 && slug[2] === 'claim') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
       return handleClaimProject(req, res)
@@ -4548,6 +4561,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug[1] === 'editors') {
       return handleEditorsRoute(req, res, slug.slice(2))
     }
+    // Editor "Request urgent" decisions — see api/_helpers/care/urgent.ts
+    if (slug[1] === 'urgent-requests') {
+      return handleUrgentAdmin(req, res, slug.slice(2))
+    }
     // Onboarding questions (full admins) — see api/_helpers/care/onboarding.ts
     if (slug[1] === 'onboarding-questions') {
       return handleQuestionsRoute(req, res, slug.slice(2))
@@ -4561,6 +4578,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // ── team (copywriters' production plans) — see care/plan-routes.ts ─────────
+  // Editor active-project limit — see api/_helpers/care/urgent.ts
+  if (slug[0] === 'editor-limit' && slug.length === 1) {
+    return handleEditorLimit(req, res)
+  }
+
   if (slug[0] === 'team') {
     return handleTeamRoute(req, res, slug.slice(1))
   }

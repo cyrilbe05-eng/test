@@ -12,7 +12,8 @@ import { DeliverableCounter } from '@/components/project/DeliverableCounter'
 import { FileUploader } from '@/components/project/FileUploader'
 import { ReviewCopyControl } from '@/components/project/ReviewCopyControl'
 import { ProjectInstagram } from '@/components/care/ProjectInstagram'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { TimelineCommentor } from '@/components/project/TimelineCommentor'
 import { cn, projectTimeLabel } from '@/lib/utils'
 
 function formatBytes(bytes: number | null): string {
@@ -166,6 +167,26 @@ export default function TeamProjectDetail() {
   const updateStatus = useUpdateProjectStatus()
   const [claiming, setClaiming] = useState(false)
   const isAssignedToMe = (assignments ?? []).some((a: any) => a.team_member_id === profile?.id)
+  // Editor limit: at the max, "Assign myself" becomes "Request urgent".
+  const { data: limit, refetch: refetchLimit } = useQuery({
+    queryKey: ['editor-limit', id],
+    enabled: !!id && !isAssignedToMe,
+    queryFn: () => apiFetch<{ editor: boolean; active: number; max: number; limited: boolean; request: 'pending' | 'approved' | 'declined' | 'used' | null }>(`/api/editor-limit?project=${id}`),
+  })
+  const [requesting, setRequesting] = useState(false)
+  const handleRequestUrgent = async () => {
+    if (!id) return
+    setRequesting(true)
+    try {
+      await apiFetch(`/api/projects/${id}/urgent`, { method: 'POST' })
+      toast.success('Requested')
+      refetchLimit()
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed')
+    } finally {
+      setRequesting(false)
+    }
+  }
 
   const handleClaim = async () => {
     if (!id) return
@@ -176,6 +197,7 @@ export default function TeamProjectDetail() {
       refetchAssignments()
       qc.invalidateQueries({ queryKey: ['projects'] })
     } catch (e: any) {
+      if (e?.message === 'editor_limit_reached') { toast.error('Limit reached'); refetchLimit(); return }
       toast.error(e?.message ?? 'Failed to assign yourself')
     } finally {
       setClaiming(false)
@@ -195,6 +217,7 @@ export default function TeamProjectDetail() {
   }
 
   const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable')
+  const latestDeliverable = deliverables[0]
   const sourceFiles = (files ?? []).filter((f) => f.file_type !== 'deliverable')
 
   const canUpload = project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment'
@@ -276,6 +299,21 @@ export default function TeamProjectDetail() {
               </div>
             </div>
 
+            {/* Same player as the review screen: timeline + comment markers */}
+            {latestDeliverable && profile && (
+              <TimelineCommentor
+                storageKey={latestDeliverable.storage_key}
+                fileId={latestDeliverable.id}
+                projectId={project.id}
+                comments={comments ?? []}
+                currentUserId={profile.id}
+                currentUserRole="team"
+                canComment={false}
+                revisionRound={project.client_revision_count + 1}
+                onCommentAdded={() => refetchComments()}
+              />
+            )}
+
             {/* Source files */}
             <div className="clay-card overflow-hidden">
               <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
@@ -310,8 +348,8 @@ export default function TeamProjectDetail() {
               </div>
             </div>
 
-            {/* Revision comments */}
-            {comments && comments.length > 0 && (
+            {/* Revision comments (the player above lists them once there's a video) */}
+            {!latestDeliverable && comments && comments.length > 0 && (
               <div className="clay-card overflow-hidden">
                 <div className="px-4 py-3 border-b border-border/60 flex items-center gap-2">
                   <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -443,7 +481,23 @@ export default function TeamProjectDetail() {
                   )}
                 </div>
               ))}
-              {!isAssignedToMe && (
+              {!isAssignedToMe && limit?.limited && limit.request !== 'approved' ? (
+                <div className="pt-1 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Active</span>
+                    <span className="font-semibold tabular-nums">{limit.active}/{limit.max}</span>
+                  </div>
+                  {limit.request === 'pending' ? (
+                    <button disabled className="w-full min-h-[44px] rounded-xl border border-border text-sm font-semibold text-muted-foreground">Requested</button>
+                  ) : (
+                    <button onClick={handleRequestUrgent} disabled={requesting}
+                      className="w-full min-h-[44px] rounded-xl bg-amber-500 text-white text-sm font-semibold hover:brightness-110 disabled:opacity-50">
+                      Request urgent
+                    </button>
+                  )}
+                  {limit.request === 'declined' && <p className="text-xs font-medium text-red-600 dark:text-red-400">Declined</p>}
+                </div>
+              ) : !isAssignedToMe && (
                 <button
                   onClick={handleClaim}
                   disabled={claiming}

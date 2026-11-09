@@ -9,6 +9,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const CARE_CONFIG = {
+  /** Editors. */
+  editors: {
+    /** Max projects an editor holds at once (assigned, not yet with the
+     *  client or approved). Above it: "Request urgent" to admins. */
+    maxActiveProjects: 2,
+  },
+
   /** Alerts shown on a client (and in the "Text today" list). */
   alerts: {
     /** Client hasn't submitted a new video request for this many days. */

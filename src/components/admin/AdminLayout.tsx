@@ -145,7 +145,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <div className="flex-1" />
 
         <div className="flex items-center gap-2">
-          {profile && <NotificationBell userId={profile.id} />}
+          {profile && <NotificationBell userId={profile.id} isAdmin />}
           <ThemeToggle />
           <span className="text-sm text-muted-foreground hidden md:block">{profile?.full_name}</span>
           <button
