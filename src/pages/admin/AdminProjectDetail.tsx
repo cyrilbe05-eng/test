@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import { useProject, useProjectFiles, useProjectAssignments, useTimelineComments, useUpdateProjectStatus } from '@/hooks/useProjects'
 import { TimelineCommentor } from '@/components/project/TimelineCommentor'
 import { CarouselReview, SlideManager } from '@/components/carousel/Carousel'
+import { VersionTabs } from '@/components/project/VersionTabs'
+import { currentVersions, commentsForVersion } from '@/lib/versions'
 import { slidesOf } from '@/lib/slides'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
@@ -183,6 +185,14 @@ export default function AdminProjectDetail() {
   // Carousel (Stage G): the deliverables are the slides, in order.
   const isCarousel = project?.kind === 'carousel'
   const slides = slidesOf(files, 'deliverable')
+  // Several versions of one video (migration 020): switch between this
+  // cycle's deliverables; each version shows its own comments.
+  const versions = currentVersions(files, project?.client_revision_count ?? 0)
+  const [versionId, setVersionId] = useState<string | null>(null)
+  const shown = versions.find((v) => v.id === versionId) ?? versions[0] ?? latestDeliverable
+  const versionIds = versions.map((v) => v.id)
+  const versionComments = shown ? commentsForVersion(comments ?? [], shown.id, versionIds) : comments ?? []
+  const commentedVersions = new Set((comments ?? []).filter((c) => c.file_id && versionIds.includes(c.file_id)).map((c) => c.file_id!))
 
   const assignTeamMember = async () => {
     if (!selectedTeamMember || !id || !profile) return
@@ -640,12 +650,14 @@ export default function AdminProjectDetail() {
                     revisionRound={revisionRound}
                     onChanged={() => refetchComments()}
                   />
-                ) : latestDeliverable ? (
+                ) : shown ? (
+                  <div className="space-y-3">
+                  <VersionTabs versions={versions} value={shown?.id ?? ''} onChange={setVersionId} commented={commentedVersions} />
                   <TimelineCommentor
-                    storageKey={latestDeliverable.storage_key}
-                    fileId={latestDeliverable.id}
+                    storageKey={shown.storage_key}
+                    fileId={shown.id}
                     projectId={project.id}
-                    comments={comments ?? []}
+                    comments={versionComments}
                     currentUserId={profile!.id}
                     currentUserRole="admin"
                     canComment={true}
@@ -654,6 +666,7 @@ export default function AdminProjectDetail() {
                     theater={theater}
                     onTheaterToggle={() => setTheater((t) => !t)}
                   />
+                  </div>
                 ) : (
                   <div className="aspect-video bg-muted rounded-2xl flex items-center justify-center border border-border/60">
                     <p className="text-muted-foreground text-sm">No deliverable uploaded yet</p>

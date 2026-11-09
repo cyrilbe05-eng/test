@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useApiFetch } from '@/lib/api'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { CarouselReview } from '@/components/carousel/Carousel'
+import { VersionTabs } from '@/components/project/VersionTabs'
+import { currentVersions, commentsForVersion } from '@/lib/versions'
 import { slidesOf } from '@/lib/slides'
 import { downloadAll, uniqueNames } from '@/lib/zipDownload'
 import type { ProjectFile } from '@/types'
@@ -153,6 +155,14 @@ export default function ClientProjectDetail() {
   const isCarousel = project?.kind === 'carousel'
   const slides = slidesOf(files, 'deliverable')
   const noun = isCarousel ? 'carousel' : 'video'
+  // Several versions of one video (migration 020): switch between this
+  // cycle's deliverables; each version shows its own comments.
+  const versions = currentVersions(files, project?.client_revision_count ?? 0)
+  const [versionId, setVersionId] = useState<string | null>(null)
+  const shown = versions.find((v) => v.id === versionId) ?? versions[0] ?? latestDeliverable
+  const versionIds = versions.map((v) => v.id)
+  const versionComments = shown ? commentsForVersion(comments ?? [], shown.id, versionIds) : comments ?? []
+  const commentedVersions = new Set((comments ?? []).filter((c) => c.file_id && versionIds.includes(c.file_id)).map((c) => c.file_id!))
 
   const remaining = project
     ? project.max_client_revisions === -1
@@ -170,7 +180,7 @@ export default function ClientProjectDetail() {
     try {
       await apiFetch('/api/projects/' + id + '/approve-client', {
         method: 'POST',
-        body: JSON.stringify({ file_id: isCarousel ? undefined : latestDeliverable?.id }),
+        body: JSON.stringify({ file_id: isCarousel ? undefined : shown?.id }),
       })
       toast.success(isCarousel ? 'Carousel approved!' : 'Video approved!')
       refetchProject()
@@ -345,11 +355,13 @@ export default function ClientProjectDetail() {
                   onChanged={refetchComments}
                 />
               ) : (
+              <>
+              <VersionTabs versions={versions} value={shown?.id ?? ''} onChange={setVersionId} commented={commentedVersions} />
               <TimelineCommentor
-                storageKey={latestDeliverable.storage_key}
-                fileId={latestDeliverable.id}
+                storageKey={shown!.storage_key}
+                fileId={shown!.id}
                 projectId={project.id}
-                comments={comments ?? []}
+                comments={versionComments}
                 currentUserId={profile!.id}
                 currentUserRole="client"
                 canComment={canComment}
@@ -358,6 +370,7 @@ export default function ClientProjectDetail() {
                 theater={theater}
                 onTheaterToggle={() => setTheater((t) => !t)}
               />
+              </>
               )}
 
               <div className={cn('gap-5', theater ? 'flex items-start' : 'space-y-4')}>
@@ -384,7 +397,7 @@ export default function ClientProjectDetail() {
                   {isApproved && approvedDeliverables.length > 0 && (
                     <div className="animate-slide-up stagger-3">
                       <button
-                        onClick={() => (isCarousel ? handleDownloadSlides() : handleDownload())}
+                        onClick={() => (isCarousel ? handleDownloadSlides() : handleDownload(shown))}
                         disabled={zipping}
                         className="flex items-center gap-2 px-5 py-2.5 bg-primary rounded-xl text-white font-semibold text-sm shadow-clay hover:brightness-110 transition-all active:scale-[0.98]"
                       >

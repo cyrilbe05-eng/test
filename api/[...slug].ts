@@ -1294,6 +1294,19 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
       [id, project_id, clerkUserId, file_type, storage_key, file_name, file_size ?? null, inferMimeType(file_name, mime_type), now]
     )
 
+    // Versions (migration 020): stamp a deliverable with the review cycle it
+    // belongs to (1 + revisions requested so far), so reviewers can switch
+    // between this cycle's versions. Best effort before the migration.
+    if (file_type === 'deliverable') {
+      try {
+        const [cycle] = await dbQuery<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM status_history WHERE project_id = ? AND new_status = 'revision_requested'",
+          [project_id],
+        )
+        await dbExecute('UPDATE project_files SET review_round = ? WHERE id = ?', [1 + (cycle?.n ?? 0), id])
+      } catch { /* pre-migration */ }
+    }
+
     const rows = await dbQuery<ProjectFile>('SELECT * FROM project_files WHERE id = ?', [id])
 
     // Trigger in_progress when team member uploads any file to a pending_assignment project
@@ -3690,7 +3703,7 @@ async function handleCreateTimelineComment(req: VercelRequest, res: VercelRespon
   try {
     const { clerkUserId, profile } = await requireAuth(req)
 
-    const { project_id, timestamp_sec, timestamp_end_sec, comment_text, revision_round, slide } = req.body
+    const { project_id, timestamp_sec, timestamp_end_sec, comment_text, revision_round, slide, file_id } = req.body
     const slideNo = Number.isInteger(slide) && slide > 0 && slide <= 100 ? (slide as number) : null
 
     if (!project_id || !comment_text) {
@@ -3739,8 +3752,16 @@ async function handleCreateTimelineComment(req: VercelRequest, res: VercelRespon
     if (slideNo) {
       try { await dbExecute('UPDATE timeline_comments SET slide = ? WHERE id = ?', [slideNo, id]) } catch { /* pre-migration */ }
     }
+    // Which version of the video the comment is on (migration 020).
+    let versionId: string | null = null
+    if (typeof file_id === 'string' && file_id) {
+      try {
+        const [f] = await dbQuery<{ id: string }>("SELECT id FROM project_files WHERE id = ? AND project_id = ? AND file_type = 'deliverable'", [file_id, project_id])
+        if (f) { await dbExecute('UPDATE timeline_comments SET file_id = ? WHERE id = ?', [f.id, id]); versionId = f.id }
+      } catch { /* pre-migration */ }
+    }
 
-    res.status(201).json({ id, project_id, author_id: clerkUserId, author_role, timestamp_sec: timestamp_sec ?? null, timestamp_end_sec: timestamp_end_sec ?? null, comment_text, revision_round: revision_round ?? 1, created_at: now, ...(slideNo ? { slide: slideNo } : {}) })
+    res.status(201).json({ id, project_id, author_id: clerkUserId, author_role, timestamp_sec: timestamp_sec ?? null, timestamp_end_sec: timestamp_end_sec ?? null, comment_text, revision_round: revision_round ?? 1, created_at: now, ...(slideNo ? { slide: slideNo } : {}), ...(versionId ? { file_id: versionId } : {}) })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: friendlyDbError(e) })
   }

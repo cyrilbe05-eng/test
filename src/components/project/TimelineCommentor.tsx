@@ -42,6 +42,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<Plyr | null>(null)
   const playerContainerRef = useRef<HTMLDivElement>(null)
+  const videoHostRef = useRef<HTMLDivElement>(null)
   const [duration, setDuration] = useState(0)
   const [showAddComment, setShowAddComment] = useState(false)
   const [loadingSource, setLoadingSource] = useState(true)
@@ -159,8 +160,12 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
   // place via applySource — never by unmounting the <video> or destroying the
   // player, so React and Plyr no longer fight over the same DOM node.
   useEffect(() => {
-    const video = videoRef.current
+    // Plyr's destroy() puts a COPY of the <video> back in the host. In dev,
+    // React mounts effects twice, so the second mount must use the element
+    // that is actually on the page, not the detached original.
+    const video = videoHostRef.current?.querySelector('video') ?? videoRef.current
     if (!video) return
+    ;(videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = video
     // play-large gives mobile a proper tap target — without it, phones only
     // get the thin control-strip play button.
     const player = new Plyr(video, { controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'fullscreen'] })
@@ -325,6 +330,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
           ...(isRange ? { timestamp_end_sec: rangeEndTs } : {}),
           comment_text: label + ' — ' + data.comment_text,
           revision_round: revisionRound,
+          file_id: fileId,
         }),
       })
       reset(); closeComposer(); onCommentAdded(); toast.success('Comment added')
@@ -394,7 +400,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
         {/* Dedicated host div: Plyr re-parents the <video> into its own wrapper
             inside this div. React must never reconcile other children in here,
             or insertBefore/removeChild would hit a moved node and throw. */}
-        <div>
+        <div ref={videoHostRef}>
           <video ref={videoRef} playsInline preload="metadata" className="w-full max-h-[80vh] object-contain" />
         </div>
         {buffering && !loadingSource && !urlError && (

@@ -15,6 +15,8 @@ import { ProjectInstagram } from '@/components/care/ProjectInstagram'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { TimelineCommentor } from '@/components/project/TimelineCommentor'
 import { CarouselReview, SlideManager, SlideSorter } from '@/components/carousel/Carousel'
+import { VersionTabs } from '@/components/project/VersionTabs'
+import { currentVersions, commentsForVersion } from '@/lib/versions'
 import { slidesOf } from '@/lib/slides'
 import { cn, projectTimeLabel } from '@/lib/utils'
 
@@ -225,6 +227,14 @@ export default function TeamProjectDetail() {
   const isCarousel = project?.kind === 'carousel'
   const slides = slidesOf(files, 'deliverable')
   const clientSlides = slidesOf(files, 'source_video')
+  // Several versions of one video (migration 020): switch between this
+  // cycle's deliverables; each version shows its own comments.
+  const versions = currentVersions(files, project?.client_revision_count ?? 0)
+  const [versionId, setVersionId] = useState<string | null>(null)
+  const shown = versions.find((v) => v.id === versionId) ?? versions[0] ?? latestDeliverable
+  const versionIds = versions.map((v) => v.id)
+  const versionComments = shown ? commentsForVersion(comments ?? [], shown.id, versionIds) : comments ?? []
+  const commentedVersions = new Set((comments ?? []).filter((c) => c.file_id && versionIds.includes(c.file_id)).map((c) => c.file_id!))
   const filesChanged = () => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }); qc.invalidateQueries({ queryKey: ['project', id] }) }
 
   const canUpload = project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment'
@@ -319,19 +329,20 @@ export default function TeamProjectDetail() {
                 onChanged={() => refetchComments()}
               />
             )}
-            {!isCarousel && latestDeliverable && profile && (
+            {!isCarousel && shown && profile && (<>
+              <VersionTabs versions={versions} value={shown?.id ?? ''} onChange={setVersionId} commented={commentedVersions} />
               <TimelineCommentor
-                storageKey={latestDeliverable.storage_key}
-                fileId={latestDeliverable.id}
+                storageKey={shown.storage_key}
+                fileId={shown.id}
                 projectId={project.id}
-                comments={comments ?? []}
+                comments={versionComments}
                 currentUserId={profile.id}
                 currentUserRole="team"
                 canComment={false}
                 revisionRound={project.client_revision_count + 1}
                 onCommentAdded={() => refetchComments()}
               />
-            )}
+            </>)}
 
             {/* Source files */}
             <div className="clay-card overflow-hidden">

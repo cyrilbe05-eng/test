@@ -115,6 +115,8 @@ export interface ProjectFile {
   downloaded_at?: string | null
   /** Slide position (migration 019). */
   sort_order?: number | null
+  /** Review cycle a deliverable was uploaded in (migration 020). */
+  review_round?: number | null
 }
 
 export interface ProjectAssignment {
@@ -145,6 +147,8 @@ export interface TimelineComment {
   resolved_at?: string | null
   /** Carousel slide number, 1-based (migration 019). */
   slide?: number | null
+  /** Video version the comment is on (migration 020). */
+  file_id?: string | null
 }
 
 export interface Notification {
