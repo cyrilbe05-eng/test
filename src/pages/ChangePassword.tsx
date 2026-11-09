@@ -48,7 +48,7 @@ export default function ChangePassword() {
       })
       qc.setQueryData(['profile', getToken()], updated)
       toast.success('Password updated successfully!')
-      const roleHome: Record<string, string> = { admin: '/admin', team: '/team', client: '/workspace' }
+      const roleHome: Record<string, string> = { admin: '/admin/home', team: '/team', client: '/workspace' }
       navigate(updated ? roleHome[updated.role] ?? '/workspace' : '/workspace', { replace: true })
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to update password')

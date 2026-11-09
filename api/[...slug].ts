@@ -23,6 +23,7 @@ import { handleInstagramRoute } from './_helpers/care/instagram.js'
 import { handleEditorsRoute } from './_helpers/care/editors.js'
 import { mayTake, markUsed, handleRequestUrgent, handleEditorLimit, handleUrgentAdmin } from './_helpers/care/urgent.js'
 import { handleEditorHome } from './_helpers/care/editor-home.js'
+import { handleAdminHome } from './_helpers/care/admin-home.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
@@ -4561,6 +4562,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Editor performance (admin-only) — see api/_helpers/care/editors.ts
     if (slug[1] === 'editors') {
       return handleEditorsRoute(req, res, slug.slice(2))
+    }
+    // Admin home — see api/_helpers/care/admin-home.ts
+    if (slug[1] === 'home' && slug.length === 2) {
+      return handleAdminHome(req, res)
     }
     // Editor "Request urgent" decisions — see api/_helpers/care/urgent.ts
     if (slug[1] === 'urgent-requests') {

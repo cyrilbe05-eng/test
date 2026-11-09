@@ -38,8 +38,11 @@ const NAV_LINKS = [
   { to: '/admin/gallery',   label: 'Gallery',   icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg> },
 ]
 
-// Bottom nav shows the 5 most important links for admin mobile
-const BOTTOM_NAV = NAV_LINKS.slice(0, 5)
+// Home: what needs an admin now (requests, reviews, late work, editors' load).
+const HOME_LINK = { to: '/admin/home', label: 'Home', exact: true, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg> }
+
+// Bottom nav (mobile): Home, Projects, Users, Analytics, Messages
+const BOTTOM_NAV = [HOME_LINK, NAV_LINKS[0], NAV_LINKS[1], NAV_LINKS[2], NAV_LINKS[4]]
 
 // Full-admin-only pages (hidden from managers). Kept separate and appended
 // after NAV_LINKS so the existing menu and mobile bottom nav are unchanged.
@@ -89,7 +92,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-1 whitespace-nowrap">
           Admin
         </p>
-        {[...NAV_LINKS, ...(profile?.admin_role === 'manager' ? [] : FULL_ADMIN_LINKS)].map(({ to, label, icon, exact }) => (
+        {[HOME_LINK, ...NAV_LINKS, ...(profile?.admin_role === 'manager' ? [] : FULL_ADMIN_LINKS)].map(({ to, label, icon, exact }) => (
           <Link
             key={to}
             to={to}

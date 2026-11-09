@@ -31,7 +31,7 @@ export default function Login() {
   // Already logged in
   if (!authLoading && user && profile) {
     if (!profile.password_changed) return <Navigate to="/change-password" replace />
-    const roleHome: Record<string, string> = { admin: '/admin', team: '/team', client: '/workspace' }
+    const roleHome: Record<string, string> = { admin: '/admin/home', team: '/team', client: '/workspace' }
     return <Navigate to={roleHome[profile.role] ?? '/workspace'} replace />
   }
 
@@ -54,7 +54,7 @@ export default function Login() {
       setToken(json.token)
       qc.setQueryData(['profile', json.token], json.profile as Profile)
 
-      const roleHome: Record<string, string> = { admin: '/admin', team: '/team', client: '/workspace' }
+      const roleHome: Record<string, string> = { admin: '/admin/home', team: '/team', client: '/workspace' }
       const dest = !json.profile.password_changed
         ? '/change-password'
         : roleHome[json.profile.role] ?? '/workspace'

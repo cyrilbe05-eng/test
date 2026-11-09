@@ -44,6 +44,7 @@ import ClientUpload from '@/pages/workspace/ClientUpload'
 import ClientProjectDetail from '@/pages/workspace/ClientProjectDetail'
 import TeamDashboard from '@/pages/team/TeamDashboard'
 import TeamHome from '@/pages/team/TeamHome'
+import AdminHome from '@/pages/admin/AdminHome'
 import TeamProjectDetail from '@/pages/team/TeamProjectDetail'
 import AdminGallery from '@/pages/admin/AdminGallery'
 import AdminMessages from '@/pages/admin/AdminMessages'
@@ -145,6 +146,7 @@ function ProductionApp() {
           <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
 
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminProjects /></ProtectedRoute>} />
+          <Route path="/admin/home" element={<ProtectedRoute allowedRoles={['admin']}><AdminHome /></ProtectedRoute>} />
           <Route path="/admin/projects/:id" element={<ProtectedRoute allowedRoles={['admin']}><AdminProjectDetail /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><AdminUserManagement /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['admin']}><AdminAnalytics /></ProtectedRoute>} />

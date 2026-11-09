@@ -8,7 +8,7 @@
 //   GET  /api/editor-limit?project=:id       editor — their count + request
 //   GET  /api/admin/urgent-requests          admins — recent requests (bell)
 //   POST /api/admin/urgent-requests/:id      admins — { decision: approve|decline }
-// An approved request lets that editor claim that one project (then "used").
+// Approving assigns the editor to that project straight away (request "used").
 // Admins assigning editors themselves are never limited. Copywriters neither.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
@@ -75,6 +75,28 @@ async function notify(recipients: string[], projectId: string, message: string, 
 
 export const URGENT_PREFIX = 'Urgent request:'
 
+/** Approved → the editor gets the project, same steps as a claim
+ *  (assignment + end-of-next-day deadline). Read back, not trusting
+ *  dbExecute().changes (always 0 on the D1 REST API). */
+async function assignEditor(projectId: string, editorId: string, adminId: string) {
+  const exists = await dbQuery<{ id: string }>('SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?', [projectId, editorId])
+  if (exists.length) return
+  const now = nowIso()
+  const assignmentId = newId()
+  await dbExecute(
+    `INSERT OR IGNORE INTO project_assignments (id, project_id, team_member_id, assigned_by, assigned_at) VALUES (?, ?, ?, ?, ?)`,
+    [assignmentId, projectId, editorId, adminId, now],
+  )
+  if (!(await dbQuery('SELECT id FROM project_assignments WHERE id = ?', [assignmentId])).length) return
+  const due = new Date(now)
+  due.setUTCDate(due.getUTCDate() + 1)
+  due.setUTCHours(23, 59, 0, 0)
+  await dbExecute(
+    `INSERT OR IGNORE INTO deadlines (id, project_id, team_member_id, assignment_id, due_at, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+    [newId(), projectId, editorId, assignmentId, due.toISOString(), now],
+  )
+}
+
 /** POST /api/projects/:id/urgent */
 export async function handleRequestUrgent(req: VercelRequest, res: VercelResponse, projectId: string) {
   try {
@@ -131,8 +153,13 @@ export async function handleUrgentAdmin(req: VercelRequest, res: VercelResponse,
       const status = decision === 'approve' ? 'approved' : 'declined'
       await dbExecute('UPDATE urgent_requests SET status = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = ?',
         [status, clerkUserId, nowIso(), r.id, 'pending'])
+      if (status === 'approved') {
+        await assignEditor(r.project_id, r.editor_id, clerkUserId)
+        await markUsed(r.id)
+      }
       const [p] = await dbQuery<{ title: string }>('SELECT title FROM projects WHERE id = ?', [r.project_id])
-      await notify([r.editor_id], r.project_id, `Urgent request ${status}: "${p?.title ?? ''}"`, 'team')
+      await notify([r.editor_id], r.project_id,
+        status === 'approved' ? `Urgent request approved: "${p?.title ?? ''}" is yours` : `Urgent request declined: "${p?.title ?? ''}"`, 'team')
       res.json({ status })
       return
     }

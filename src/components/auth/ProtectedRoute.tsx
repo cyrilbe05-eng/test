@@ -31,7 +31,7 @@ export function ProtectedRoute({ children, allowedRoles }: Props) {
   // Role guard
   if (allowedRoles && !allowedRoles.includes(profile.role as UserRole)) {
     const roleHome: Record<UserRole, string> = {
-      admin: '/admin',
+      admin: '/admin/home',
       team: '/team',
       client: '/workspace',
     }
