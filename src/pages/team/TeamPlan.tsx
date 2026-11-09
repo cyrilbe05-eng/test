@@ -17,6 +17,11 @@ export default function TeamPlan() {
           </Link>
           <h2 className="text-xl font-heading font-semibold tracking-tight truncate">{data?.client.name ?? ''}</h2>
           {data && <span className="text-sm text-muted-foreground whitespace-nowrap">#{data.contract.number}</span>}
+          {data && (
+            <Link to={`/team/clients/${data.client.id}/onboarding`} className="ml-auto min-h-[44px] px-3 inline-flex items-center rounded-lg border border-border text-sm hover:bg-muted whitespace-nowrap">
+              Onboarding
+            </Link>
+          )}
         </div>
         {isLoading ? (
           <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>

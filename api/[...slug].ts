@@ -23,6 +23,7 @@ import { handleInstagramRoute } from './_helpers/care/instagram.js'
 import { handleEditorsRoute } from './_helpers/care/editors.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
+import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
 // Signed-URL lifetimes. Downloads get 5 h: on slow routes (e.g. the Mumbai
@@ -4518,6 +4519,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Editor performance (admin-only) — see api/_helpers/care/editors.ts
     if (slug[1] === 'editors') {
       return handleEditorsRoute(req, res, slug.slice(2))
+    }
+    // Onboarding questions (full admins) — see api/_helpers/care/onboarding.ts
+    if (slug[1] === 'onboarding-questions') {
+      return handleQuestionsRoute(req, res, slug.slice(2))
     }
     res.status(404).json({ error: 'Not found' }); return
   }

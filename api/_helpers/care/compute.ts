@@ -51,6 +51,8 @@ export interface ClientInput {
   care: CareFields | null
   /** Production plan of the current contract, auto ticks already applied. */
   plan?: PlanItem[]
+  /** Onboarding questionnaire (migration 015). done_at = the client finished it. */
+  onboarding?: { status: 'not_started' | 'in_progress' | 'done'; done_at: string | null }
   last_contact_at: string | null
   projects: ProjectInput[]
 }
@@ -316,6 +318,16 @@ export function computeOutputRate(facts: ProjectFacts[], deadlinesDue: { on_time
 
 // ── Everything for one client ───────────────────────────────────────────────
 
+/** Information only — shown in "Text today", never changes health.
+ *  "Finished onboarding": full package until the copywriter creates the
+ *  production plan; otherwise for `infoDays` days. */
+export function computeInfo(client: ClientInput, now: number, cfg: CareConfig = CARE_CONFIG): string[] {
+  const done = client.onboarding?.status === 'done' ? client.onboarding.done_at : null
+  if (!done) return []
+  if (client.contract?.package === 'full_package') return client.plan?.length ? [] : ['Finished onboarding']
+  return now - ms(done) < cfg.alerts.onboardingInfoDays * DAY ? ['Finished onboarding'] : []
+}
+
 export interface ClientCare {
   client_id: string
   name: string
@@ -323,6 +335,7 @@ export interface ClientCare {
   health: Health
   reasons: string[]
   alerts: Alert[]
+  info: string[]
   stats: ClientStats
   output: OutputRate
   facts: ProjectFacts[]
@@ -342,6 +355,7 @@ export function evaluateClient(client: ClientInput, now: number, cfg: CareConfig
     health,
     reasons,
     alerts,
+    info: computeInfo(client, now, cfg),
     stats: computeStats(client, facts, now),
     output: computeOutputRate(facts, deadline_outcomes, now, cfg),
     facts,

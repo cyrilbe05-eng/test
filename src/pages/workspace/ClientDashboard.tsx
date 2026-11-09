@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
@@ -94,6 +94,8 @@ function Plan({ steps }: { steps: Dashboard['plan'] }) {
 
 export default function ClientDashboard() {
   const { data, isLoading, error } = useClientDashboard()
+  // Onboarding opens before the dashboard until it's done.
+  if (data?.needs_onboarding) return <Navigate to="/workspace/onboarding" replace />
   return (
     <ClientLayout>
       <main className="px-4 md:px-6 py-5 md:py-6 space-y-4 max-w-5xl">

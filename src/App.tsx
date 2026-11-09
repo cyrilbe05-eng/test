@@ -52,6 +52,9 @@ import AdminEditorPerformance from '@/pages/admin/AdminEditorPerformance'
 import ClientDashboard from '@/pages/workspace/ClientDashboard'
 import TeamPlans from '@/pages/team/TeamPlans'
 import TeamPlan from '@/pages/team/TeamPlan'
+import TeamClientOnboarding from '@/pages/team/TeamClientOnboarding'
+import ClientOnboarding from '@/pages/workspace/ClientOnboarding'
+import AdminOnboardingQuestions from '@/pages/admin/AdminOnboardingQuestions'
 import TeamGallery from '@/pages/team/TeamGallery'
 import TeamMessages from '@/pages/team/TeamMessages'
 import TeamCalendar from '@/pages/team/TeamCalendar'
@@ -151,10 +154,12 @@ function ProductionApp() {
           <Route path="/admin/calendar" element={<ProtectedRoute allowedRoles={['admin']}><AdminCalendar /></ProtectedRoute>} />
           <Route path="/admin/care" element={<ProtectedRoute allowedRoles={['admin']}><AdminClientCare /></ProtectedRoute>} />
           <Route path="/admin/editors" element={<ProtectedRoute allowedRoles={['admin']}><AdminEditorPerformance /></ProtectedRoute>} />
+          <Route path="/admin/onboarding-questions" element={<ProtectedRoute allowedRoles={['admin']}><AdminOnboardingQuestions /></ProtectedRoute>} />
 
           {/* Client home = dashboard; the video list (unchanged page) lives at /workspace/videos. */}
           <Route path="/workspace" element={<ProtectedRoute allowedRoles={['client']}><ClientDashboard /></ProtectedRoute>} />
           <Route path="/workspace/videos" element={<ProtectedRoute allowedRoles={['client']}><ClientWorkspace /></ProtectedRoute>} />
+          <Route path="/workspace/onboarding" element={<ProtectedRoute allowedRoles={['client']}><ClientOnboarding /></ProtectedRoute>} />
           <Route path="/workspace/new" element={<ProtectedRoute allowedRoles={['client']}><ClientNewProject /></ProtectedRoute>} />
           <Route path="/workspace/projects/:id" element={<ProtectedRoute allowedRoles={['client']}><ClientProjectDetail /></ProtectedRoute>} />
           <Route path="/workspace/gallery" element={<ProtectedRoute allowedRoles={['client']}><ClientGallery /></ProtectedRoute>} />
@@ -170,6 +175,7 @@ function ProductionApp() {
           <Route path="/team/stats" element={<ProtectedRoute allowedRoles={['team']}><TeamStats /></ProtectedRoute>} />
           <Route path="/team/plans" element={<ProtectedRoute allowedRoles={['team']}><TeamPlans /></ProtectedRoute>} />
           <Route path="/team/plans/:contractId" element={<ProtectedRoute allowedRoles={['team']}><TeamPlan /></ProtectedRoute>} />
+          <Route path="/team/clients/:clientId/onboarding" element={<ProtectedRoute allowedRoles={['team']}><TeamClientOnboarding /></ProtectedRoute>} />
 
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />

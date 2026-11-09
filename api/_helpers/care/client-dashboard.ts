@@ -2,6 +2,7 @@
 //
 //   GET  /api/client/dashboard                 everything for the home page
 //   POST /api/client/plan-items/:id/done       { done?: boolean } — client steps only
+//   /api/client/onboarding...                  see onboarding.ts
 //
 // Built from the same loadClients() as Client Care and the copywriter page,
 // so plan auto ticks / overdue steps are identical everywhere.
@@ -14,6 +15,7 @@ import { loadClients } from './data.js'
 import { daysUntilDate, type ClientInput } from './compute.js'
 import { overdueClientSteps, planWithState } from './plans.js'
 import { loadClientRevisions } from './sop.js'
+import { handleClientOnboarding } from './onboarding.js'
 
 const DAY = 86_400_000
 const toMs = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))
@@ -54,6 +56,9 @@ export function buildDashboard(client: ClientInput, styleRules: { text: string; 
 
   return {
     name: client.full_name,
+    // Onboarding opens before the dashboard until it's done (once there is
+    // a contract: the package decides which questions they get).
+    needs_onboarding: !!k && (client.onboarding?.status ?? 'not_started') !== 'done',
     contract,
     needs,
     plan: planWithState(plan, now).map((i) => ({
@@ -87,6 +92,8 @@ export async function handleClientRoute(req: VercelRequest, res: VercelResponse,
       if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
       res.json(await dashboardFor(profile.id)); return
     }
+
+    if (rest[0] === 'onboarding') return await handleClientOnboarding(req, res, profile.id, rest.slice(1))
 
     if (rest.length === 3 && rest[0] === 'plan-items' && rest[2] === 'done') {
       if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }

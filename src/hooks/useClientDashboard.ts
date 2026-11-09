@@ -5,6 +5,7 @@ export type DashboardOwner = 'pingu' | 'client' | 'both'
 
 export interface ClientDashboard {
   name: string
+  needs_onboarding: boolean
   contract: { number: number; package: string; start_date: string; end_date: string; day: number; total_days: number; days_left: number; progress: number } | null
   needs: (
     | { type: 'plan_step'; id: string; title: string; date: string; days_late: number }

@@ -52,7 +52,7 @@ async function handleOverview(req: VercelRequest, res: VercelResponse) {
     const toCard = (c: ClientCare) => card(c, instagram)
 
     const textToday = evaluated
-      .filter((c) => c.health === 'at_risk' || c.alerts.length > 0)
+      .filter((c) => c.health === 'at_risk' || c.alerts.length > 0 || c.info.length > 0)
       .map((c) => ({
         client_id: c.client_id,
         name: c.name,
@@ -60,7 +60,7 @@ async function handleOverview(req: VercelRequest, res: VercelResponse) {
         health: c.health,
         // At risk: full reasons (risk + alerts). Otherwise: what triggered
         // the message — the alerts (a contract date alone isn't "text today").
-        reasons: c.health === 'at_risk' ? c.reasons : c.alerts.map((a) => a.message),
+        reasons: [...(c.health === 'at_risk' ? c.reasons : c.alerts.map((a) => a.message)), ...c.info],
       }))
 
     const byId = new Map(evaluated.map((e) => [e.client_id, e]))
@@ -144,6 +144,7 @@ async function buildClientDetail(clientId: string) {
     health: ev.health,
     reasons: ev.reasons,
     alerts: ev.alerts,
+    info: ev.info,
     stats: ev.stats,
     output: ev.output,
     last_contact_at: client.last_contact_at,

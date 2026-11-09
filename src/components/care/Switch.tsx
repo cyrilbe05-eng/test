@@ -1,12 +1,13 @@
 import { cn } from '@/lib/utils'
 
 /** On/off control: a label + a sliding switch (whole row is the 44px tap target). */
-export function Switch({ checked, onChange, label, className }: { checked: boolean; onChange: (v: boolean) => void; label: string; className?: string }) {
+export function Switch({ checked, onChange, label, className, ariaLabel }: { checked: boolean; onChange: (v: boolean) => void; label: string; className?: string; ariaLabel?: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
       onClick={() => onChange(!checked)}
       className={cn('min-h-[44px] inline-flex items-center gap-2 px-1 text-sm rounded-lg', className)}
     >

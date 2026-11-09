@@ -17,6 +17,8 @@ export const CARE_CONFIG = {
     inProgressStuckDays: 2,
     /** No "Contacted" tick for this many days. */
     noContactDays: 3,
+    /** "Finished onboarding" info for editing-only clients, this many days. */
+    onboardingInfoDays: 3,
   },
 
   /** Health status rules. */

@@ -37,8 +37,9 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
        FROM profiles p LEFT JOIN plans pl ON pl.id = p.plan_id
        WHERE p.role = 'client'${opts.includeDisabled ? '' : ' AND p.disabled = 0'}${only}
        ORDER BY p.full_name ASC`, args),
-    dbQuery<CareFields & { client_id: string }>(
-      `SELECT client_id, contract_start, contract_end, videos_included, renewal_status, care_notes, miro_url
+    dbQuery<CareFields & { client_id: string; onboarding_status: 'in_progress' | 'done' | null; onboarding_done_at: string | null }>(
+      `SELECT client_id, contract_start, contract_end, videos_included, renewal_status, care_notes, miro_url,
+              onboarding_status, onboarding_done_at
        FROM client_care WHERE client_id IN (${clientScope})`, args),
     dbQuery<{ client_id: string; last_contact_at: string }>(
       `SELECT client_id, MAX(contacted_at) AS last_contact_at FROM client_contacts
@@ -111,6 +112,7 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
         miro_url: careRow?.miro_url ?? null,
       } : null,
       last_contact_at: contactBy.get(c.id) ?? null,
+      onboarding: { status: careRow?.onboarding_status ?? 'not_started', done_at: careRow?.onboarding_done_at ?? null },
       projects: (projectsBy.get(c.id) ?? []).map((p): ProjectInput => ({
         id: p.id, title: p.title, status: p.status, created_at: p.created_at, updated_at: p.updated_at,
         client_revision_count: p.client_revision_count ?? 0,
@@ -125,10 +127,12 @@ export async function loadClients(clientId?: string, opts: { includeDisabled?: b
 
   // Production plan of the current contract, with auto ticks applied and
   // saved here — the single path every page uses (dashboard, copywriter
-  // page, Client Care alerts), so they always agree.
-  const plans = await loadPlanItems(result.map((c) => c.contract?.id).filter(Boolean) as string[])
+  // page, Client Care alerts), so they always agree. Full package only:
+  // editing-only clients have no plan.
+  const planned = (c: ClientInput) => c.contract?.package === 'full_package'
+  const plans = await loadPlanItems(result.filter(planned).map((c) => c.contract!.id))
   for (const c of result) {
-    const items = c.contract ? plans.get(c.contract.id) ?? [] : []
+    const items = planned(c) ? plans.get(c.contract!.id) ?? [] : []
     if (items.length && c.care) {
       const start = `${c.contract!.start_date}T00:00:00.000Z`
       const end = `${c.contract!.end_date}T23:59:59.999Z`

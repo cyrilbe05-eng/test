@@ -8,6 +8,7 @@
 //   POST   /api/team/plans/:contractId/reorder      { ids: [...] }
 //   PATCH  /api/team/plans/items/:id                edit / tick a step
 //   DELETE /api/team/plans/items/:id
+//   /api/team/clients/:id/onboarding...           see onboarding.ts
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAuth } from '../auth.js'
@@ -16,6 +17,7 @@ import { sendError } from './access.js'
 import { loadClients } from './data.js'
 import { loadAssignments, isAssigned, planWithState, createPlanFromTemplate, overdueClientSteps, PLAN_OWNERS, AUTO_RULES, type PlanOwner, type AutoRule } from './plans.js'
 import { todayUtc } from './contracts.js'
+import { handleTeamOnboarding } from './onboarding.js'
 
 type Caller = { id: string; isAdmin: boolean }
 
@@ -83,7 +85,10 @@ async function planResponse(contractId: string) {
 
 async function handleList(req: VercelRequest, res: VercelResponse, caller: Caller) {
   const assigned = caller.isAdmin ? null : new Set((await loadAssignments()).filter((a) => a.team_member_id === caller.id).map((a) => a.client_id))
-  const clients = (await loadClients()).filter((c) => (assigned ? assigned.has(c.id) : true))
+  // Editing-only clients have no plan, so they are not listed.
+  const clients = (await loadClients())
+    .filter((c) => (assigned ? assigned.has(c.id) : true))
+    .filter((c) => c.contract?.package !== 'editing_only')
   const now = Date.now()
   res.json(clients.map((c) => {
     const items = c.plan ?? []
@@ -103,6 +108,12 @@ async function handleList(req: VercelRequest, res: VercelResponse, caller: Calle
 /** Router entry. `rest` = path after /api/team. */
 export async function handleTeamRoute(req: VercelRequest, res: VercelResponse, rest: string[]) {
   try {
+    // /clients/:id/onboarding[/files]
+    if (rest[0] === 'clients' && rest[2] === 'onboarding') {
+      const caller = await requirePlanner(req)
+      await requireClientAccess(caller, rest[1])
+      return await handleTeamOnboarding(req, res, caller, rest[1], rest.slice(3))
+    }
     if (rest[0] !== 'plans') { res.status(404).json({ error: 'Not found' }); return }
     const caller = await requirePlanner(req)
 

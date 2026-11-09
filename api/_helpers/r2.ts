@@ -16,6 +16,10 @@ import { inferPlaybackMimeType } from './mime.js'
 const BUCKET = process.env.CLOUDFLARE_R2_BUCKET_NAME!
 const ACCOUNT_ID = process.env.CLOUDFLARE_R2_ACCOUNT_ID!
 
+// Local development only: when LOCAL_R2_DIR is set (never on Vercel), files
+// are kept on disk instead of R2. See api/_helpers/local-r2.ts.
+const local = () => (process.env.LOCAL_R2_DIR ? import('./local-r2.js') : null)
+
 const s3 = new S3Client({
   region: 'auto',
   endpoint: `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -27,6 +31,7 @@ const s3 = new S3Client({
 
 /** Generate a pre-signed URL for a browser to PUT a file directly to R2 (upload) */
 export async function getPresignedUploadUrl(key: string, _mimeType: string, expiresIn = 3600): Promise<string> {
+  const l = local(); if (l) return (await l).getPresignedUploadUrl(key)
   // ContentType is intentionally omitted from the command so it is NOT included
   // in X-Amz-SignedHeaders. Including it requires R2's CORS policy to explicitly
   // allow the Content-Type header in AllowedHeaders, and causes browser preflight
@@ -58,6 +63,7 @@ export async function getPresignedDownloadUrl(
   downloadFileName?: string | null,
   contentType?: string | null,
 ): Promise<string> {
+  const l = local(); if (l) return (await l).getPresignedDownloadUrl(key, expiresIn, downloadFileName, contentType)
   const command = new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
@@ -83,6 +89,7 @@ function sanitizeFilenameForHeader(name: string): string {
 
 /** Hard delete a file from R2 */
 export async function deleteObject(key: string): Promise<void> {
+  const l = local(); if (l) return (await l).deleteObject(key)
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
 }
 
@@ -101,6 +108,7 @@ export async function deleteObject(key: string): Promise<void> {
  *  on per-request response-content-type overrides — which iOS streaming
  *  handles poorly. */
 export async function createMultipartUpload(key: string, contentType?: string | null): Promise<string> {
+  const l = local(); if (l) return (await l).createMultipartUpload(key, contentType)
   const out = await s3.send(new CreateMultipartUploadCommand({
     Bucket: BUCKET,
     Key: key,
@@ -112,6 +120,7 @@ export async function createMultipartUpload(key: string, contentType?: string | 
 
 /** Read an object's stored metadata (null if it does not exist). */
 export async function headObject(key: string): Promise<{ contentType: string | null; size: number } | null> {
+  const l = local(); if (l) return (await l).headObject(key)
   try {
     const out = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }))
     return { contentType: out.ContentType ?? null, size: out.ContentLength ?? 0 }
@@ -123,6 +132,7 @@ export async function headObject(key: string): Promise<{ contentType: string | n
 /** Rewrite an object's stored Content-Type in place (metadata-replace copy).
  *  R2 CopyObject supports objects up to ~5 GB; callers must gate on size. */
 export async function replaceObjectContentType(key: string, contentType: string): Promise<void> {
+  const l = local(); if (l) return (await l).replaceObjectContentType(key, contentType)
   await s3.send(new CopyObjectCommand({
     Bucket: BUCKET,
     Key: key,
@@ -190,6 +200,7 @@ export async function getPresignedPartUrl(
   partNumber: number,
   expiresIn = 86400,
 ): Promise<string> {
+  const l = local(); if (l) return (await l).getPresignedPartUrl(key, uploadId, partNumber)
   const command = new UploadPartCommand({
     Bucket: BUCKET,
     Key: key,
@@ -205,6 +216,7 @@ export async function completeMultipartUpload(
   uploadId: string,
   parts: Array<{ partNumber: number; etag: string }>,
 ): Promise<void> {
+  const l = local(); if (l) return (await l).completeMultipartUpload(key, uploadId, parts)
   await s3.send(
     new CompleteMultipartUploadCommand({
       Bucket: BUCKET,
@@ -222,5 +234,6 @@ export async function completeMultipartUpload(
 
 /** Abandon a multipart upload — frees the parts so they don't accrue storage. */
 export async function abortMultipartUpload(key: string, uploadId: string): Promise<void> {
+  const l = local(); if (l) return (await l).abortMultipartUpload(key, uploadId)
   await s3.send(new AbortMultipartUploadCommand({ Bucket: BUCKET, Key: key, UploadId: uploadId }))
 }

@@ -15,6 +15,7 @@ import { parseInstagramList } from '@/lib/instagram'
 import { HealthBadge } from '@/components/care/HealthBadge'
 import { Block } from '@/components/care/Block'
 import { SopRules, RevisionBacklog } from '@/components/care/RevisionSections'
+import { OnboardingAnswers } from '@/components/onboarding/OnboardingAnswers'
 import type { ClientCareDetail, Contract, ContractPackage, OnboardingStep, RenewalStatus } from '@/types/care'
 
 // Client detail: side panel on desktop, full screen on phones. All numbers
@@ -401,7 +402,7 @@ function Onboarding({ detail }: { detail: ClientCareDetail }) {
     { onError: (e) => toast.error(errMsg(e)) },
   )
   return (
-    <Block title={`Onboarding · ${done}/${steps.length}`}>
+    <Block title={`Onboarding steps · ${done}/${steps.length}`}>
       <div className="space-y-0.5">
         {steps.map((step) => {
           const at = detail.onboarding[step]
@@ -452,6 +453,7 @@ function Videos({ detail }: { detail: ClientCareDetail }) {
 
 export function ClientCarePanel({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const { data, isLoading, error } = useCareClient(clientId)
+  const [tab, setTab] = useState<'care' | 'onboarding'>('care')
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -475,19 +477,30 @@ export function ClientCarePanel({ clientId, onClose }: { clientId: string; onClo
           <h3 className="min-w-0 flex-1 font-heading font-semibold truncate">{data?.client.name ?? ''}</h3>
           {data && <HealthBadge health={data.health} />}
         </header>
+        <div role="tablist" className="flex gap-1 px-4 md:px-5 border-b border-border flex-shrink-0">
+          {(['care', 'onboarding'] as const).map((t) => (
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+              className={cn('min-h-[44px] px-3 -mb-px border-b-2 text-sm', tab === t ? 'border-primary font-semibold' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+              {t === 'care' ? 'Care' : 'Onboarding'}
+            </button>
+          ))}
+        </div>
 
         <div className="flex-1 overflow-y-auto overscroll-contain pb-10">
-          {isLoading ? (
+          {tab === 'onboarding' ? (
+            <OnboardingAnswers clientId={clientId} compact />
+          ) : isLoading ? (
             <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
           ) : error ? (
             <p className="p-6 text-sm">{errMsg(error)}</p>
           ) : data ? (
             <>
               <ContactedTick detail={data} />
-              {data.health !== 'healthy' && (
+              {(data.health !== 'healthy' || data.info.length > 0) && (
                 <Block title="Why">
                   <ul className="space-y-1.5 text-sm">
-                    {data.reasons.map((r) => <li key={r} className="break-words">{r}</li>)}
+                    {data.health !== 'healthy' && data.reasons.map((r) => <li key={r} className="break-words">{r}</li>)}
+                    {data.info.map((r) => <li key={r} className="break-words text-primary">{r}</li>)}
                   </ul>
                 </Block>
               )}

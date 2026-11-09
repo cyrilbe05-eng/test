@@ -102,6 +102,8 @@ export interface ClientCareDetail {
   health: Health
   reasons: string[]
   alerts: { type: string; message: string; project_id?: string }[]
+  /** Information only (e.g. "Finished onboarding"); never changes health. */
+  info: string[]
   stats: ClientStats
   output: OutputRate
   last_contact_at: string | null

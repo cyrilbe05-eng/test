@@ -360,11 +360,44 @@ db.exec(m013.slice(m013.indexOf('-- COPY')))
   makePlan('stuck', 5, ['Scripts · batch 1'])
 }
 
+// Onboarding questionnaire (migration 015). Its "mark existing" step ran
+// before any client existed; run it now (everyone done), then:
+//  - Saffron (full package, new): not started → sees onboarding on login
+//  - Peak (editing only): not started → the short version
+//  - Harbor (editing only): half way through
+//  - Bloom: done, answers pasted in by Clara from the old Notion doc
+{
+  const m015 = fs.readFileSync(path.join(ROOT, 'db/migrations/015_client_onboarding.sql'), 'utf8')
+  db.exec(m015.slice(m015.indexOf('-- MARK EXISTING')))
+  const reset = db.prepare('UPDATE client_care SET onboarding_status = ?, onboarding_done_at = NULL WHERE client_id = ?')
+  reset.run(null, clientIds.new)
+  reset.run(null, clientIds.renewing)
+  reset.run('in_progress', clientIds.renewal)
+  const answer = (clientKey, qid, value, by) => insert('onboarding_answers', {
+    id: randomUUID(), client_id: clientIds[clientKey], question_id: qid, answer: value, file_url: null,
+    updated_at: iso(daysAgo(30)), updated_by: by ?? clientIds[clientKey] })
+  answer('renewal', 'obq_01', '@harbor.homes')
+  answer('renewal', 'obq_02', 'Referral')
+  answer('renewal', 'obq_03', 'Sam from Peak Coffee')
+  answer('renewal', 'obq_04', 'Saw the before/after edits for Peak and wanted the same pace.')
+  const BLOOM = {
+    obq_01: '@bloom.bakery', obq_02: 'Instagram', obq_04: 'Their reels felt like us, not like an agency.',
+    obq_05: 'Price, and whether they would get our humour.', obq_06: "Lyon, in the back of my parents' bakery.",
+    obq_10: 'The 5am quiet before the shop opens.', obq_12: 'Sourdough, viennoiserie, wedding cakes. Ideal client: locals who care where bread comes from.',
+    obq_19: 'Warm, nerdy, fast', obq_20: '"Proper bread"', obq_21: '"Artisanal"', obq_26: 'Hungry and a bit nostalgic.',
+    obq_28: 'The friendly neighbour who always has flour on her apron.', obq_29: 'Raw, close-up, natural light, no stock music.',
+    obq_30: '@thebreadcode, @fullproofbaking', obq_31: 'Close-ups and calm voice-over.',
+    obq_32: JSON.stringify(['https://www.instagram.com/reel/abc123/', 'https://www.tiktok.com/@baker/video/1']),
+    obq_33: JSON.stringify(['https://www.instagram.com/reel/xyz789/']), obq_34: 'Fast zooms, meme sound effects.',
+  }
+  for (const [qid, v] of Object.entries(BLOOM)) answer('healthy', qid, v, clara)
+}
+
 // ── 5. Summary ──────────────────────────────────────────────────────────────
 
 const count = (t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n
 console.log(`Local database ready: ${path.relative(ROOT, DB_FILE)}`)
-for (const t of ['profiles', 'projects', 'project_assignments', 'deadlines', 'project_files', 'status_history', 'timeline_comments', 'client_care', 'client_contacts', 'client_onboarding', 'revision_entries', 'client_contracts', 'client_team_assignments', 'production_plan_items']) {
+for (const t of ['profiles', 'projects', 'project_assignments', 'deadlines', 'project_files', 'status_history', 'timeline_comments', 'client_care', 'client_contacts', 'client_onboarding', 'revision_entries', 'client_contracts', 'client_team_assignments', 'production_plan_items', 'onboarding_questions', 'onboarding_answers']) {
   console.log(`  ${t.padEnd(20)} ${count(t)}`)
 }
 console.log(`\nLog in at http://localhost:5173 with admin@pingu.local / ${LOCAL_PASSWORD}`)
