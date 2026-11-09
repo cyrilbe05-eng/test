@@ -9,6 +9,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const CARE_CONFIG = {
+  /** Client "time saved": hours per delivered video (Client Approved),
+   *  by the package of the contract running when it was delivered. The
+   *  admin's typed number is added on top as extra hours. */
+  timeSaved: {
+    editingOnlyHours: 2,
+    fullPackageHours: 3.5,
+    carouselHours: 1,
+  },
+
   /** Editors. */
   editors: {
     /** Max projects an editor holds at once (assigned, not yet with the

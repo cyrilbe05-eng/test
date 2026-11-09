@@ -4,6 +4,7 @@ import { useUpdateProjectStatus } from '@/hooks/useProjects'
 import { projectTimeLabel } from '@/lib/utils'
 import type { Project, ProjectStatus } from '@/types'
 import { Link } from 'react-router-dom'
+import { isBackward } from '@/lib/statusFlow'
 
 const COLUMNS: { statuses: ProjectStatus[]; dropTarget: ProjectStatus; label: string }[] = [
   { statuses: ['pending_assignment'], dropTarget: 'pending_assignment', label: 'Pending Assignment' },
@@ -14,15 +15,9 @@ const COLUMNS: { statuses: ProjectStatus[]; dropTarget: ProjectStatus; label: st
   { statuses: ['client_approved'],    dropTarget: 'client_approved',    label: 'Client Approved' },
 ]
 
-// Allowed drag transitions
-const ALLOWED_TRANSITIONS: Partial<Record<ProjectStatus, ProjectStatus[]>> = {
-  pending_assignment: ['in_progress'],
-  in_progress: ['in_review', 'admin_approved'],
-  in_review: ['admin_approved', 'revision_requested'],
-  admin_approved: ['client_reviewing'],
-  client_reviewing: ['client_approved', 'revision_requested'],
-  revision_requested: ['in_progress'],
-}
+// Admins can move a card to ANY column. Backwards (an earlier stage outside
+// the normal flow) asks first, and the API sends no notifications for it.
+const LABEL = (s: ProjectStatus) => COLUMNS.find((c) => c.statuses.includes(s))?.label ?? s
 
 interface Props {
   projects: (Project & { profiles?: { full_name: string }; assigned_team_names?: string | null })[]
@@ -30,33 +25,53 @@ interface Props {
 
 export function KanbanBoard({ projects }: Props) {
   const [dragging, setDragging] = useState<{ id: string; fromStatus: ProjectStatus } | null>(null)
+  const [back, setBack] = useState<{ id: string; to: ProjectStatus; title: string } | null>(null)
   const updateStatus = useUpdateProjectStatus()
 
-  const handleDrop = async (toStatus: ProjectStatus) => {
-    if (!dragging) return
-    const allowed = ALLOWED_TRANSITIONS[dragging.fromStatus] ?? []
-    if (!allowed.includes(toStatus)) {
-      toast.error(`Cannot move from ${dragging.fromStatus} to ${toStatus}`)
-      setDragging(null)
-      return
-    }
-    // Confirm sensitive transitions
-    if (toStatus === 'client_approved') {
-      if (!confirm('Mark this project as client approved? This will unlock the download for the client.')) {
-        setDragging(null)
-        return
-      }
-    }
+  const move = async (id: string, toStatus: ProjectStatus) => {
     try {
-      await updateStatus.mutateAsync({ id: dragging.id, status: toStatus })
+      await updateStatus.mutateAsync({ id, status: toStatus })
       toast.success('Status updated')
     } catch (err) {
       toast.error((err as Error).message)
     }
+  }
+
+  const handleDrop = async (toStatus: ProjectStatus) => {
+    if (!dragging) return
+    const { id, fromStatus } = dragging
     setDragging(null)
+    // Same column (In Review and Admin Approved share one): nothing to do.
+    if (COLUMNS.find((c) => c.statuses.includes(fromStatus))?.dropTarget === toStatus) return
+    if (isBackward(fromStatus, toStatus)) {
+      setBack({ id, to: toStatus, title: projects.find((p) => p.id === id)?.title ?? '' })
+      return
+    }
+    // Confirm sensitive transitions
+    if (toStatus === 'client_approved') {
+      if (!confirm('Mark this project as client approved? This will unlock the download for the client.')) return
+    }
+    await move(id, toStatus)
   }
 
   return (
+    <>
+    {back && (
+      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-4" onClick={() => setBack(null)}>
+        <div role="dialog" aria-modal="true" aria-label="Move back" onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-sm bg-card border border-border rounded-2xl p-5 space-y-4 shadow-2xl">
+          <div>
+            <p className="font-heading font-semibold">Move back to {LABEL(back.to)}?</p>
+            <p className="text-sm text-muted-foreground mt-1 truncate">{back.title}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button className="min-h-[44px] rounded-xl border border-border text-sm hover:bg-muted" onClick={() => setBack(null)}>Cancel</button>
+            <button className="min-h-[44px] rounded-xl bg-primary text-white text-sm font-semibold hover:brightness-110"
+              onClick={() => { const b = back; setBack(null); void move(b.id, b.to) }}>Move back</button>
+          </div>
+        </div>
+      </div>
+    )}
     <div className="flex gap-3 overflow-x-auto pb-4">
       {COLUMNS.map((col) => {
         const cards = projects.filter((p) => col.statuses.includes(p.status))
@@ -120,5 +135,6 @@ export function KanbanBoard({ projects }: Props) {
         )
       })}
     </div>
+    </>
   )
 }

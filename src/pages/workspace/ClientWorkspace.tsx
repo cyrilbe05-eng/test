@@ -59,7 +59,13 @@ export default function ClientWorkspace() {
   const displayProjects = tab === 'active' ? active : completed
 
   const projectLimitReached = plan && plan.max_active_projects !== -1 && active.length >= plan.max_active_projects
-  const timeSaved = profile?.time_saved_hours ?? null
+  // Automatic: hours per delivered video by package + any extra hours (see
+  // api/_helpers/care/time-saved.ts).
+  const { data: timeSavedData } = useQuery<{ total: number }>({
+    queryKey: ['time-saved'],
+    queryFn: () => apiFetch<{ total: number }>('/api/time-saved'),
+  })
+  const timeSaved = timeSavedData?.total ?? null
 
   return (
     <ClientLayout>
@@ -77,17 +83,7 @@ export default function ClientWorkspace() {
           <StatCard label="Active Projects" value={active.length} icon={<IconVideo />} color="bg-primary/10 text-primary" delay="stagger-1" />
           <StatCard label="Completed" value={completed.length} icon={<IconCheck />} color="bg-green-50 text-green-700" delay="stagger-2" />
           <StatCard label="Total Projects" value={allProjects.length} icon={<IconVideo />} color="bg-blue-50 text-blue-700" delay="stagger-3" />
-          {timeSaved !== null ? (
-            <StatCard label="Time Saved" value={`${timeSaved}h`} icon={<IconClock />} color="bg-amber-50 text-amber-700" delay="stagger-4" />
-          ) : (
-            <div className="clay-card p-4 flex items-center gap-4 animate-slide-up stagger-4 opacity-50">
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0"><IconClock /></div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Time Saved</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Set by your account manager</p>
-              </div>
-            </div>
-          )}
+          <StatCard label="Time Saved" value={timeSaved === null ? '—' : `${timeSaved}h`} icon={<IconClock />} color="bg-amber-50 text-amber-700" delay="stagger-4" />
         </div>
 
         {/* New project CTA */}

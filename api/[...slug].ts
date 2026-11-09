@@ -24,6 +24,9 @@ import { handleEditorsRoute } from './_helpers/care/editors.js'
 import { mayTake, markUsed, handleRequestUrgent, handleEditorLimit, handleUrgentAdmin } from './_helpers/care/urgent.js'
 import { handleEditorHome } from './_helpers/care/editor-home.js'
 import { handleAdminHome } from './_helpers/care/admin-home.js'
+import { isBackward } from '../src/lib/statusFlow.js'
+import { handleClientArchiveRoute } from './_helpers/care/archive.js'
+import { handleTimeSaved } from './_helpers/care/time-saved.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
@@ -255,6 +258,8 @@ async function handleDeleteUser(req: VercelRequest, res: VercelResponse) {
     const [target] = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [targetId])
     if (!target) { res.status(404).json({ error: 'User not found' }); return }
     if (target.role === 'admin') { res.status(403).json({ error: 'Cannot delete an admin account' }); return }
+    // Clients: archive first, then the permanent delete (DELETE /api/admin/clients/:id).
+    if (target.role === 'client') { res.status(400).json({ error: 'Archive the client first, then delete permanently' }); return }
 
     let storageKeys: string[] = []
 
@@ -1075,9 +1080,13 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
     )
     await recordStatusChange(projectId, project.status, status, clerkUserId)
 
-    // Send notifications on key transitions
+    // Send notifications on key transitions — never when an admin moves a
+    // project BACKWARDS (e.g. Completed → In Progress); see src/lib/statusFlow.
     const notifyMessages: { recipientId: string; type: string; message: string }[] = []
-    if (status === 'revision_requested') {
+    const quiet = isBackward(project.status, status)
+    if (quiet) {
+      // no notifications
+    } else if (status === 'revision_requested') {
       // Notify assigned team members
       const assigned = await dbQuery<{ team_member_id: string }>(
         'SELECT team_member_id FROM project_assignments WHERE project_id = ?',
@@ -4563,6 +4572,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug[1] === 'editors') {
       return handleEditorsRoute(req, res, slug.slice(2))
     }
+    // Archive / restore / permanently delete a client — see api/_helpers/care/archive.ts
+    if (slug[1] === 'clients' && slug.length >= 3) {
+      return handleClientArchiveRoute(req, res, slug.slice(2))
+    }
     // Admin home — see api/_helpers/care/admin-home.ts
     if (slug[1] === 'home' && slug.length === 2) {
       return handleAdminHome(req, res)
@@ -4587,6 +4600,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Editor active-project limit — see api/_helpers/care/urgent.ts
   if (slug[0] === 'editor-limit' && slug.length === 1) {
     return handleEditorLimit(req, res)
+  }
+  // Client time saved (automatic) — see api/_helpers/care/time-saved.ts
+  if (slug[0] === 'time-saved' && slug.length === 1) {
+    return handleTimeSaved(req, res)
   }
   if (slug[0] === 'editor-home' && slug.length === 1) {
     return handleEditorHome(req, res)

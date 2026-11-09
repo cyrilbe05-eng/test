@@ -14,6 +14,49 @@ import type { Profile, Plan, ChatConnection, ChatGroup } from '@/types'
 interface UserRow extends Profile {
   plans: { name: string; storage_limit_mb: number } | null
   used_bytes: number
+  /** Set when the client is archived (migration 017). */
+  archived_at?: string | null
+}
+
+type TimeSaved = { auto: number; extra: number; total: number }
+/** Automatic time saved per client (api/_helpers/care/time-saved.ts). */
+function useTimeSaved() {
+  const apiFetch = useApiFetch()
+  return useQuery({ queryKey: ['time-saved'], queryFn: () => apiFetch<Record<string, TimeSaved>>('/api/time-saved') })
+}
+
+/** Permanent delete of an archived client: type their exact name. */
+function DeleteClientModal({ user, onClose, onDeleted }: { user: UserRow; onClose: () => void; onDeleted: () => void }) {
+  const apiFetch = useApiFetch()
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const match = typed.trim() === user.full_name.trim()
+  const run = async () => {
+    setBusy(true)
+    try {
+      await apiFetch(`/api/admin/clients/${user.id}`, { method: 'DELETE', body: JSON.stringify({ confirm_name: typed }) })
+      toast.success(`${user.full_name} deleted`)
+      onDeleted()
+    } catch (err) { toast.error((err as Error).message) } finally { setBusy(false) }
+  }
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="Delete permanently" onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm bg-card border border-border rounded-2xl p-5 space-y-4 shadow-2xl">
+        <div>
+          <p className="font-heading font-semibold text-red-600 dark:text-red-400">Delete permanently</p>
+          <p className="text-sm font-medium mt-1 break-words">{user.full_name}</p>
+        </div>
+        <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={user.full_name} aria-label="Client name"
+          className="w-full min-h-[44px] px-3 bg-muted border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30" />
+        <div className="grid grid-cols-2 gap-2">
+          <button className="min-h-[44px] rounded-xl border border-border text-sm hover:bg-muted" onClick={onClose}>Cancel</button>
+          <button disabled={!match || busy} onClick={run}
+            className="min-h-[44px] rounded-xl bg-red-600 text-white text-sm font-semibold hover:brightness-110 disabled:opacity-40">{busy ? 'Deleting…' : 'Delete'}</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -94,6 +137,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
       })
       toast.success('Time saved updated')
       qc.invalidateQueries({ queryKey: ['all_users'] })
+      qc.invalidateQueries({ queryKey: ['time-saved'] })
     } catch (err) {
       toast.error((err as Error).message)
     }
@@ -113,6 +157,8 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
   }
 
   const [editTimeSaved, setEditTimeSaved] = useState(false)
+  const { data: savedMap } = useTimeSaved()
+  const saved = savedMap?.[user.id]
   const [timeSavedInput, setTimeSavedInput] = useState(user.time_saved_hours !== null ? String(user.time_saved_hours) : '')
   const [editClientId, setEditClientId] = useState(false)
   const [clientIdInput, setClientIdInput] = useState(user.client_id_label ?? '')
@@ -247,6 +293,10 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
               {/* Time saved */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Time Saved</p>
+                <p className="flex items-center gap-1.5 text-amber-600 font-semibold mb-2"><IconClock />{saved ? `${saved.total}h` : '—'}
+                  {saved && <span className="text-xs font-normal text-muted-foreground">{saved.auto}h + {saved.extra}h</span>}
+                </p>
+                <p className="text-xs text-muted-foreground mb-1">Extra hours</p>
                 {editTimeSaved ? (
                   <div className="flex items-center gap-2">
                     <input
@@ -263,9 +313,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    {user.time_saved_hours !== null
-                      ? <span className="flex items-center gap-1.5 text-amber-600 font-semibold"><IconClock />{user.time_saved_hours}h saved</span>
-                      : <span className="text-muted-foreground text-sm">Not set</span>}
+                    <span className="text-sm font-medium tabular-nums">{user.time_saved_hours !== null ? `${user.time_saved_hours}h` : '0h'}</span>
                     <button onClick={() => setEditTimeSaved(true)} className="p-1 text-muted-foreground hover:text-primary rounded hover:bg-primary/10 transition-colors"><IconEdit /></button>
                   </div>
                 )}
@@ -420,6 +468,18 @@ export default function AdminUserManagement() {
     } catch (err) { toast.error((err as Error).message) }
   }
 
+  const { data: savedMap } = useTimeSaved()
+  const [deleting, setDeleting] = useState<UserRow | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+  const archiveClient = async (userId: string, name: string, restore = false) => {
+    if (!restore && !confirm(`Archive ${name}?`)) return
+    try {
+      await apiFetch(`/api/admin/clients/${userId}/${restore ? 'restore' : 'archive'}`, { method: 'POST' })
+      toast.success(restore ? `${name} restored` : `${name} archived`)
+      qc.invalidateQueries({ queryKey: ['all_users'] })
+    } catch (err) { toast.error((err as Error).message) }
+  }
+
   const deleteUser = async (userId: string, name: string) => {
     if (!confirm(`Permanently delete "${name}"? This cannot be undone.`)) return
     try {
@@ -478,10 +538,11 @@ export default function AdminUserManagement() {
   const toggleGroupMember = (id: string) =>
     setGroupMembers((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
 
-  const clients = users.filter((u) => u.role === 'client')
+  const clients = users.filter((u) => u.role === 'client' && !u.archived_at)
+  const archivedClients = users.filter((u) => u.role === 'client' && u.archived_at)
   const team = users.filter((u) => u.role === 'team')
   const admins = users.filter((u) => u.role === 'admin')
-  const connectableUsers = users.filter((u) => u.role !== 'admin')
+  const connectableUsers = users.filter((u) => u.role !== 'admin' && !u.archived_at)
 
   return (
     <AdminLayout>
@@ -719,8 +780,8 @@ export default function AdminUserManagement() {
                             ) : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
                           <td className="px-4 py-3">
-                            {u.time_saved_hours !== null
-                              ? <span className="flex items-center gap-1 text-amber-600 font-semibold text-xs"><IconClock />{u.time_saved_hours}h</span>
+                            {savedMap?.[u.id]
+                              ? <span className="flex items-center gap-1 text-amber-600 font-semibold text-xs"><IconClock />{savedMap[u.id].total}h</span>
                               : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
                           <td className="px-4 py-3">
@@ -733,7 +794,7 @@ export default function AdminUserManagement() {
                               {u.disabled
                                 ? <button onClick={() => enableUser(u.id, u.full_name)} className="text-xs text-primary hover:underline">Enable</button>
                                 : <button onClick={() => disableUser(u.id, u.full_name)} className="text-xs text-muted-foreground hover:text-foreground hover:underline">Disable</button>}
-                              {!isManagerViewer && <button onClick={() => deleteUser(u.id, u.full_name)} className="text-xs text-destructive hover:underline">Delete</button>}
+                              <button onClick={() => archiveClient(u.id, u.full_name)} className="text-xs text-destructive hover:underline">Archive</button>
                             </div>
                           </td>
                         </tr>
@@ -746,6 +807,35 @@ export default function AdminUserManagement() {
                 </table>
               </div>
             </section>
+
+            {/* Archived clients: hidden everywhere else; restore or delete permanently */}
+            {archivedClients.length > 0 && (
+              <section className="mb-8">
+                <button onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived}
+                  className="flex items-center gap-2 mb-3 min-h-[44px]">
+                  <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Archived</h2>
+                  <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">{archivedClients.length}</span>
+                  <span className="text-muted-foreground text-xs">{showArchived ? '▾' : '▸'}</span>
+                </button>
+                {showArchived && (
+                  <ul className="clay-card divide-y divide-border/50">
+                    {archivedClients.map((u) => (
+                      <li key={u.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
+                        <div className="flex-1 min-w-[10rem]">
+                          <p className="text-sm font-medium">{u.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{u.email} · {new Date(u.archived_at!).toLocaleDateString()}</p>
+                        </div>
+                        <button onClick={() => archiveClient(u.id, u.full_name, true)}
+                          className="min-h-[44px] px-3 rounded-lg border border-border text-sm hover:bg-muted">Restore</button>
+                        {!isManagerViewer && (
+                          <button onClick={() => setDeleting(u)} className="min-h-[44px] px-3 rounded-lg text-sm text-destructive hover:bg-destructive/10">Delete permanently</button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
 
             {/* Team + Admins */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -843,6 +933,10 @@ export default function AdminUserManagement() {
           onClose={() => setShowCreate(false)}
           onCreated={() => qc.invalidateQueries({ queryKey: ['all_users'] })}
         />
+      )}
+      {deleting && (
+        <DeleteClientModal user={deleting} onClose={() => setDeleting(null)}
+          onDeleted={() => { setDeleting(null); qc.invalidateQueries({ queryKey: ['all_users'] }) }} />
       )}
     </AdminLayout>
   )
