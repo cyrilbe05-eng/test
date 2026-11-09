@@ -6,6 +6,7 @@ import { useApiFetch } from '@/lib/api'
 import { useUploadManager } from '@/lib/uploadManager'
 import { uploadGalleryFile, apiFetchResilient } from '@/lib/storage'
 import { downloadAll } from '@/lib/zipDownload'
+import { grabFrame, saveThumbnail } from '@/lib/thumbnail'
 import {
   useGalleryFiles,
   useGalleryFolders,
@@ -748,7 +749,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
     enqueue(picked.map((file) => ({
       file,
       label: folderName ? `Gallery · ${folderName}` : 'Gallery',
-      invalidate: [['gallery_files', ownerId]],
+      invalidate: [['gallery_files', ownerId], ['gallery_thumbs', ownerId]],
       run: async ({ onProgress, onConnectionState }) => {
         const { storageKey } = await uploadGalleryFile(apiFetch, {
           file,
@@ -758,7 +759,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
         })
         // Bytes are safe in R2 at this point — registration must survive a
         // network blip too, or the upload is orphaned.
-        await apiFetchResilient(apiFetch, '/api/gallery/register', {
+        const row = await apiFetchResilient<{ id?: string }>(apiFetch, '/api/gallery/register', {
           method: 'POST',
           body: JSON.stringify({
             fileName: file.name,
@@ -769,6 +770,11 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
             ownerId,
           }),
         })
+        // Clip thumbnail from the local file (best effort — never fails the upload).
+        if (row?.id && (file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|mkv)$/i.test(file.name))) {
+          const local = URL.createObjectURL(file)
+          try { await saveThumbnail(apiFetch, row.id, await grabFrame(local)) } catch { /* picker backfills later */ } finally { URL.revokeObjectURL(local) }
+        }
       },
     })))
     toast.success(picked.length > 1 ? `${picked.length} files added to the upload queue` : `${picked[0].name} added to the upload queue`)

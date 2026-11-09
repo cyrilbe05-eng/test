@@ -10,7 +10,7 @@ import { useUploadManager } from '@/lib/uploadManager'
 import { autoTitles, isVideo } from '@/lib/autoTitle'
 import { cn } from '@/lib/utils'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
-import { GalleryPickerModal } from '@/pages/workspace/ClientNewProject'
+import { GalleryPickerModal } from '@/components/gallery/GalleryPickerModal'
 import type { GalleryFile } from '@/types'
 
 // One-step "New video" (Part 4). Drop the footage, send. The title fills

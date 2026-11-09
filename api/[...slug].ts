@@ -27,6 +27,7 @@ import { handleAdminHome } from './_helpers/care/admin-home.js'
 import { isBackward } from '../src/lib/statusFlow.js'
 import { handleClientArchiveRoute } from './_helpers/care/archive.js'
 import { handleTimeSaved } from './_helpers/care/time-saved.js'
+import { handleGalleryThumbnail, handleGalleryThumbnails } from './_helpers/care/thumbs.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
@@ -2533,6 +2534,8 @@ async function handleGalleryFile(req: VercelRequest, res: VercelResponse) {
     }
 
     await deleteObject(file.storage_key)
+    const thumb = (file as { thumb_key?: string | null }).thumb_key
+    if (thumb) await deleteObject(thumb).catch(() => {})
     await dbExecute('DELETE FROM gallery_files WHERE id = ?', [fileId])
 
     res.json({ success: true })
@@ -4413,6 +4416,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (slug[1] === 'folders' && slug.length === 3) {
       ;(req as any).query = { ...(req.query || {}), id: slug[2] }
       return handleGalleryFolder(req, res)
+    }
+    // Clip thumbnails — see api/_helpers/care/thumbs.ts
+    if (slug[1] === 'thumbnails' && slug.length === 2) {
+      return handleGalleryThumbnails(req, res)
+    }
+    if (slug.length === 3 && slug[2] === 'thumbnail') {
+      return handleGalleryThumbnail(req, res, slug[1])
     }
     if (slug.length === 2) {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }
