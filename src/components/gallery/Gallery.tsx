@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { useApiFetch } from '@/lib/api'
 import { useUploadManager } from '@/lib/uploadManager'
 import { uploadGalleryFile, apiFetchResilient } from '@/lib/storage'
-import { downloadAsZip } from '@/lib/zipDownload'
+import { downloadAll } from '@/lib/zipDownload'
 import {
   useGalleryFiles,
   useGalleryFolders,
@@ -574,14 +574,14 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   const handleBatchDownload = async () => {
     if (selectedIds.size === 0) return
     const files = currentFiles.filter((f) => selectedIds.has(f.id))
-    // One file: a plain download. Several: ONE zip (separate downloads get
-    // cut off by the browser after the first few).
+    // One file: a plain download. Several: see downloadAll — one resumable
+    // zip on desktop Chrome/Edge, else normal downloads one after another.
     if (files.length === 1) { await handleDownload(files[0].id, files[0].file_name); clearSelection(); return }
     setBatchDownloading(true)
     setBatchDone(0)
     try {
       const folder = folderPath[folderPath.length - 1]?.name ?? 'Gallery'
-      const result = await downloadAsZip(`${folder} ${new Date().toISOString().slice(0, 10)}`, files.map((f) => ({
+      const result = await downloadAll(`${folder} ${new Date().toISOString().slice(0, 10)}`, files.map((f) => ({
         name: f.file_name,
         size: f.file_size,
         url: async () => (await apiFetch<{ url: string }>(`/api/gallery/${f.id}/signed-url?download=1`)).url,
