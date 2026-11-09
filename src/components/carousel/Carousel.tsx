@@ -96,33 +96,35 @@ export function CarouselViewer({ slides, index, onIndex, marked }: {
   if (!n) return null
 
   return (
-    <div className="w-full max-w-md mx-auto select-none">
-      <div
-        className="relative rounded-2xl overflow-hidden bg-black/90"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'ArrowLeft') go(index - 1); if (e.key === 'ArrowRight') go(index + 1) }}
-        aria-roledescription="carousel"
-      >
-        <div ref={track} onScroll={onScroll} className="flex overflow-x-auto snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {slides.map((s, i) => (
-            <div key={s.id} className="w-full flex-shrink-0 snap-center aspect-[4/5] flex items-center justify-center" aria-label={`${i + 1} / ${n}`}>
-              <SlideImg fileId={s.id} className="w-full h-full object-contain" />
-            </div>
-          ))}
-        </div>
-
-        <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/60 text-white text-xs font-medium tabular-nums">
-          {index + 1} / {n}
-        </span>
-        {index > 0 && (
-          <button type="button" aria-label="Previous" onClick={() => go(index - 1)}
-            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/85 text-black items-center justify-center shadow hover:bg-white">
+    <div className="w-full max-w-md sm:max-w-[35rem] mx-auto select-none">
+      {/* Arrows sit outside the slide (desktop) so they never cover the picture. */}
+      <div className="flex items-center gap-3">
+        {n > 1 && (
+          <button type="button" aria-label="Previous" onClick={() => go(index - 1)} disabled={index === 0}
+            className="hidden sm:flex w-11 h-11 flex-shrink-0 rounded-full border border-border bg-card text-foreground items-center justify-center shadow-sm hover:bg-muted transition-opacity disabled:opacity-0 disabled:pointer-events-none">
             <Chevron left />
           </button>
         )}
-        {index < n - 1 && (
-          <button type="button" aria-label="Next" onClick={() => go(index + 1)}
-            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/85 text-black items-center justify-center shadow hover:bg-white">
+        <div
+          className="relative flex-1 min-w-0 rounded-2xl overflow-hidden bg-black/90"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'ArrowLeft') go(index - 1); if (e.key === 'ArrowRight') go(index + 1) }}
+          aria-roledescription="carousel"
+        >
+          <div ref={track} onScroll={onScroll} className="flex overflow-x-auto snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {slides.map((s, i) => (
+              <div key={s.id} className="w-full flex-shrink-0 snap-center aspect-[4/5] flex items-center justify-center" aria-label={`${i + 1} / ${n}`}>
+                <SlideImg fileId={s.id} className="w-full h-full object-contain" />
+              </div>
+            ))}
+          </div>
+          <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/60 text-white text-xs font-medium tabular-nums">
+            {index + 1} / {n}
+          </span>
+        </div>
+        {n > 1 && (
+          <button type="button" aria-label="Next" onClick={() => go(index + 1)} disabled={index >= n - 1}
+            className="hidden sm:flex w-11 h-11 flex-shrink-0 rounded-full border border-border bg-card text-foreground items-center justify-center shadow-sm hover:bg-muted transition-opacity disabled:opacity-0 disabled:pointer-events-none">
             <Chevron />
           </button>
         )}
