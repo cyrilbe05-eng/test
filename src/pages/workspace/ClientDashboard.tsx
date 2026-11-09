@@ -5,9 +5,14 @@ import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { useClientDashboard, useTickClientStep, type ClientDashboard as Dashboard, type DashboardOwner } from '@/hooks/useClientDashboard'
 import { cn } from '@/lib/utils'
 import { ClientBrief } from '@/components/onboarding/ClientBrief'
+import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
+import { useProjects } from '@/hooks/useProjects'
+import { projectTimeLabel } from '@/lib/utils'
+import type { Project } from '@/types'
 
-// Client home: contract timeline → what we need from you → plan; Miro board,
-// SOPs and style on the side.
+// Client home: contract timeline → what we need from you → active videos →
+// plan; Miro board and SOPs on the side. Home is also the "Active" list: a
+// tap on a video opens it.
 // Compact; labels and numbers only. Everything comes from /api/client/dashboard.
 
 const OWNER: Record<DashboardOwner, string> = { client: 'You', pingu: 'Pingu', both: 'Both' }
@@ -61,6 +66,26 @@ function Needs({ items }: { items: Dashboard['needs'] }) {
   )
 }
 
+function Active({ projects }: { projects: Project[] }) {
+  return (
+    <Card title={`Active · ${projects.length}`}>
+      {projects.length ? (
+        <ul className="divide-y divide-border/60 -my-1 -mx-2">
+          {projects.map((p) => (
+            <li key={p.id}>
+              <Link to={`/workspace/projects/${p.id}`} className="flex items-center gap-3 min-h-[44px] px-2 py-1.5 rounded-lg hover:bg-muted/60">
+                <span className="flex-1 min-w-0 text-sm font-medium truncate">{p.title}</span>
+                <span className="hidden sm:inline text-xs text-muted-foreground whitespace-nowrap">{projectTimeLabel(p)}</span>
+                <ProjectStatusBadge status={p.status} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-sm text-muted-foreground">—</p>}
+    </Card>
+  )
+}
+
 function Plan({ steps }: { steps: Dashboard['plan'] }) {
   const tick = useTickClientStep()
   return (
@@ -96,6 +121,10 @@ function Plan({ steps }: { steps: Dashboard['plan'] }) {
 
 export default function ClientDashboard() {
   const { data, isLoading, error } = useClientDashboard()
+  const { data: projects } = useProjects()
+  const active = ((projects ?? []) as Project[])
+    .filter((p) => p.status !== 'client_approved')
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
   // Onboarding opens before the dashboard until it's done.
   if (data?.needs_onboarding) return <Navigate to="/workspace/onboarding" replace />
   return (
@@ -114,15 +143,14 @@ export default function ClientDashboard() {
         ) : data ? (
           <>
             {data.contract && <Timeline c={data.contract} />}
-            {data.needs.length > 0 || data.plan.length > 0 ? (
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
-                <div className="space-y-4 min-w-0">
-                  {data.needs.length > 0 && <Needs items={data.needs} />}
-                  {data.plan.length > 0 && <Plan steps={data.plan} />}
-                </div>
-                <ClientBrief brief={data} noStyle />
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
+              <div className="space-y-4 min-w-0">
+                {data.needs.length > 0 && <Needs items={data.needs} />}
+                <Active projects={active} />
+                {data.plan.length > 0 && <Plan steps={data.plan} />}
               </div>
-            ) : <ClientBrief brief={data} wide noStyle />}
+              <ClientBrief brief={data} noStyle />
+            </div>
           </>
         ) : null}
       </main>

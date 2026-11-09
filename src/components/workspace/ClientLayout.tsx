@@ -111,6 +111,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         >
           <IconHome />
           <span>Home</span>
+          {/* Home is also the Active list. */}
+          {active.length > 0 && <span className="ml-auto text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-medium">{active.length}</span>}
         </Link>
         <Link
           to="/workspace/onboarding"
@@ -121,15 +123,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <span>Onboarding</span>
         </Link>
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-2">Projects</p>
-        <Link
-          to="/workspace/videos"
-          onClick={onClick}
-          className={cn('sidebar-item w-full', pathname === '/workspace/videos' && new URLSearchParams(window.location.search).get('tab') !== 'completed' && 'active')}
-        >
-          <IconVideo />
-          <span>Active</span>
-          <span className="ml-auto text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-medium">{active.length}</span>
-        </Link>
         <Link
           to="/workspace/videos?tab=completed"
           onClick={onClick}

@@ -1,6 +1,4 @@
-import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { formatDistanceToNow } from 'date-fns'
 import { useProjects } from '@/hooks/useProjects'
 import { useAuth } from '@/hooks/useAuth'
 import { useQuery } from '@tanstack/react-query'
@@ -42,55 +40,6 @@ function StatCard({ label, value, sub, icon, color, delay = '' }: {
   )
 }
 
-function ProjectPreviewCard({ project }: { project: Project }) {
-  const needsAction = project.status === 'client_reviewing'
-  return (
-    <div className="clay-card overflow-hidden animate-scale-in">
-      <div className="px-6 py-5 border-b border-border flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-xl font-heading font-bold truncate">{project.title}</h2>
-          {project.description && (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
-          )}
-        </div>
-        <ProjectStatusBadge status={project.status} />
-      </div>
-      <div className="px-6 py-3 flex items-center gap-6 text-xs text-muted-foreground border-b border-border/50 bg-muted/20">
-        <span>{project.status === 'client_approved' ? projectTimeLabel(project) : `Updated ${formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}`}</span>
-        {project.max_client_revisions !== -1
-          ? <span>{project.max_client_revisions - project.client_revision_count} revision(s) left</span>
-          : <span>Unlimited revisions</span>}
-      </div>
-      <div className="px-6 py-5">
-        {needsAction ? (
-          <div className="bg-primary/8 border border-primary/20 rounded-xl px-4 py-3 text-sm text-primary mb-4">
-            Your video is ready to review. Open the project to approve or leave feedback.
-          </div>
-        ) : project.status === 'revision_requested' ? (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-800 mb-4">
-            Revision requested — the team is working on your feedback.
-          </div>
-        ) : project.status === 'in_progress' ? (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800 mb-4">
-            Our team is actively editing your video. You'll be notified when it's ready.
-          </div>
-        ) : project.status === 'client_approved' ? (
-          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800 mb-4">
-            Project complete! Your video has been approved and is available to download.
-          </div>
-        ) : (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 mb-4">
-            Waiting for a team member to be assigned. We'll notify you when work begins.
-          </div>
-        )}
-        <Link to={`/workspace/projects/${project.id}`} className="btn-gradient inline-flex items-center gap-2 text-sm">
-          Open Project <IconChevronRight />
-        </Link>
-      </div>
-    </div>
-  )
-}
-
 export default function ClientWorkspace() {
   const { data: projects, isLoading } = useProjects()
   const { profile } = useAuth()
@@ -108,9 +57,6 @@ export default function ClientWorkspace() {
   const active = allProjects.filter((p) => p.status !== 'client_approved')
   const completed = allProjects.filter((p) => p.status === 'client_approved')
   const displayProjects = tab === 'active' ? active : completed
-
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
-  const selectedProject = allProjects.find((p) => p.id === (activeProjectId ?? displayProjects[0]?.id))
 
   const projectLimitReached = plan && plan.max_active_projects !== -1 && active.length >= plan.max_active_projects
   const timeSaved = profile?.time_saved_hours ?? null
@@ -185,38 +131,23 @@ export default function ClientWorkspace() {
           <div className="space-y-4">
             <div className="space-y-1">
               {displayProjects.map((p, i) => (
-                <button
+                // One tap opens the video (no preview card in between).
+                <Link
                   key={p.id}
-                  onClick={() => setActiveProjectId(p.id)}
+                  to={`/workspace/projects/${p.id}`}
                   className={cn(
-                    'w-full text-left px-3 py-2 rounded-xl border transition-all duration-150 flex items-center gap-3 animate-slide-up',
+                    'w-full text-left px-3 py-2 min-h-[44px] rounded-xl border transition-all duration-150 flex items-center gap-3 animate-slide-up',
                     `stagger-${Math.min(i + 1, 7)}`,
-                    selectedProject?.id === p.id
-                      ? 'bg-primary/10 border-primary/30 text-primary'
-                      : 'bg-card border-border hover:bg-muted/50',
+                    'bg-card border-border hover:bg-muted/50',
                   )}
                 >
-                  <div className={cn('w-2 h-2 rounded-full flex-shrink-0', {
-                    'bg-amber-400': p.status === 'pending_assignment',
-                    'bg-blue-500': p.status === 'in_progress',
-                    'bg-violet-500': p.status === 'in_review',
-                    'bg-orange-500': p.status === 'client_reviewing',
-                    'bg-red-500': p.status === 'revision_requested',
-                    'bg-green-500': p.status === 'client_approved',
-                    'bg-indigo-500': p.status === 'admin_approved',
-                  })} />
                   <span className="flex-1 text-sm font-medium truncate">{p.title}</span>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">{projectTimeLabel(p)}</span>
+                  <span className="hidden sm:inline text-xs text-muted-foreground flex-shrink-0">{projectTimeLabel(p)}</span>
+                  <ProjectStatusBadge status={p.status} />
                   <IconChevronRight />
-                </button>
+                </Link>
               ))}
             </div>
-
-            {selectedProject && (
-              <div className="mt-6">
-                <ProjectPreviewCard project={selectedProject} />
-              </div>
-            )}
           </div>
         )}
       </main>
