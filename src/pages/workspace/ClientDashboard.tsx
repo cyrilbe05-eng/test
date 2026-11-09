@@ -120,9 +120,9 @@ export default function ClientDashboard() {
                   {data.needs.length > 0 && <Needs items={data.needs} />}
                   {data.plan.length > 0 && <Plan steps={data.plan} />}
                 </div>
-                <ClientBrief brief={data} />
+                <ClientBrief brief={data} noStyle />
               </div>
-            ) : <ClientBrief brief={data} wide />}
+            ) : <ClientBrief brief={data} wide noStyle />}
           </>
         ) : null}
       </main>

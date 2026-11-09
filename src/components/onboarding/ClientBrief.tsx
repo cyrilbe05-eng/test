@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import type { Brief } from '@/types/onboarding'
 
 // Miro board · SOPs · Style — the client's Home and the copywriter's page.
-// Always shown, "—" when there is nothing yet.
+// (The client's Home leaves Style out.) Always shown, "—" when there is nothing yet.
 
 function Card({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
@@ -19,9 +19,9 @@ function Card({ title, children, action }: { title: string; children: React.Reac
 
 const empty = <p className="text-sm text-muted-foreground">—</p>
 
-export function ClientBrief({ brief, wide, className }: { brief: Brief; wide?: boolean; className?: string }) {
+export function ClientBrief({ brief, wide, noStyle, className }: { brief: Brief; wide?: boolean; noStyle?: boolean; className?: string }) {
   return (
-    <div className={cn(wide ? 'grid gap-4 md:grid-cols-3 items-start min-w-0' : 'space-y-4 min-w-0', className)}>
+    <div className={cn(wide ? cn('grid gap-4 items-start min-w-0', noStyle ? 'md:grid-cols-2' : 'md:grid-cols-3') : 'space-y-4 min-w-0', className)}>
       <Card
         title="Miro board"
         action={brief.miro_url && (
@@ -40,7 +40,7 @@ export function ClientBrief({ brief, wide, className }: { brief: Brief; wide?: b
           </ul>
         ) : empty}
       </Card>
-      <Card title="Style">
+      {!noStyle && <Card title="Style">
         {brief.style.length ? (
           <dl className="divide-y divide-border/60 -my-1.5">
             {brief.style.map((s) => (
@@ -51,7 +51,7 @@ export function ClientBrief({ brief, wide, className }: { brief: Brief; wide?: b
             ))}
           </dl>
         ) : empty}
-      </Card>
+      </Card>}
     </div>
   )
 }
