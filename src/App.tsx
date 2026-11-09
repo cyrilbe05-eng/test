@@ -43,6 +43,7 @@ import ClientWorkspace from '@/pages/workspace/ClientWorkspace'
 import ClientUpload from '@/pages/workspace/ClientUpload'
 import ClientProjectDetail from '@/pages/workspace/ClientProjectDetail'
 import TeamDashboard from '@/pages/team/TeamDashboard'
+import TeamHome from '@/pages/team/TeamHome'
 import TeamProjectDetail from '@/pages/team/TeamProjectDetail'
 import AdminGallery from '@/pages/admin/AdminGallery'
 import AdminMessages from '@/pages/admin/AdminMessages'
@@ -168,7 +169,9 @@ function ProductionApp() {
           <Route path="/workspace/calendar" element={<ProtectedRoute allowedRoles={['client']}><ClientCalendar /></ProtectedRoute>} />
           <Route path="/workspace/analytics" element={<ProtectedRoute allowedRoles={['client']}><ClientAnalytics /></ProtectedRoute>} />
 
-          <Route path="/team" element={<ProtectedRoute allowedRoles={['team']}><TeamDashboard /></ProtectedRoute>} />
+          {/* Editors: Home (my videos + limit); copywriters: the board. Board for everyone at /team/all. */}
+          <Route path="/team" element={<ProtectedRoute allowedRoles={['team']}><TeamHome /></ProtectedRoute>} />
+          <Route path="/team/all" element={<ProtectedRoute allowedRoles={['team']}><TeamDashboard /></ProtectedRoute>} />
           <Route path="/team/projects/:id" element={<ProtectedRoute allowedRoles={['team']}><TeamProjectDetail /></ProtectedRoute>} />
           <Route path="/team/gallery" element={<ProtectedRoute allowedRoles={['team']}><TeamGallery /></ProtectedRoute>} />
           <Route path="/team/messages" element={<ProtectedRoute allowedRoles={['team']}><TeamMessages /></ProtectedRoute>} />

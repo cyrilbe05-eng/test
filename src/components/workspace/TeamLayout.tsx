@@ -48,13 +48,18 @@ const NAV_LINKS = [
 // editors' menus are unchanged.
 const PLANS_LINK = { to: '/team/plans', label: 'Plans', exact: false, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> }
 
+const ALL_PROJECTS_LINK = { to: '/team/all', label: 'All projects', exact: true, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg> }
+
 interface TeamLayoutProps {
   children: React.ReactNode
 }
 
 export function TeamLayout({ children }: TeamLayoutProps) {
   const { profile, impersonating, stopImpersonating } = useAuth()
-  const links = profile?.team_role === 'copywriter' ? [...NAV_LINKS, PLANS_LINK] : NAV_LINKS
+  // Editors: "Home" (their videos + limit) and the full board under "All projects".
+  const links = profile?.team_role === 'copywriter'
+    ? [...NAV_LINKS, PLANS_LINK]
+    : [{ ...NAV_LINKS[0], label: 'Home' }, ALL_PROJECTS_LINK, ...NAV_LINKS.slice(1)]
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const qc = useQueryClient()

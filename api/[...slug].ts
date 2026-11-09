@@ -22,6 +22,7 @@ import { recordRevisionEntries } from './_helpers/care/sop.js'
 import { handleInstagramRoute } from './_helpers/care/instagram.js'
 import { handleEditorsRoute } from './_helpers/care/editors.js'
 import { mayTake, markUsed, handleRequestUrgent, handleEditorLimit, handleUrgentAdmin } from './_helpers/care/urgent.js'
+import { handleEditorHome } from './_helpers/care/editor-home.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
@@ -4581,6 +4582,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Editor active-project limit — see api/_helpers/care/urgent.ts
   if (slug[0] === 'editor-limit' && slug.length === 1) {
     return handleEditorLimit(req, res)
+  }
+  if (slug[0] === 'editor-home' && slug.length === 1) {
+    return handleEditorHome(req, res)
   }
 
   if (slug[0] === 'team') {
