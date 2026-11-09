@@ -7,8 +7,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        heading: ['Cal Sans', 'Inter', 'system-ui', 'sans-serif'],
+        // Pingu: SF Pro on Apple devices; Inter (already loaded) elsewhere.
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', 'Inter', 'system-ui', 'sans-serif'],
+        heading: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: 'hsl(var(--border))',
@@ -105,8 +106,8 @@ const config: Config = {
           '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
         },
         'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgba(60,70,150,0.0)' },
-          '50%': { boxShadow: '0 0 0 4px rgba(60,70,150,0.18)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 hsl(223 54% 40% / 0)' },
+          '50%': { boxShadow: '0 0 0 4px hsl(223 54% 40% / 0.18)' },
         },
         'status-dot-live': {
           '0%, 100%': { opacity: '1', transform: 'scale(1)' },

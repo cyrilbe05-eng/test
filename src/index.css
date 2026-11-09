@@ -4,81 +4,81 @@
 
 @layer base {
   :root {
-    /* ── Lively indigo-violet palette ── */
-    --background: 220 30% 97%;          /* warm near-white with blue hint */
-    --foreground: 224 20% 10%;          /* deep ink */
+    /* Day: Pingu "light matte" - off-white paper, solid white surfaces,
+       hairlines instead of shadows, navy accent */
+    --background: 60 12% 95%;           /* #F4F4F1 */
+    --foreground: 220 12% 10%;          /* #16181C */
 
-    --card: 0 0% 100%;                  /* pure white cards */
-    --card-foreground: 224 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 12% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 224 20% 10%;
+    --popover-foreground: 220 12% 10%;
 
-    --primary: 234 76% 58%;             /* vivid indigo-violet */
+    --primary: 223 54% 40%;             /* navy #2F4E9E */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 262 60% 62%;           /* playful purple accent */
+    --secondary: 222 57% 64%;           /* #6F8FD8 */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 20% 95%;               /* soft blue-tinted fill */
-    --muted-foreground: 220 10% 46%;    /* medium gray text */
+    --muted: 60 8% 92%;                 /* #EBEBE7 */
+    --muted-foreground: 219 6% 45%;     /* #6B7079 */
 
-    --accent: 280 40% 96%;              /* violet tint accent */
-    --accent-foreground: 234 76% 45%;
+    --accent: 60 8% 92%;
+    --accent-foreground: 223 54% 40%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 4 70% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 20% 90%;              /* light border */
-    --input: 220 20% 95%;
-    --ring: 234 76% 58%;
+    --border: 60 4% 88%;
+    --input: 60 8% 93%;
+    --ring: 223 54% 40%;
 
-    --radius: 0.875rem;                 /* 14px */
+    --radius: 0.875rem;
 
-    /* ── Claymorphism shadow scale (indigo-tinted) ── */
-    --shadow-sm: 0 1px 3px rgba(60,70,150,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 16px rgba(60,70,150,0.09), 0 2px 4px rgba(0,0,0,0.04);
-    --shadow-lg: 0 8px 32px rgba(60,70,150,0.10), 0 4px 8px rgba(0,0,0,0.04);
-    --shadow-xl: 0 16px 48px rgba(60,70,150,0.12), 0 6px 12px rgba(0,0,0,0.06);
-    --shadow-clay: 0 8px 32px rgba(60,70,150,0.14), 0 2px 8px rgba(0,0,0,0.04);
+    --shadow-sm: 0 1px 2px rgba(20,24,30,0.04);
+    --shadow-md: 0 1px 2px rgba(20,24,30,0.04);
+    --shadow-lg: 0 8px 24px rgba(20,24,30,0.08);
+    --shadow-xl: 0 16px 40px rgba(20,24,30,0.12);
+    --shadow-clay: 0 1px 2px rgba(20,24,30,0.04);
   }
 
   .dark {
-    /* ── Dark mode: cool dark grays, same indigo-violet accent ── */
-    --background: 224 20% 10%;          /* deep slate-gray */
-    --foreground: 220 20% 92%;          /* near-white */
+    /* Night: Pingu dark - near-black base, graphite surfaces, white text,
+       navy accent */
+    --background: 220 12% 5%;           /* #0B0C0E */
+    --foreground: 220 9% 94%;           /* #EDEEF0 */
 
-    --card: 224 18% 13%;                /* slightly lifted card surface */
-    --card-foreground: 220 20% 92%;
+    --card: 225 8% 9%;                  /* #16171A */
+    --card-foreground: 220 9% 94%;
 
-    --popover: 224 18% 13%;
-    --popover-foreground: 220 20% 92%;
+    --popover: 225 7% 12%;              /* #1C1D20 */
+    --popover-foreground: 220 9% 94%;
 
-    --primary: 234 76% 62%;             /* same vivid indigo, slightly lifted for dark */
+    --primary: 223 55% 54%;             /* navy, lifted for dark */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 262 55% 65%;           /* same purple accent */
+    --secondary: 222 57% 64%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 224 16% 17%;               /* muted surface */
-    --muted-foreground: 220 12% 54%;    /* medium gray text */
+    --muted: 225 7% 12%;
+    --muted-foreground: 219 7% 57%;     /* #8A8F98 */
 
-    --accent: 234 30% 18%;              /* dark indigo tint */
-    --accent-foreground: 234 76% 72%;
+    --accent: 225 7% 13%;
+    --accent-foreground: 222 57% 70%;
 
-    --destructive: 0 65% 55%;
+    --destructive: 7 75% 63%;           /* #E86A5A */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 224 16% 20%;              /* subtle dark border */
-    --input: 224 16% 17%;
-    --ring: 234 76% 62%;
+    --border: 225 6% 15%;
+    --input: 225 7% 12%;
+    --ring: 222 57% 64%;
 
-    /* ── Dark clay shadows (deeper, indigo-tinted) ── */
-    --shadow-sm:   0 1px 3px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
-    --shadow-md:   0 4px 16px rgba(0,0,0,0.40), 0 2px 4px rgba(0,0,0,0.20);
-    --shadow-lg:   0 8px 32px rgba(0,0,0,0.45), 0 4px 8px rgba(0,0,0,0.25);
-    --shadow-xl:   0 16px 48px rgba(0,0,0,0.50), 0 6px 12px rgba(0,0,0,0.30);
-    --shadow-clay: 0 8px 32px rgba(0,0,0,0.50), 0 2px 8px rgba(60,70,150,0.20);
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.35);
+    --shadow-xl: 0 16px 40px rgba(0,0,0,0.45);
+    --shadow-clay: none;
   }
 }
 
@@ -89,25 +89,18 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    /* Subtle dot-grid texture */
-    background-image: radial-gradient(circle, hsl(234 76% 58% / 0.05) 1px, transparent 1px);
-    background-size: 24px 24px;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight;
   }
 
-  /* Indigo-tinted selection */
   ::selection {
-    background: hsl(234 76% 58% / 0.16);
-    color: hsl(234 76% 35%);
+    background: hsl(223 54% 40% / 0.18);
   }
 
-  /* Focus ring */
   :focus-visible {
-    outline: 2px solid hsl(234 76% 58% / 0.5);
+    outline: 2px solid hsl(var(--ring) / 0.6);
     outline-offset: 2px;
   }
 }
@@ -170,8 +163,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(60,70,150,0.0); }
-  50%       { box-shadow: 0 0 0 4px rgba(60,70,150,0.18); }
+  0%, 100% { box-shadow: 0 0 0 0 hsl(223 54% 40% / 0); }
+  50%       { box-shadow: 0 0 0 4px hsl(223 54% 40% / 0.18); }
 }
 
 @keyframes shimmer {
@@ -216,53 +209,39 @@
 .stagger-6 { animation-delay: 0.24s; }
 .stagger-7 { animation-delay: 0.28s; }
 
-/* ── Gradient primary button ───────────────────────────────────────────── */
+/* Primary button: solid pill */
 .btn-gradient {
-  background: linear-gradient(135deg, hsl(234 76% 58%), hsl(262 60% 62%));
-  @apply rounded-xl px-5 py-2 text-white font-medium text-sm
-         transition-all duration-200 active:scale-[0.98]
-         shadow-[var(--shadow-clay)];
-}
-.btn-gradient:hover {
-  background: linear-gradient(135deg, hsl(234 76% 52%), hsl(262 60% 56%));
-  transform: translateY(-1px);
-  box-shadow: 0 10px 36px rgba(60,70,150,0.22), 0 2px 8px rgba(0,0,0,0.06);
+  @apply bg-primary text-primary-foreground rounded-full px-5 py-2 font-semibold text-sm
+         transition-all duration-150 active:scale-[0.97] hover:brightness-110;
 }
 
-/* ── Logo mark with gradient ───────────────────────────────────────────── */
+/* Logo mark */
 .logo-mark {
-  background: linear-gradient(135deg, hsl(234 76% 58%), hsl(262 60% 62%));
-  box-shadow: 0 4px 16px rgba(60,70,150,0.30), 0 1px 4px rgba(0,0,0,0.08);
-  @apply rounded-xl flex items-center justify-center text-white;
+  @apply bg-foreground text-background rounded-xl flex items-center justify-center;
 }
 
-/* ── Shimmer gradient text ─────────────────────────────────────────────── */
+/* Formerly shimmering gradient text: plain emphasis now */
 .text-shimmer {
-  background: linear-gradient(90deg, hsl(234 76% 58%), hsl(262 60% 62%), hsl(234 76% 58%));
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: shimmer 3s linear infinite;
+  color: inherit;
 }
 
-/* ── Claymorphism glass card ────────────────────────────────────────────── */
+/* Glass: floating bars over content */
 .glass {
-  background: rgba(255,255,255,0.72);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255,255,255,0.9);
-  box-shadow: var(--shadow-md);
+  background: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid hsl(var(--border));
+  box-shadow: var(--shadow-lg);
 }
 
-/* ── Clay card — with hover lift ─────────────────────────────────────────── */
+/* Card: flat surface with a hairline */
 .clay-card {
   @apply bg-card rounded-2xl border border-border;
   box-shadow: var(--shadow-md);
   transition: box-shadow 0.2s cubic-bezier(0.16,1,0.3,1), transform 0.2s cubic-bezier(0.16,1,0.3,1);
 }
 
-/* ── Sidebar nav item ───────────────────────────────────────────────────── */
+/* Sidebar nav item */
 .sidebar-item {
   @apply flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium
          text-muted-foreground hover:text-foreground
@@ -272,8 +251,7 @@
   background: hsl(var(--accent));
 }
 .sidebar-item.active {
-  @apply bg-primary/10 text-primary font-semibold;
-  box-shadow: inset 0 0 0 1px hsl(234 76% 58% / 0.14);
+  @apply bg-foreground/[0.06] text-foreground font-semibold;
 }
 
 /* ── Frame.io timeline comment pin ─────────────────────────────────────── */
@@ -296,17 +274,17 @@
 
 /* ── Plyr custom theme overrides ───────────────────────────────────────── */
 .plyr--video .plyr__control:hover {
-  background: hsl(234 76% 58%);
+  background: hsl(var(--primary));
 }
 .plyr--full-ui input[type=range] {
-  color: hsl(234 76% 58%);
+  color: hsl(var(--primary));
 }
 
 /* ── Scrollbar polish (indigo-tinted) ────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: hsl(234 76% 58% / 0.20); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: hsl(234 76% 58% / 0.40); }
+::-webkit-scrollbar-thumb { background: hsl(var(--foreground) / 0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--foreground) / 0.3); }
 
 /* ── Safe area / iPhone home bar support ─────────────────────────────────── */
 .safe-area-bottom {
