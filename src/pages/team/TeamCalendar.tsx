@@ -69,7 +69,7 @@ function PropRow({ label, children }: { label: string; children: React.ReactNode
 }
 
 // ─── Create event modal ───────────────────────────────────────────────────────
-function CreateEventModal({ defaultDate, onClose, clients }: { defaultDate: Date; onClose: () => void; clients: Profile[] }) {
+function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { defaultDate: Date; onClose: () => void; clients: Profile[]; defaultClientId?: string }) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(format(defaultDate, 'yyyy-MM-dd'))
   const [color, setColor] = useState(EVENT_COLORS[0].value)
@@ -82,7 +82,7 @@ function CreateEventModal({ defaultDate, onClose, clients }: { defaultDate: Date
   const [caption, setCaption] = useState('')
   // Copywriters only (clients is empty for editors) — assigning a client also
   // makes the entry show up in that client's own calendar.
-  const [assignedClientIds, setAssignedClientIds] = useState<string[]>([])
+  const [assignedClientIds, setAssignedClientIds] = useState<string[]>(defaultClientId ? [defaultClientId] : [])
   const createEvent = useCreateCalendarEvent()
 
   const handleCreate = () => {
@@ -441,12 +441,18 @@ export default function TeamCalendar() {
   const [dayDetail, setDayDetail] = useState<Date | null>(null)
   const [filterType, setFilterType] = useState<ContentType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<ContentStatus | 'all'>('all')
+  const [filterClient, setFilterClient] = useState('')
 
   const from = format(startOfWeek(startOfMonth(viewDate)), 'yyyy-MM-dd')
   const to = format(endOfWeek(endOfMonth(viewDate)), 'yyyy-MM-dd')
   const { data: allEvents } = useCalendarEvents(from, to)
 
+  // Project → client, so manual entries linked to a project follow its client.
+  const projectClient = new Map((allEvents ?? []).filter((e) => e.client_id && e.project_id).map((e) => [e.project_id!, e.client_id!]))
+  const forClient = (e: CalendarEvent) =>
+    e.client_id === filterClient || !!e.assigned_client_ids?.includes(filterClient) || (!!e.project_id && projectClient.get(e.project_id) === filterClient)
   const events = (allEvents ?? []).filter((e) => {
+    if (filterClient && !forClient(e)) return false
     if (filterType !== 'all' && e.type === 'manual' && e.content_type !== filterType) return false
     if (filterStatus !== 'all' && e.type === 'manual' && e.content_status !== filterStatus) return false
     return true
@@ -474,6 +480,19 @@ export default function TeamCalendar() {
         {/* Filters */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <span className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Filter:</span>
+          {isCopywriter && assignableClients.length > 0 && (
+            <select
+              value={filterClient}
+              onChange={(e) => setFilterClient(e.target.value)}
+              aria-label="Client"
+              className={cn('h-11 sm:h-8 pl-3 pr-8 rounded-lg text-sm sm:text-xs font-medium border-0 outline-none focus:ring-2 focus:ring-primary/40 max-w-full', filterClient ? 'bg-primary text-white' : 'bg-muted text-foreground')}
+            >
+              <option value="">All clients</option>
+              {[...assignableClients].sort((a, b) => a.full_name.localeCompare(b.full_name)).map((c) => (
+                <option key={c.id} value={c.id}>{c.full_name}</option>
+              ))}
+            </select>
+          )}
           <div className="flex gap-1 flex-wrap">
             <button onClick={() => setFilterType('all')} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium transition-colors', filterType === 'all' ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>All types</button>
             {CONTENT_TYPES.map((t) => (
@@ -537,7 +556,7 @@ export default function TeamCalendar() {
         </div>
       </main>
 
-      {createDay && <CreateEventModal defaultDate={createDay} onClose={() => setCreateDay(null)} clients={assignableClients} />}
+      {createDay && <CreateEventModal defaultDate={createDay} onClose={() => setCreateDay(null)} clients={assignableClients} defaultClientId={filterClient || undefined} />}
       {dayDetail && (
         <DayEventsModal
           day={dayDetail}

@@ -2671,6 +2671,7 @@ async function handleGalleryFolder(req: VercelRequest, res: VercelResponse) {
 interface CalendarDeadlineRow extends Deadline {
   project_title: string
   member_full_name: string
+  project_client_id?: string
 }
 
 interface CalendarProjectRow {
@@ -2766,6 +2767,7 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         id: `ce-created-${p.id}`,
         project_id: p.id,
         type: 'project_created',
+        client_id: p.client_id,
         title: `${p.title} — ${stateLabel}`,
         date: p.created_at.slice(0, 10),
         color: lifecycle.color,
@@ -2782,7 +2784,7 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         deadlineRows = []
       } else if (profile.role === 'admin') {
         deadlineRows = await dbQuery<CalendarDeadlineRow>(
-          `SELECT d.*, pr.title AS project_title, p.full_name AS member_full_name
+          `SELECT d.*, pr.title AS project_title, pr.client_id AS project_client_id, p.full_name AS member_full_name
            FROM deadlines d
            JOIN projects pr ON pr.id = d.project_id
            JOIN profiles p  ON p.id  = d.team_member_id
@@ -2790,7 +2792,7 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         )
       } else {
         deadlineRows = await dbQuery<CalendarDeadlineRow>(
-          `SELECT d.*, pr.title AS project_title, p.full_name AS member_full_name
+          `SELECT d.*, pr.title AS project_title, pr.client_id AS project_client_id, p.full_name AS member_full_name
            FROM deadlines d
            JOIN projects pr ON pr.id = d.project_id
            JOIN profiles p  ON p.id  = d.team_member_id
@@ -2812,6 +2814,7 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
           id: `ce-deadline-${dl.id}`,
           project_id: dl.project_id,
           type: 'deadline',
+          client_id: dl.project_client_id,
           title: `⏰ ${dl.project_title}${suffix}`,
           date: dl.due_at.slice(0, 10),
           color,

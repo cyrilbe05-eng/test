@@ -197,6 +197,8 @@ export interface CalendarEvent {
   posted?: boolean
   assigned_client_ids?: string[]
   assigned_team_ids?: string[]
+  /** Project's client (project and deadline entries). */
+  client_id?: string
   created_at: string
 }
 
