@@ -610,11 +610,14 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
     // Started from a calendar entry ("Create project" button): link them so the
     // entry's colour follows this project's progress (migration 007). Guarded —
     // a missing column or a stale id must never fail project creation.
+    // The entry may be the caller's own, or one a copywriter planned FOR them
+    // (they are a participant) — both link.
     if (calendar_event_id) {
       try {
         await dbExecute(
-          'UPDATE calendar_events SET project_id = ? WHERE id = ? AND (owner_id = ? OR ? = 1)',
-          [id, calendar_event_id, clerkUserId, isAdmin ? 1 : 0],
+          `UPDATE calendar_events SET project_id = ? WHERE id = ? AND (owner_id = ? OR ? = 1
+             OR EXISTS (SELECT 1 FROM calendar_event_participants cp WHERE cp.event_id = calendar_events.id AND cp.profile_id = ?))`,
+          [id, calendar_event_id, clerkUserId, isAdmin ? 1 : 0, clerkUserId],
         )
       } catch { /* pre-migration or not the owner — project is created regardless */ }
     }
@@ -2848,7 +2851,11 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    let filtered = events
+    // A planned entry linked to a project already shows that project's
+    // progress (its colour changes) — don't add a second, automatic entry for
+    // the same project on another day.
+    const linkedToEntry = new Set(manualRows.map((m) => m.project_id).filter(Boolean))
+    let filtered = events.filter((e) => !(e.type === 'project_created' && e.project_id && linkedToEntry.has(e.project_id)))
     if (from) filtered = filtered.filter((e) => e.date >= from)
     if (to)   filtered = filtered.filter((e) => e.date <= to)
 
