@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { useApiFetch } from '@/lib/api'
 import { useUploadManager } from '@/lib/uploadManager'
 import { uploadGalleryFile, apiFetchResilient } from '@/lib/storage'
+import { downloadAsZip } from '@/lib/zipDownload'
 import {
   useGalleryFiles,
   useGalleryFolders,
@@ -562,6 +563,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   // Multi-select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [batchDownloading, setBatchDownloading] = useState(false)
+  const [batchDone, setBatchDone] = useState(0)
 
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) { n.delete(id) } else { n.add(id) } return n })
@@ -571,13 +573,25 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
 
   const handleBatchDownload = async () => {
     if (selectedIds.size === 0) return
-    setBatchDownloading(true)
     const files = currentFiles.filter((f) => selectedIds.has(f.id))
-    for (const f of files) {
-      await handleDownload(f.id, f.file_name)
+    // One file: a plain download. Several: ONE zip (separate downloads get
+    // cut off by the browser after the first few).
+    if (files.length === 1) { await handleDownload(files[0].id, files[0].file_name); clearSelection(); return }
+    setBatchDownloading(true)
+    setBatchDone(0)
+    try {
+      const folder = folderPath[folderPath.length - 1]?.name ?? 'Gallery'
+      const result = await downloadAsZip(`${folder} ${new Date().toISOString().slice(0, 10)}`, files.map((f) => ({
+        name: f.file_name,
+        size: f.file_size,
+        url: async () => (await apiFetch<{ url: string }>(`/api/gallery/${f.id}/signed-url?download=1`)).url,
+      })), setBatchDone)
+      if (result !== 'cancelled') clearSelection()
+    } catch {
+      toast.error('Download failed')
+    } finally {
+      setBatchDownloading(false)
     }
-    setBatchDownloading(false)
-    clearSelection()
   }
 
   const isLoading = filesLoading || foldersLoading
@@ -846,7 +860,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                     ? <div className="w-3 h-3 rounded-full border border-white border-t-transparent animate-spin" />
                     : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   }
-                  Download
+                  {batchDownloading && selectedIds.size > 1 ? `${batchDone}/${selectedIds.size}` : 'Download'}
                 </button>
                 <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground transition-colors">✕</button>
               </>

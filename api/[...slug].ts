@@ -748,6 +748,49 @@ async function handleAssignProject(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+/** An editor assigns themselves to a project: assignment row, next-day
+ *  deadline, admins notified. Shared by "claim" and the download rule.
+ *  Returns false when they were already assigned. */
+async function selfAssign(project: Project, clerkUserId: string, profile: { full_name: string }): Promise<boolean> {
+  const projectId = project.id
+  const now = nowIso()
+  const assignmentId = newId()
+  await dbExecute(
+    `INSERT OR IGNORE INTO project_assignments (id, project_id, team_member_id, assigned_by, assigned_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [assignmentId, projectId, clerkUserId, clerkUserId, now]
+  )
+  // Checked by reading the row back: dbExecute's `changes` is always 0 on
+  // the D1 REST API (it is reported in `meta`, not in `results`).
+  const inserted = (await dbQuery<{ id: string }>('SELECT id FROM project_assignments WHERE id = ?', [assignmentId])).length > 0
+  if (inserted) {
+    // Same deadline policy as an admin assignment: end of next calendar day.
+    const tomorrow = new Date(now)
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+    tomorrow.setUTCHours(23, 59, 0, 0)
+    await dbExecute(
+      `INSERT OR IGNORE INTO deadlines (id, project_id, team_member_id, assignment_id, due_at, status, created_at)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+      [newId(), projectId, clerkUserId, assignmentId, tomorrow.toISOString(), now]
+    )
+
+    const msg = `${profile.full_name} assigned themselves to "${project.title}"`
+    const admins = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
+    await Promise.all(admins.map((a) =>
+      dbExecute(
+        'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
+        [newId(), a.id, projectId, 'team_assigned', msg, now]
+      )
+    ))
+    await sendEmailNotifications(admins.map((a) => ({
+      recipientId: a.id,
+      subject: msg,
+      text: `${msg}\n\nView it here: ${projectUrl(projectId, 'admin')}`,
+    })))
+  }
+  return inserted
+}
+
 /** Team self-assign ("claim"). Mirrors handleAssignProject's side effects
  *  (assignment row, next-day deadline) but is callable by the team member
  *  themselves; admins get notified instead of the assignee. */
@@ -761,41 +804,9 @@ async function handleClaimProject(req: VercelRequest, res: VercelResponse) {
     const [project] = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [projectId])
     if (!project) { res.status(404).json({ error: 'Project not found' }); return }
 
-    const now = nowIso()
-    const assignmentId = newId()
-    const result = await dbExecute(
-      `INSERT OR IGNORE INTO project_assignments (id, project_id, team_member_id, assigned_by, assigned_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [assignmentId, projectId, clerkUserId, clerkUserId, now]
-    )
+    const assigned = await selfAssign(project, clerkUserId, profile)
 
-    if (result.changes > 0) {
-      // Same deadline policy as an admin assignment: end of next calendar day.
-      const tomorrow = new Date(now)
-      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
-      tomorrow.setUTCHours(23, 59, 0, 0)
-      await dbExecute(
-        `INSERT OR IGNORE INTO deadlines (id, project_id, team_member_id, assignment_id, due_at, status, created_at)
-         VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
-        [newId(), projectId, clerkUserId, assignmentId, tomorrow.toISOString(), now]
-      )
-
-      const msg = `${profile.full_name} assigned themselves to "${project.title}"`
-      const admins = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
-      await Promise.all(admins.map((a) =>
-        dbExecute(
-          'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
-          [newId(), a.id, projectId, 'team_assigned', msg, now]
-        )
-      ))
-      await sendEmailNotifications(admins.map((a) => ({
-        recipientId: a.id,
-        subject: msg,
-        text: `${msg}\n\nView it here: ${projectUrl(projectId, 'admin')}`,
-      })))
-    }
-
-    res.json({ ok: true, alreadyAssigned: result.changes === 0 })
+    res.json({ ok: true, alreadyAssigned: !assigned })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
@@ -1773,15 +1784,25 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
         : await getPresignedDownloadUrl(file.storage_key, STREAM_URL_TTL_SECONDS, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
     const servedQuality: 'preview' | 'original' = previewKey ? 'preview' : 'original'
 
-    // Trigger: team member downloading a source file moves project pending_assignment → in_progress
-    if (profile.role === 'team' && file.file_type === 'source_video') {
-      const projectRows = await dbQuery<{ status: string }>('SELECT status FROM projects WHERE id = ?', [file.project_id])
-      if (projectRows[0]?.status === 'pending_assignment') {
-        await dbExecute(
-          'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',
-          ['in_progress', nowIso(), file.project_id]
+    // An EDITOR actually downloading (not just playing) the raw footage of a
+    // pending project takes it: they become its editor and it goes In
+    // Progress. Admins, clients and copywriters never change anything. If
+    // someone else is already assigned, nothing changes either.
+    if (wantDownload && profile.role === 'team' && profile.team_role !== 'copywriter' && file.file_type === 'source_video') {
+      const [project] = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [file.project_id])
+      if (project?.status === 'pending_assignment') {
+        const others = await dbQuery<{ n: number }>(
+          'SELECT COUNT(*) AS n FROM project_assignments WHERE project_id = ? AND team_member_id != ?',
+          [file.project_id, clerkUserId]
         )
-        await recordStatusChange(file.project_id, 'pending_assignment', 'in_progress', clerkUserId)
+        if (!(others[0]?.n > 0)) {
+          await selfAssign(project, clerkUserId, profile)
+          await dbExecute(
+            'UPDATE projects SET status = ?, updated_at = ? WHERE id = ?',
+            ['in_progress', nowIso(), file.project_id]
+          )
+          await recordStatusChange(file.project_id, 'pending_assignment', 'in_progress', clerkUserId)
+        }
       }
     }
 
