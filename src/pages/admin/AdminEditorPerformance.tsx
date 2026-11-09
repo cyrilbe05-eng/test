@@ -1,19 +1,11 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { AdminLayout } from '@/components/admin/AdminLayout'
-import { useEditorPerformance } from '@/hooks/useCare'
+import { Navigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import type { EditorPerformance, PerfStats, PerformancePeriod } from '@/types/editors'
+import type { EditorPerformance, PerfStats } from '@/types/editors'
 
-// Editor Performance (admin-only). Every number is computed by the API
+// Editor Performance — now the "Editors" tab of Analytics (follows its
+// period bar). Every number is computed by the API
 // (api/_helpers/care/editors.ts) with the same definitions as Client Care.
-
-const PERIODS: { key: PerformancePeriod; label: string }[] = [
-  { key: '30', label: '30 days' },
-  { key: '90', label: '90 days' },
-  { key: '365', label: '12 months' },
-  { key: 'all', label: 'All time' },
-]
 
 // Editor colours: validated categorical palette (colour-blind safe, light and
 // dark steps). Assigned by the API's stable legend order, so an editor keeps
@@ -34,25 +26,6 @@ const NEUTRAL = { other: 'bg-zinc-400 dark:bg-zinc-500', unassigned: 'bg-zinc-30
 const fmt = (n: number | null, suffix = '') => (n == null ? '—' : `${n}${suffix}`)
 type Editor = EditorPerformance['editors'][number]
 type Split = EditorPerformance['client_split']
-
-function PeriodPicker({ value, onChange }: { value: PerformancePeriod; onChange: (p: PerformancePeriod) => void }) {
-  return (
-    <div role="radiogroup" aria-label="Period" className="inline-flex rounded-xl border border-border bg-muted/40 p-1 gap-1">
-      {PERIODS.map((p) => (
-        <button
-          key={p.key}
-          role="radio"
-          aria-checked={value === p.key}
-          onClick={() => onChange(p.key)}
-          className={cn('min-h-[44px] px-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
-            value === p.key ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}
-        >
-          {p.label}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -174,42 +147,27 @@ function ClientSplit({ split }: { split: Split }) {
   )
 }
 
-export default function AdminEditorPerformance() {
-  const [params, setParams] = useSearchParams()
-  const raw = params.get('period')
-  const period: PerformancePeriod = raw === '30' || raw === '365' || raw === 'all' ? raw : '90'
-  const { data, isLoading, error } = useEditorPerformance(period)
-  const labels = Object.fromEntries((data?.categories ?? []).map((c) => [c.key, c.label]))
-
+/** The Editors tab of Analytics: one card per editor + who edits each client. */
+export function EditorsPanel({ data }: { data: EditorPerformance }) {
+  const labels = Object.fromEntries(data.categories.map((c) => [c.key, c.label]))
+  if (!data.editors.length) return <div className="clay-card p-6 text-sm text-muted-foreground">—</div>
   return (
-    <AdminLayout>
-      <main className="px-4 md:px-6 py-5 md:py-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h2 className="text-xl font-heading font-semibold tracking-tight">Editors</h2>
-          <PeriodPicker value={period} onChange={(p) => setParams(p === '90' ? {} : { period: p })} />
-        </div>
-
-        {isLoading ? (
-          <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
-        ) : error ? (
-          <div className="clay-card p-6 text-sm">{(error as Error).message}</div>
-        ) : data && data.editors.length === 0 ? (
-          <div className="clay-card p-6 text-sm text-muted-foreground">—</div>
-        ) : data ? (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {data.editors.map((e) => {
-                const inLegend = data.client_split.legend.find((l) => l.key === e.editor_id)
-                return <EditorCard key={e.editor_id} e={e} labels={labels} colorClass={inLegend ? colorFor(e.editor_id, data.client_split.legend) : undefined} />
-              })}
-            </div>
-            <section className="clay-card p-4 md:p-5 min-w-0">
-              <h3 className="font-heading font-semibold mb-3">Who edits each client</h3>
-              <ClientSplit split={data.client_split} />
-            </section>
-          </>
-        ) : null}
-      </main>
-    </AdminLayout>
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {data.editors.map((e) => {
+          const inLegend = data.client_split.legend.find((l) => l.key === e.editor_id)
+          return <EditorCard key={e.editor_id} e={e} labels={labels} colorClass={inLegend ? colorFor(e.editor_id, data.client_split.legend) : undefined} />
+        })}
+      </div>
+      <section className="clay-card p-4 md:p-5 min-w-0">
+        <h3 className="font-heading font-semibold mb-3">Who edits each client</h3>
+        <ClientSplit split={data.client_split} />
+      </section>
+    </div>
   )
+}
+
+/** Old address (/admin/editors) → the Editors tab of Analytics. */
+export default function AdminEditorPerformance() {
+  return <Navigate to="/admin/analytics?tab=editors" replace />
 }

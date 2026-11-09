@@ -1,6 +1,7 @@
 // Editor performance (admin-only):
 //
 //   GET /api/admin/editors/performance?days=30|90|365|all   (default 90)
+//   GET /api/admin/editors/performance?from=ISO&to=ISO     (any range — Analytics period bar)
 //
 // Per editor, and per editor × client:
 //   videos              delivered videos (first version sent to the client in
@@ -37,6 +38,11 @@ interface Bucket {
 }
 const emptyBucket = (): Bucket => ({ turnarounds: [], revisions: [], met: 0, missed: 0, categories: {} })
 
+/** A window: last N days (null = all time), or an explicit {from, to} in ms. */
+export type Span = number | null | { from: number; to: number }
+const bounds = (now: number, w: Span): [number, number] =>
+  w == null ? [-Infinity, now] : typeof w === 'number' ? [now - w * DAY, now] : [w.from, Math.min(w.to, now)]
+
 const round1 = (n: number) => Math.round(n * 10) / 10
 const avg = (xs: number[]) => (xs.length ? round1(xs.reduce((a, b) => a + b, 0) / xs.length) : null)
 
@@ -61,10 +67,10 @@ function summarise(b: Bucket) {
 
 /** Pure aggregation (unit-tested). `days` null = all time. */
 export function aggregateEditorPerformance(
-  clients: ClientInput[], editors: EditorInfo[], categoryCounts: CategoryCount[], now: number, days: number | null,
+  clients: ClientInput[], editors: EditorInfo[], categoryCounts: CategoryCount[], now: number, days: Span,
 ) {
-  const from = days == null ? -Infinity : now - days * DAY
-  const inWindow = (iso: string | null) => !!iso && new Date(iso).getTime() >= from && new Date(iso).getTime() <= now
+  const [from, to] = bounds(now, days)
+  const inWindow = (iso: string | null) => !!iso && new Date(iso).getTime() >= from && new Date(iso).getTime() <= to
   const cell = new Map<string, Bucket>()               // `${editor}|${client}`
   const get = (e: string, c: string) => cell.get(`${e}|${c}`) ?? cell.set(`${e}|${c}`, emptyBucket()).get(`${e}|${c}`)!
 
@@ -142,8 +148,8 @@ const MAX_LEGEND = 8   // categorical colours available; extra editors fold into
 /** Per client: delivered videos in the period and who edited them, as shares
  *  that add up to 100%. A video edited by two editors counts half for each;
  *  a video with no assigned editor shows as "No editor". Pure (unit-tested). */
-export function aggregateClientSplit(clients: ClientInput[], editors: EditorInfo[], now: number, days: number | null) {
-  const from = days == null ? -Infinity : now - days * DAY
+export function aggregateClientSplit(clients: ClientInput[], editors: EditorInfo[], now: number, days: Span) {
+  const [from, to] = bounds(now, days)
   const names = new Map(editors.map((e) => [e.id, e.full_name]))
   const perClient = clients.map((client) => {
     const credit = new Map<string, number>()
@@ -151,7 +157,7 @@ export function aggregateClientSplit(clients: ClientInput[], editors: EditorInfo
     for (const p of client.projects) {
       const f = projectFacts(p, now)
       const t = f.delivered_at ? new Date(f.delivered_at).getTime() : NaN
-      if (!(t >= from && t <= now)) continue
+      if (!(t >= from && t <= to)) continue
       videos++
       const eds = [...new Set(p.editor_ids)]
       if (!eds.length) credit.set('unassigned', (credit.get('unassigned') ?? 0) + 1)
@@ -198,22 +204,34 @@ async function handlePerformance(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     await requireCareAdmin(req)
-    const key = String((req.query as any)?.days ?? '90') as keyof typeof PERIODS
-    if (!(key in PERIODS)) { res.status(400).json({ error: 'days must be 30, 90, 365 or all' }); return }
-    const days = PERIODS[key]
+    const q = req.query as Record<string, string | undefined>
     const now = Date.now()
+    let key: string
+    let days: Span
+    if (q.from || q.to) {
+      const f = Date.parse(q.from ?? ''), t = q.to ? Date.parse(q.to) : now
+      if (Number.isNaN(f) || Number.isNaN(t)) { res.status(400).json({ error: 'from and to must be dates' }); return }
+      key = 'custom'
+      days = { from: Math.min(f, t), to: Math.max(f, t) }
+    } else {
+      key = String(q.days ?? '90')
+      if (!(key in PERIODS)) { res.status(400).json({ error: 'days must be 30, 90, 365 or all' }); return }
+      days = PERIODS[key as keyof typeof PERIODS]
+    }
     await processRevisionsSafely()
 
-    const since = days == null ? null : new Date(now - days * DAY).toISOString()
+    const [fromMs, toMs] = bounds(now, days)
+    const since = Number.isFinite(fromMs) ? new Date(fromMs).toISOString() : null
+    const until = new Date(toMs).toISOString()
     const [clients, editors, categoryCounts] = await Promise.all([
       loadClients(undefined, { includeDisabled: true }),
       dbQuery<EditorInfo>("SELECT id, full_name, team_role, disabled FROM profiles WHERE role = 'team'"),
       dbQuery<CategoryCount>(
         `SELECT editor_id, client_id, category, COUNT(*) AS n FROM revision_entries
          WHERE editor_id IS NOT NULL AND processed_at IS NOT NULL AND processed_at NOT LIKE 'claim:%'
-         ${since ? 'AND created_at >= ?' : ''}
+         ${since ? 'AND created_at >= ?' : ''} AND created_at <= ?
          GROUP BY editor_id, client_id, category`,
-        since ? [since] : [],
+        since ? [since, until] : [until],
       ).catch(() => [] as CategoryCount[]),
     ])
 

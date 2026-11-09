@@ -12,6 +12,16 @@ export function useEditorPerformance(period: PerformancePeriod) {
   })
 }
 
+/** Any range (Analytics period bar): `query` = "from=…&to=…" or "days=all". */
+export function useEditorPerformanceRange(query: string) {
+  const apiFetch = useApiFetch()
+  return useQuery({
+    queryKey: ['editors', 'performance', query],
+    retry: false,
+    queryFn: () => apiFetch<EditorPerformance>(`/api/admin/editors/performance?${query}`),
+  })
+}
+
 export function useCareOverview() {
   const apiFetch = useApiFetch()
   return useQuery({

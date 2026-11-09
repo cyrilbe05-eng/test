@@ -113,3 +113,15 @@ describe('aggregateClientSplit', () => {
     expect(clients[0].split.reduce((s, x) => s + x.share, 0)).toBe(100)
   })
 })
+
+describe('explicit from/to window', () => {
+  it('only counts deliveries inside the window', async () => {
+    const { aggregateClientSplit: split } = await import('./editors')
+    const all = split([client], editors, NOW, null)
+    const none = split([client], editors, NOW, { from: NOW - 1000, to: NOW })
+    expect(all.clients.length).toBeGreaterThan(0)
+    expect(none.clients.reduce((a, c) => a + c.videos, 0)).toBe(0)
+    const wide = split([client], editors, NOW, { from: 0, to: NOW + 1e12 })
+    expect(wide).toEqual(all)
+  })
+})

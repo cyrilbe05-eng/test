@@ -16,7 +16,7 @@ export interface PerfStats {
 
 export interface EditorPerformance {
   generated_at: string
-  period: PerformancePeriod
+  period: PerformancePeriod | 'custom'
   categories: { key: RevisionCategory; label: string }[]
   editors: {
     editor_id: string
