@@ -2,15 +2,18 @@ import { Link, useParams } from 'react-router-dom'
 import { TeamLayout } from '@/components/workspace/TeamLayout'
 import { PlanEditor } from '@/components/plans/PlanEditor'
 import { usePlan } from '@/hooks/usePlans'
+import { useClientBrief } from '@/hooks/useOnboarding'
+import { ClientBrief } from '@/components/onboarding/ClientBrief'
 
-// Copywriter: one client's production plan.
+// Copywriter: one client's production plan, with their Miro board, SOPs and style.
 
 export default function TeamPlan() {
   const { contractId } = useParams()
   const { data, isLoading, error } = usePlan(contractId)
+  const { data: brief } = useClientBrief(data?.client.id)
   return (
     <TeamLayout>
-      <main className="px-4 md:px-6 py-5 md:py-6 space-y-4 max-w-3xl">
+      <main className="px-4 md:px-6 py-5 md:py-6 space-y-4 max-w-6xl">
         <div className="flex items-center gap-2">
           <Link to="/team/plans" aria-label="Plans" className="w-11 h-11 -ml-2 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -28,9 +31,12 @@ export default function TeamPlan() {
         ) : error ? (
           <div className="clay-card p-5 text-sm">{(error as Error).message}</div>
         ) : data ? (
-          <section className="clay-card p-3 md:p-4">
-            <PlanEditor plan={data} />
-          </section>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
+            <section className="clay-card p-3 md:p-4 min-w-0">
+              <PlanEditor plan={data} />
+            </section>
+            {brief && <ClientBrief brief={brief} />}
+          </div>
         ) : null}
       </main>
     </TeamLayout>

@@ -16,6 +16,9 @@ import type { Project } from '@/types'
 function IconHome() {
   return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
 }
+function IconOnboarding() {
+  return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+}
 function IconVideo() {
   return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg>
 }
@@ -108,6 +111,14 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         >
           <IconHome />
           <span>Home</span>
+        </Link>
+        <Link
+          to="/workspace/onboarding"
+          onClick={onClick}
+          className={cn('sidebar-item w-full', isActive('/workspace/onboarding') && 'active')}
+        >
+          <IconOnboarding />
+          <span>Onboarding</span>
         </Link>
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-2">Projects</p>
         <Link
@@ -259,6 +270,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             <div className="w-full h-px bg-border/60 mb-1" />
             {[
               { to: '/workspace', icon: <IconHome />, label: 'Home', exact: true },
+              { to: '/workspace/onboarding', icon: <IconOnboarding />, label: 'Onboarding' },
               { to: '/workspace/videos', icon: <IconVideo />, label: 'Videos' },
               { to: '/workspace/gallery', icon: <IconFolder />, label: 'Gallery' },
               { to: '/workspace/messages', icon: <IconChat />, label: 'Messages' },

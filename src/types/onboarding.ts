@@ -50,3 +50,10 @@ export interface Question {
 }
 
 export type QuestionBody = Partial<Omit<Question, 'id' | 'sort_order'>>
+
+/** Miro board, SOPs and style answers (api/_helpers/care/brief.ts). */
+export interface Brief {
+  miro_url: string | null
+  sops: string[]
+  style: { question: string; type: QuestionType; value: AnswerValue }[]
+}

@@ -9,6 +9,7 @@
 //   PATCH  /api/team/plans/items/:id                edit / tick a step
 //   DELETE /api/team/plans/items/:id
 //   /api/team/clients/:id/onboarding...           see onboarding.ts
+//   GET    /api/team/clients/:id/brief               Miro, SOPs, style (brief.ts)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAuth } from '../auth.js'
@@ -18,6 +19,7 @@ import { loadClients } from './data.js'
 import { loadAssignments, isAssigned, planWithState, createPlanFromTemplate, overdueClientSteps, PLAN_OWNERS, AUTO_RULES, type PlanOwner, type AutoRule } from './plans.js'
 import { todayUtc } from './contracts.js'
 import { handleTeamOnboarding } from './onboarding.js'
+import { loadBrief } from './brief.js'
 
 type Caller = { id: string; isAdmin: boolean }
 
@@ -113,6 +115,13 @@ export async function handleTeamRoute(req: VercelRequest, res: VercelResponse, r
       const caller = await requirePlanner(req)
       await requireClientAccess(caller, rest[1])
       return await handleTeamOnboarding(req, res, caller, rest[1], rest.slice(3))
+    }
+    // /clients/:id/brief
+    if (rest[0] === 'clients' && rest[2] === 'brief' && rest.length === 3) {
+      if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
+      const caller = await requirePlanner(req)
+      await requireClientAccess(caller, rest[1])
+      res.json(await loadBrief(rest[1])); return
     }
     if (rest[0] !== 'plans') { res.status(404).json({ error: 'Not found' }); return }
     const caller = await requirePlanner(req)

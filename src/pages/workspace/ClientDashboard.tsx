@@ -4,8 +4,10 @@ import { toast } from 'sonner'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { useClientDashboard, useTickClientStep, type ClientDashboard as Dashboard, type DashboardOwner } from '@/hooks/useClientDashboard'
 import { cn } from '@/lib/utils'
+import { ClientBrief } from '@/components/onboarding/ClientBrief'
 
-// Client home: contract timeline → what we need from you → plan → your style.
+// Client home: contract timeline → what we need from you → plan; Miro board,
+// SOPs and style on the side.
 // Compact; labels and numbers only. Everything comes from /api/client/dashboard.
 
 const OWNER: Record<DashboardOwner, string> = { client: 'You', pingu: 'Pingu', both: 'Both' }
@@ -112,19 +114,15 @@ export default function ClientDashboard() {
         ) : data ? (
           <>
             {data.contract && <Timeline c={data.contract} />}
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
-              <div className="space-y-4 min-w-0">
-                {data.needs.length > 0 && <Needs items={data.needs} />}
-                {data.plan.length > 0 && <Plan steps={data.plan} />}
+            {data.needs.length > 0 || data.plan.length > 0 ? (
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
+                <div className="space-y-4 min-w-0">
+                  {data.needs.length > 0 && <Needs items={data.needs} />}
+                  {data.plan.length > 0 && <Plan steps={data.plan} />}
+                </div>
+                <ClientBrief brief={data} />
               </div>
-              {data.style.length > 0 && (
-                <Card title="Your style">
-                  <ul className="space-y-2 text-sm">
-                    {data.style.map((s) => <li key={s} className="flex gap-2"><span className="text-muted-foreground" aria-hidden>–</span><span className="break-words">{s}</span></li>)}
-                  </ul>
-                </Card>
-              )}
-            </div>
+            ) : <ClientBrief brief={data} wide />}
           </>
         ) : null}
       </main>

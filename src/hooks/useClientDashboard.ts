@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
+import type { Brief } from '@/types/onboarding'
 
 export type DashboardOwner = 'pingu' | 'client' | 'both'
 
-export interface ClientDashboard {
+export interface ClientDashboard extends Brief {
   name: string
   needs_onboarding: boolean
   contract: { number: number; package: string; start_date: string; end_date: string; day: number; total_days: number; days_left: number; progress: number } | null
@@ -13,7 +14,6 @@ export interface ClientDashboard {
     | { type: 'footage'; project_id: string; title: string }
   )[]
   plan: { id: string; date: string; title: string; owner: DashboardOwner; done: boolean; state: string; can_tick: boolean }[]
-  style: string[]
 }
 
 export function useClientDashboard() {

@@ -14,7 +14,7 @@ import { sendError, processRevisionsSafely } from './access.js'
 import { loadClients } from './data.js'
 import { daysUntilDate, type ClientInput } from './compute.js'
 import { overdueClientSteps, planWithState } from './plans.js'
-import { loadClientRevisions } from './sop.js'
+import { loadBrief } from './brief.js'
 import { handleClientOnboarding } from './onboarding.js'
 
 const DAY = 86_400_000
@@ -26,7 +26,7 @@ export type NeedItem =
   | { type: 'footage'; project_id: string; title: string }
 
 /** Pure: the whole dashboard for one client (unit-tested). */
-export function buildDashboard(client: ClientInput, styleRules: { text: string; count: number }[], now: number) {
+export function buildDashboard(client: ClientInput, now: number) {
   const k = client.contract ?? null
   let contract = null
   if (k) {
@@ -65,7 +65,6 @@ export function buildDashboard(client: ClientInput, styleRules: { text: string; 
       id: i.id, date: i.date, title: i.title, owner: i.owner, done: i.done, state: i.state,
       can_tick: i.owner !== 'pingu',
     })),
-    style: [...styleRules].sort((a, b) => b.count - a.count).map((r) => r.text),
   }
 }
 
@@ -79,8 +78,8 @@ async function dashboardFor(clientId: string) {
   await processRevisionsSafely(clientId)
   const [client] = await loadClients(clientId)
   if (!client) throw Object.assign(new Error('Not found'), { status: 404 })
-  const { sop_rules } = await loadClientRevisions(clientId).catch(() => ({ sop_rules: [] as { text: string; count: number }[] }))
-  return buildDashboard(client, sop_rules, Date.now())
+  // Miro board, SOPs, style — same brief the copywriter sees.
+  return { ...buildDashboard(client, Date.now()), ...(await loadBrief(clientId)) }
 }
 
 /** Router entry. `rest` = path after /api/client. */

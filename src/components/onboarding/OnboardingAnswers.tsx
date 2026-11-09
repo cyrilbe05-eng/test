@@ -14,7 +14,8 @@ type Q = TeamOnboarding['sections'][number]['questions'][number]
 const btn = 'min-h-[44px] px-3 rounded-lg border border-border text-sm hover:bg-muted disabled:opacity-50'
 const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
 
-function Answer({ q }: { q: Q }) {
+/** Read-only answer: text, clickable links, downloadable files. */
+export function Answer({ q }: { q: Pick<Q, 'type' | 'value'> }) {
   const v = q.value
   if (v == null || (Array.isArray(v) && !v.length)) return <p className="text-sm text-muted-foreground">—</p>
   if (q.type === 'link') {

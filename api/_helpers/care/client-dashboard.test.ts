@@ -19,11 +19,11 @@ const base: ClientInput = {
 
 describe('buildDashboard', () => {
   it('contract timeline: day X of Y, days left, contract number', () => {
-    expect(buildDashboard(base, [], NOW).contract).toEqual({
+    expect(buildDashboard(base, NOW).contract).toEqual({
       number: 2, package: 'full_package', start_date: '2026-11-01', end_date: '2026-11-30',
       day: 8, total_days: 30, days_left: 22, progress: 27,
     })
-    expect(buildDashboard({ ...base, contract: null }, [], NOW).contract).toBeNull()
+    expect(buildDashboard({ ...base, contract: null }, NOW).contract).toBeNull()
   })
 
   it('what we need: overdue client steps, videos to review, requests without footage', () => {
@@ -40,7 +40,7 @@ describe('buildDashboard', () => {
         project({ id: 'ok', title: 'Has footage', status: 'pending_assignment', has_footage: true }),
         project({ id: 'done', title: 'Approved', status: 'client_approved', has_footage: false }),
       ],
-    }, [], NOW)
+    }, NOW)
     expect(d.needs).toEqual([
       { type: 'plan_step', id: 'call', title: 'Onboarding call', date: '2026-11-03', days_late: 5 },
       { type: 'review', project_id: 'r', title: 'Promo' },
@@ -49,12 +49,7 @@ describe('buildDashboard', () => {
   })
 
   it('plan: client/both steps are tickable, Pingu steps are not', () => {
-    const d = buildDashboard({ ...base, plan: [step({ id: 'a', date: '2026-11-20', owner: 'pingu' }), step({ id: 'b', date: '2026-11-21', owner: 'client', sort_order: 1 })] }, [], NOW)
+    const d = buildDashboard({ ...base, plan: [step({ id: 'a', date: '2026-11-20', owner: 'pingu' }), step({ id: 'b', date: '2026-11-21', owner: 'client', sort_order: 1 })] }, NOW)
     expect(d.plan.map((p) => [p.id, p.can_tick])).toEqual([['a', false], ['b', true]])
-  })
-
-  it('your style: rule text only, most frequent first', () => {
-    expect(buildDashboard(base, [{ text: 'Bigger captions', count: 2 }, { text: 'Warmer colours', count: 6 }], NOW).style)
-      .toEqual(['Warmer colours', 'Bigger captions'])
   })
 })

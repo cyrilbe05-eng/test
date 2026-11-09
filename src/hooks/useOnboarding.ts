@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
-import type { AnswerValue, ClientOnboarding, FileRef, Question, QuestionBody, TeamOnboarding } from '@/types/onboarding'
+import type { AnswerValue, Brief, ClientOnboarding, FileRef, Question, QuestionBody, TeamOnboarding } from '@/types/onboarding'
 
 const json = (method: string, body: unknown) => ({ method, body: JSON.stringify(body) })
 type AnswerItem = { question_id: string; value: AnswerValue }
@@ -17,10 +17,11 @@ export function useSaveClientOnboarding() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: { answers?: AnswerItem[]; done?: true }) => apiFetch<ClientOnboarding>('/api/client/onboarding', json('PUT', body)),
-    onSuccess: (d, v) => {
-      // Typing autosaves: keep the local draft, only refresh status.
-      qc.setQueryData<ClientOnboarding>(['client', 'onboarding'], (old) => (old && !v.done ? { ...old, status: d.status, done_at: d.done_at } : d))
-      if (v.done) qc.invalidateQueries({ queryKey: ['client', 'dashboard'] })
+    onSuccess: (d) => {
+      // The question-by-question screen keeps its own draft, so this never
+      // overwrites what they are typing.
+      qc.setQueryData<ClientOnboarding>(['client', 'onboarding'], d)
+      qc.invalidateQueries({ queryKey: ['client', 'dashboard'] })
     },
   })
 }
@@ -87,4 +88,16 @@ export function useQuestionActions() {
     update: useMutation({ mutationFn: ({ id, ...b }: QuestionBody & { id: string }) => apiFetch<Question[]>(`${base}/${id}`, json('PATCH', b)), ...store }),
     reorder: useMutation({ mutationFn: (order: string[]) => apiFetch<Question[]>(base, json('PATCH', { order })), ...store }),
   }
+}
+
+// ── Brief (Miro, SOPs, style) for the copywriter's client page ─────────────
+
+export function useClientBrief(clientId: string | null | undefined) {
+  const apiFetch = useApiFetch()
+  return useQuery({
+    queryKey: ['brief', clientId],
+    enabled: !!clientId,
+    retry: false,
+    queryFn: () => apiFetch<Brief>(`/api/team/clients/${clientId}/brief`),
+  })
 }
