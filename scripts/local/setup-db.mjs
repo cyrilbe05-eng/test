@@ -376,12 +376,11 @@ db.exec(m013.slice(m013.indexOf('-- COPY')))
   const answer = (clientKey, qid, value, by) => insert('onboarding_answers', {
     id: randomUUID(), client_id: clientIds[clientKey], question_id: qid, answer: value, file_url: null,
     updated_at: iso(daysAgo(30)), updated_by: by ?? clientIds[clientKey] })
-  answer('renewal', 'obq_01', '@harbor.homes')
   answer('renewal', 'obq_02', 'Referral')
   answer('renewal', 'obq_03', 'Sam from Peak Coffee')
   answer('renewal', 'obq_04', 'Saw the before/after edits for Peak and wanted the same pace.')
   const BLOOM = {
-    obq_01: '@bloom.bakery', obq_02: 'Instagram', obq_04: 'Their reels felt like us, not like an agency.',
+    obq_02: 'Instagram', obq_04: 'Their reels felt like us, not like an agency.',
     obq_05: 'Price, and whether they would get our humour.', obq_06: "Lyon, in the back of my parents' bakery.",
     obq_10: 'The 5am quiet before the shop opens.', obq_12: 'Sourdough, viennoiserie, wedding cakes. Ideal client: locals who care where bread comes from.',
     obq_19: 'Warm, nerdy, fast', obq_20: '"Proper bread"', obq_21: '"Artisanal"', obq_26: 'Hungry and a bit nostalgic.',

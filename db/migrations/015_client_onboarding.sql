@@ -52,9 +52,9 @@ ALTER TABLE client_care ADD COLUMN onboarding_status TEXT
   CHECK (onboarding_status IS NULL OR onboarding_status IN ('in_progress', 'done'));
 ALTER TABLE client_care ADD COLUMN onboarding_done_at TEXT;
 
--- The 36 starting questions, in order.
+-- The 35 starting questions, in order. (No Instagram question: it is
+-- entered when the account is created.)
 INSERT OR IGNORE INTO onboarding_questions (id, section, text, type, options, required, admin_only, sort_order, packages) VALUES
-  ('obq_01', 'Getting started', 'What''s your Instagram?', 'short_text', NULL, 1, 0, 10, 'both'),
   ('obq_02', 'Getting started', 'How did you first hear about us?', 'choice', '["Instagram","YouTube","Referral","Cold DM","Email","Other"]', 1, 0, 20, 'both'),
   ('obq_03', 'Getting started', 'If applicable, who referred you or what specific post/message led you to us?', 'text', NULL, 0, 0, 30, 'both'),
   ('obq_04', 'Getting started', 'What made you decide to work with us?', 'text', NULL, 1, 1, 40, 'both'),
