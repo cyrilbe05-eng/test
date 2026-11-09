@@ -115,25 +115,20 @@ function ClientSplit({ split }: { split: Split }) {
                 <span className="font-semibold break-words min-w-0">{c.name}</span>
                 <span className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{c.videos} video{c.videos === 1 ? '' : 's'}</span>
               </div>
-              {/* 100% stacked bar; 2px surface gap between segments. */}
-              <div className="flex h-3.5 gap-[2px] rounded-full overflow-hidden mt-1.5 bg-muted" role="img" aria-label={`${c.name}: ${label}`}>
+              {/* 100% stacked bar, % written inside each segment (the legend
+                  above names the colours). Tiny segments keep it in the tooltip. */}
+              <div className="flex h-6 gap-[2px] rounded-full overflow-hidden mt-1.5 bg-muted" role="img" aria-label={`${c.name}: ${label}`}>
                 {c.split.filter((s) => s.share > 0).map((s) => (
                   <span
                     key={s.key}
-                    className={cn('h-full first:rounded-l-full last:rounded-r-full', colorFor(s.key, split.legend))}
+                    className={cn('h-full flex items-center justify-center text-[11px] font-semibold text-white tabular-nums first:rounded-l-full last:rounded-r-full', colorFor(s.key, split.legend))}
                     style={{ width: `${s.share}%` }}
                     title={`${names[s.key]}: ${s.videos} of ${c.videos} video${c.videos === 1 ? '' : 's'} (${s.share}%)`}
-                  />
-                ))}
-              </div>
-              <p className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-muted-foreground">
-                {c.split.map((s) => (
-                  <span key={s.key} className="flex items-center gap-1 tabular-nums">
-                    <span className={cn('w-2 h-2 rounded-full', colorFor(s.key, split.legend))} aria-hidden />
-                    <span className="text-foreground">{names[s.key]}</span> {s.share}%
+                  >
+                    {s.share >= 10 ? `${s.share}%` : ''}
                   </span>
                 ))}
-              </p>
+              </div>
             </li>
           )
         })}
