@@ -259,7 +259,7 @@ async function handleDeleteUser(req: VercelRequest, res: VercelResponse) {
     if (!target) { res.status(404).json({ error: 'User not found' }); return }
     if (target.role === 'admin') { res.status(403).json({ error: 'Cannot delete an admin account' }); return }
     // Clients: archive first, then the permanent delete (DELETE /api/admin/clients/:id).
-    if (target.role === 'client') { res.status(400).json({ error: 'Archive the client first, then delete permanently' }); return }
+    if (String(target.role) === 'client') { res.status(400).json({ error: 'Archive the client first, then delete permanently' }); return }
 
     let storageKeys: string[] = []
 
