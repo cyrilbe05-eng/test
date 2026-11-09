@@ -28,6 +28,7 @@ import { isBackward } from '../src/lib/statusFlow.js'
 import { handleClientArchiveRoute } from './_helpers/care/archive.js'
 import { handleTimeSaved } from './_helpers/care/time-saved.js'
 import { handleGalleryThumbnail, handleGalleryThumbnails } from './_helpers/care/thumbs.js'
+import { handleFileOrder } from './_helpers/care/carousel.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
@@ -558,7 +559,7 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
       res.status(403).json({ error: 'Forbidden' }); return
     }
 
-    const { title, description, inspiration_url, video_script, instructions, client_id: bodyClientId, calendar_event_id } = req.body
+    const { title, description, inspiration_url, video_script, instructions, client_id: bodyClientId, calendar_event_id, kind } = req.body
     if (!title) { res.status(400).json({ error: 'title required' }); return }
 
     // Admins can specify a client_id override; otherwise use their own id
@@ -629,6 +630,12 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
           [id, calendar_event_id, clerkUserId, isAdmin ? 1 : 0, clerkUserId],
         )
       } catch { /* pre-migration or not the owner — project is created regardless */ }
+    }
+
+    // Carousel (migration 019). Before the migration the project is created
+    // as a normal one rather than failing.
+    if (kind === 'carousel') {
+      try { await dbExecute("UPDATE projects SET kind = 'carousel' WHERE id = ?", [id]) } catch { /* pre-migration */ }
     }
 
     const rows = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [id])
@@ -1301,7 +1308,13 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
       if (file_type === 'deliverable') {
         const [projInfo] = await dbQuery<{ title: string }>('SELECT title FROM projects WHERE id = ?', [project_id])
         const deliverableMsg = `New deliverable uploaded for "${projInfo?.title ?? project_id}"`
-        const adminsForDeliverable = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
+        // Several files in one go (carousel slides) → one notification, not one each.
+        const recent = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+        const [already] = await dbQuery<{ id: string }>(
+          'SELECT id FROM notifications WHERE project_id = ? AND message = ? AND created_at > ? LIMIT 1',
+          [project_id, deliverableMsg, recent],
+        )
+        const adminsForDeliverable = already ? [] : await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
         await Promise.all(adminsForDeliverable.map(async (a) => {
           await dbExecute(
             'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
@@ -3677,7 +3690,8 @@ async function handleCreateTimelineComment(req: VercelRequest, res: VercelRespon
   try {
     const { clerkUserId, profile } = await requireAuth(req)
 
-    const { project_id, timestamp_sec, timestamp_end_sec, comment_text, revision_round } = req.body
+    const { project_id, timestamp_sec, timestamp_end_sec, comment_text, revision_round, slide } = req.body
+    const slideNo = Number.isInteger(slide) && slide > 0 && slide <= 100 ? (slide as number) : null
 
     if (!project_id || !comment_text) {
       res.status(400).json({ error: 'project_id and comment_text required' }); return
@@ -3721,7 +3735,12 @@ async function handleCreateTimelineComment(req: VercelRequest, res: VercelRespon
       )
     }
 
-    res.status(201).json({ id, project_id, author_id: clerkUserId, author_role, timestamp_sec: timestamp_sec ?? null, timestamp_end_sec: timestamp_end_sec ?? null, comment_text, revision_round: revision_round ?? 1, created_at: now })
+    // Carousel comment → which slide (migration 019).
+    if (slideNo) {
+      try { await dbExecute('UPDATE timeline_comments SET slide = ? WHERE id = ?', [slideNo, id]) } catch { /* pre-migration */ }
+    }
+
+    res.status(201).json({ id, project_id, author_id: clerkUserId, author_role, timestamp_sec: timestamp_sec ?? null, timestamp_end_sec: timestamp_end_sec ?? null, comment_text, revision_round: revision_round ?? 1, created_at: now, ...(slideNo ? { slide: slideNo } : {}) })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: friendlyDbError(e) })
   }
@@ -4349,6 +4368,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (slug[2] === 'complete') return handleMultipartComplete(req, res)
       if (slug[2] === 'abort') return handleMultipartAbort(req, res)
       res.status(404).json({ error: 'Not found' }); return
+    }
+    if (slug[1] === 'order' && slug.length === 2) {
+      return handleFileOrder(req, res)
     }
     if (slug.length === 2 && req.method === 'DELETE') {
       ;(req as any).query = { ...(req.query || {}), id: slug[1] }

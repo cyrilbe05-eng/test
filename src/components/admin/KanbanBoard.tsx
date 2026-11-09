@@ -147,7 +147,10 @@ export function KanbanBoard({ projects }: Props) {
                     landed === project.id && 'motion-safe:animate-spring-pop ring-2 ring-primary/40')}
                 >
                   <Link to={`/admin/projects/${project.id}`} className="block">
-                    <p className="font-medium text-sm text-foreground line-clamp-2 leading-snug">{project.title}</p>
+                    <div className="flex items-start gap-1">
+                      <p className="font-medium text-sm text-foreground line-clamp-2 leading-snug flex-1">{project.title}</p>
+                      {project.kind === 'carousel' && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 flex-shrink-0 mt-0.5">Carousel</span>}
+                    </div>
                     {project.profiles?.full_name && (
                       <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
                         <span className="w-1 h-1 rounded-full bg-muted-foreground/40 flex-shrink-0" />

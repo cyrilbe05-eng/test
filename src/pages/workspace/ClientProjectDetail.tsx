@@ -11,6 +11,9 @@ import { FileUploader } from '@/components/project/FileUploader'
 import { useAuth } from '@/hooks/useAuth'
 import { useApiFetch } from '@/lib/api'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
+import { CarouselReview } from '@/components/carousel/Carousel'
+import { slidesOf } from '@/lib/slides'
+import { downloadAll, uniqueNames } from '@/lib/zipDownload'
 import type { ProjectFile } from '@/types'
 
 function IconArrowLeft() {
@@ -146,6 +149,10 @@ export default function ClientProjectDetail() {
   const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable')
   const approvedDeliverables = deliverables.filter((f) => f.approved)
   const latestDeliverable = deliverables[0]
+  // Carousel (Stage G): the deliverables are the slides, in order.
+  const isCarousel = project?.kind === 'carousel'
+  const slides = slidesOf(files, 'deliverable')
+  const noun = isCarousel ? 'carousel' : 'video'
 
   const remaining = project
     ? project.max_client_revisions === -1
@@ -159,13 +166,13 @@ export default function ClientProjectDetail() {
   const revisionRound = project ? project.client_revision_count + 1 : 1
 
   const handleApprove = async () => {
-    if (!id || !confirm('Approve this video? This will finalise your project and unlock the download.')) return
+    if (!id || !confirm(`Approve this ${noun}? This will finalise your project and unlock the download.`)) return
     try {
       await apiFetch('/api/projects/' + id + '/approve-client', {
         method: 'POST',
-        body: JSON.stringify({ file_id: latestDeliverable?.id }),
+        body: JSON.stringify({ file_id: isCarousel ? undefined : latestDeliverable?.id }),
       })
-      toast.success('Video approved!')
+      toast.success(isCarousel ? 'Carousel approved!' : 'Video approved!')
       refetchProject()
     } catch (err) {
       toast.error((err as Error).message)
@@ -200,6 +207,25 @@ export default function ClientProjectDetail() {
       }
     }
     setSubmitting(false)
+  }
+
+  const [zipping, setZipping] = useState(false)
+  const handleDownloadSlides = async () => {
+    if (!id || !project) return
+    const approved = slides.filter((f) => f.approved)
+    const names = uniqueNames(approved.map((f, i) => `${String(i + 1).padStart(2, '0')} ${f.file_name}`))
+    setZipping(true)
+    try {
+      await downloadAll(project.title, approved.map((f, i) => ({
+        name: names[i],
+        size: f.file_size ?? 0,
+        url: async () => (await apiFetch<{ signedUrl: string }>(`/api/downloads/${id}/${f.id}?download=1`)).signedUrl,
+      })))
+      refetchFiles()
+    } catch {
+      toast.error('Download failed')
+    }
+    setZipping(false)
   }
 
   const handleDownload = async (file?: { id: string; file_name?: string }) => {
@@ -270,8 +296,8 @@ export default function ClientProjectDetail() {
         {/* Status banners */}
         <div className="space-y-2 mb-4">
           {project.status === 'pending_assignment' && <StatusBanner color="amber">Your project is waiting for a team member to be assigned. We'll notify you when work begins.</StatusBanner>}
-          {project.status === 'in_progress' && <StatusBanner color="blue">Our team is actively working on your video. You'll be notified when it's ready to review.</StatusBanner>}
-          {project.status === 'in_review' && <StatusBanner color="purple">Your video is being quality-checked by our team. Almost there!</StatusBanner>}
+          {project.status === 'in_progress' && <StatusBanner color="blue">Our team is actively working on your {noun}. You'll be notified when it's ready to review.</StatusBanner>}
+          {project.status === 'in_review' && <StatusBanner color="purple">Your {noun} is being quality-checked by our team. Almost there!</StatusBanner>}
           {project.status === 'revision_requested' && <StatusBanner color="red">Your feedback has been submitted. The team is working on the revisions.</StatusBanner>}
         </div>
 
@@ -288,7 +314,7 @@ export default function ClientProjectDetail() {
                   : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
-              {tab === 'review' ? '📺 My Video' : '📁 Files'}
+              {tab === 'review' ? (isCarousel ? '🖼️ My Carousel' : '📺 My Video') : '📁 Files'}
             </button>
           ))}
         </div>
@@ -308,6 +334,17 @@ export default function ClientProjectDetail() {
         {activeTab === 'review' && (
           (canReview || isApproved) && latestDeliverable ? (
             <div className="space-y-4 animate-slide-up stagger-2">
+              {isCarousel ? (
+                <CarouselReview
+                  projectId={project.id}
+                  slides={slides}
+                  comments={comments ?? []}
+                  userId={profile!.id}
+                  canComment={canComment}
+                  revisionRound={revisionRound}
+                  onChanged={refetchComments}
+                />
+              ) : (
               <TimelineCommentor
                 storageKey={latestDeliverable.storage_key}
                 fileId={latestDeliverable.id}
@@ -321,6 +358,7 @@ export default function ClientProjectDetail() {
                 theater={theater}
                 onTheaterToggle={() => setTheater((t) => !t)}
               />
+              )}
 
               <div className={cn('gap-5', theater ? 'flex items-start' : 'space-y-4')}>
                 <div className={cn('space-y-3', theater && 'flex-1')}>
@@ -331,7 +369,7 @@ export default function ClientProjectDetail() {
                         className="flex items-center gap-2 px-5 py-2.5 bg-green-600 rounded-xl text-white font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.98] shadow-clay"
                       >
                         <IconThumbUp />
-                        Approve Video
+                        {isCarousel ? 'Approve Carousel' : 'Approve Video'}
                       </button>
                       <button
                         onClick={handleReject}
@@ -346,11 +384,12 @@ export default function ClientProjectDetail() {
                   {isApproved && approvedDeliverables.length > 0 && (
                     <div className="animate-slide-up stagger-3">
                       <button
-                        onClick={() => handleDownload()}
+                        onClick={() => (isCarousel ? handleDownloadSlides() : handleDownload())}
+                        disabled={zipping}
                         className="flex items-center gap-2 px-5 py-2.5 bg-primary rounded-xl text-white font-semibold text-sm shadow-clay hover:brightness-110 transition-all active:scale-[0.98]"
                       >
                         <IconDownload />
-                        Download Video
+                        {isCarousel ? (zipping ? 'Downloading…' : 'Download Slides') : 'Download Video'}
                       </button>
                     </div>
                   )}
@@ -366,7 +405,7 @@ export default function ClientProjectDetail() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
                     </svg>
                   </div>
-                  <p className="text-muted-foreground text-sm">Your video will appear here when it's ready</p>
+                  <p className="text-muted-foreground text-sm">Your {noun} will appear here when it's ready</p>
                 </div>
               </div>
             </div>

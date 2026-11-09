@@ -6,6 +6,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { useProject, useProjectFiles, useProjectAssignments, useTimelineComments, useUpdateProjectStatus } from '@/hooks/useProjects'
 import { TimelineCommentor } from '@/components/project/TimelineCommentor'
+import { CarouselReview, SlideManager } from '@/components/carousel/Carousel'
+import { slidesOf } from '@/lib/slides'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
 import { ReviewCopyControl } from '@/components/project/ReviewCopyControl'
@@ -178,6 +180,9 @@ export default function AdminProjectDetail() {
   const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable')
   const sourceFiles = (files ?? []).filter((f) => f.file_type !== 'deliverable')
   const latestDeliverable = deliverables[0]
+  // Carousel (Stage G): the deliverables are the slides, in order.
+  const isCarousel = project?.kind === 'carousel'
+  const slides = slidesOf(files, 'deliverable')
 
   const assignTeamMember = async () => {
     if (!selectedTeamMember || !id || !profile) return
@@ -321,8 +326,8 @@ export default function AdminProjectDetail() {
             <div className="flex items-center justify-between gap-2 mb-3 overflow-hidden">
               <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground truncate">Deliverables</h3>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <DeliverableCounter used={deliverables.length} max={project.max_deliverables} />
-                <button
+                {!isCarousel && <DeliverableCounter used={deliverables.length} max={project.max_deliverables} />}
+                {!isCarousel && <button
                   onClick={async () => {
                     const input = prompt('Deliverable limit for this project (-1 for unlimited):', String(project.max_deliverables))
                     if (input === null) return
@@ -338,9 +343,12 @@ export default function AdminProjectDetail() {
                   title="Change deliverable limit"
                 >
                   ✎
-                </button>
+                </button>}
               </div>
             </div>
+            {isCarousel ? (
+              <SlideManager projectId={project.id} slides={slides} canEdit onChanged={() => qc.invalidateQueries({ queryKey: ['project_files', id] })} />
+            ) : (
             <div className="space-y-0.5">
               {deliverables.length === 0
                 ? <p className="text-xs text-muted-foreground">None uploaded</p>
@@ -356,6 +364,7 @@ export default function AdminProjectDetail() {
                     </div>
                   ))}
             </div>
+            )}
           </div>
 
           {/* Team assignment */}
@@ -620,7 +629,18 @@ export default function AdminProjectDetail() {
             {/* Review tab */}
             {activeTab === 'review' && (
               <div className="animate-slide-up">
-                {latestDeliverable ? (
+                {isCarousel && slides.length > 0 ? (
+                  <CarouselReview
+                    projectId={project.id}
+                    slides={slides}
+                    comments={comments ?? []}
+                    userId={profile!.id}
+                    canComment
+                    canResolve
+                    revisionRound={revisionRound}
+                    onChanged={() => refetchComments()}
+                  />
+                ) : latestDeliverable ? (
                   <TimelineCommentor
                     storageKey={latestDeliverable.storage_key}
                     fileId={latestDeliverable.id}

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -11,6 +11,8 @@ import { autoTitles, isVideo } from '@/lib/autoTitle'
 import { cn } from '@/lib/utils'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { GalleryPickerModal } from '@/components/gallery/GalleryPickerModal'
+import { SlideSorter } from '@/components/carousel/Carousel'
+import { isImage, isPdf, toSlides } from '@/lib/pdfSlides'
 import type { GalleryFile } from '@/types'
 
 // One-step "New video" (Part 4). Drop the footage, send. The title fills
@@ -20,6 +22,8 @@ import type { GalleryFile } from '@/types'
 // queue as the old form (ClientNewProject, kept but no longer routed).
 
 type Picked = { id: string; file: File }
+type Slide = Picked & { url: string }
+type Kind = 'video' | 'carousel'
 type Mode = 'separate' | 'one'
 type Prefill = { title?: string; inspiration_url?: string; video_script?: string; instructions?: string; fromEventTitle?: string; fromEventId?: string }
 
@@ -51,6 +55,12 @@ export default function ClientUpload() {
   const { data: projects = [] } = useProjects()
   const prefill = ((useLocation().state as { prefill?: Prefill } | null)?.prefill) ?? {}
 
+  const [kind, setKind] = useState<Kind>('video')
+  const [slides, setSlides] = useState<Slide[]>([])
+  const [preparing, setPreparing] = useState(false)
+  const slidesRef = useRef(slides)
+  slidesRef.current = slides
+  useEffect(() => () => slidesRef.current.forEach((x) => URL.revokeObjectURL(x.url)), [])
   const [videos, setVideos] = useState<Picked[]>([])
   const [files, setFiles] = useState<Picked[]>([])
   const [gallery, setGallery] = useState<GalleryFile[]>([])
@@ -67,7 +77,8 @@ export default function ClientUpload() {
   const [sending, setSending] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const separate = mode === 'separate' && videos.length > 1
+  const carousel = kind === 'carousel'
+  const separate = !carousel && mode === 'separate' && videos.length > 1
   const count = separate ? videos.length : 1
   const auto = useMemo(() => {
     const t = autoTitles(profile?.full_name, new Date(), projects, count)
@@ -76,8 +87,27 @@ export default function ClientUpload() {
   }, [profile?.full_name, projects, count, prefill.title])
   const titleFor = (key: string, i: number) => titles[key] ?? auto[i] ?? ''
 
+  const addSlides = async (list: File[]) => {
+    const others = list.filter((f) => !isImage(f) && !isPdf(f))
+    setFiles((s) => [...s, ...others.map((file) => ({ id: crypto.randomUUID(), file }))])
+    setPreparing(true)
+    try {
+      const made = await toSlides(list.filter((f) => isImage(f) || isPdf(f)))
+      setSlides((s) => [...s, ...made.map((file) => ({ id: crypto.randomUUID(), file, url: URL.createObjectURL(file) }))])
+    } catch {
+      toast.error('Could not read that PDF')
+    }
+    setPreparing(false)
+  }
+  const removeSlide = (id: string) => setSlides((s) => {
+    const gone = s.find((x) => x.id === id)
+    if (gone) URL.revokeObjectURL(gone.url)
+    return s.filter((x) => x.id !== id)
+  })
+
   const add = (list: FileList | null) => {
     if (!list?.length) return
+    if (carousel) { void addSlides(Array.from(list)); return }
     const all = Array.from(list).map((file) => ({ id: crypto.randomUUID(), file }))
     const v = all.filter((p) => isVideo(p.file))
     setFiles((s) => [...s, ...all.filter((p) => !isVideo(p.file))])
@@ -87,7 +117,7 @@ export default function ClientUpload() {
   const drop = (id: string) => setVideos((s) => s.filter((p) => p.id !== id))
 
   const send = async () => {
-    const groups = separate ? videos.map((v) => ({ key: v.id, videos: [v] })) : [{ key: '', videos }]
+    const groups = separate ? videos.map((v) => ({ key: v.id, videos: [v] })) : [{ key: '', videos: carousel ? [] : videos }]
     const names = groups.map((g, i) => titleFor(g.key, i).trim())
     if (names.some((n) => n.length < 2)) { toast.error('Title required'); return }
     if (link.trim() && !/^https?:\/\/\S+$/i.test(link.trim())) { toast.error('Link must start with https://'); return }
@@ -104,9 +134,25 @@ export default function ClientUpload() {
             instructions: notes.trim() || undefined,
             // One calendar entry = one video: only the first is linked.
             calendar_event_id: i === 0 ? prefill.fromEventId ?? null : null,
+            ...(carousel ? { kind: 'carousel' } : {}),
           }),
         })
         created.push(id)
+        // Carousel: each image goes up in the background like a video, then
+        // says which slide it is.
+        if (carousel) {
+          enqueue(slides.map((sl, n) => ({
+            file: sl.file,
+            label: `${sl.file.name} · ${names[i]}`,
+            invalidate: [['project_files', id], ['projects']],
+            run: ({ onProgress, onConnectionState }) =>
+              storage.upload({ file: sl.file, projectId: id, fileType: 'source_video', onProgress, onConnectionState })
+                .then(({ fileId }) => fileId
+                  ? apiFetch('/api/project-files/order', { method: 'PUT', body: JSON.stringify({ project_id: id, ids: [fileId], from: n }) }).catch(() => undefined)
+                  : undefined)
+                .then(() => undefined),
+          })))
+        }
         enqueue([
           ...g.videos.map((p) => ({ file: p.file, fileType: 'source_video' as const })),
           ...files.map((p) => ({ file: p.file, fileType: 'attachment' as const })),
@@ -149,10 +195,19 @@ export default function ClientUpload() {
       <main className="max-w-2xl px-4 md:px-6 pt-5 pb-24 md:py-8">
         <form noValidate className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (!sending) void send() }}>
           <div className="flex items-center justify-between gap-3 min-w-0">
-            <h1 className="text-xl md:text-2xl font-heading font-semibold tracking-tight">New video</h1>
+            <h1 className="text-xl md:text-2xl font-heading font-semibold tracking-tight">{carousel ? 'New carousel' : 'New video'}</h1>
             {prefill.fromEventTitle && (
               <span className="min-w-0 truncate text-xs font-medium px-2.5 py-1 rounded-full bg-primary/10 text-primary">{prefill.fromEventTitle}</span>
             )}
+          </div>
+
+          <div role="radiogroup" aria-label="Type" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted">
+            {([['video', 'Video'], ['carousel', 'Carousel']] as const).map(([k, label]) => (
+              <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => setKind(k)}
+                className={cn('min-h-[40px] rounded-lg text-sm font-medium', kind === k ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                {label}
+              </button>
+            ))}
           </div>
 
           {!separate && (
@@ -173,14 +228,22 @@ export default function ClientUpload() {
               dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-muted/50')}
           >
             <p className={cn('text-sm font-medium', dragging ? 'text-primary' : 'text-muted-foreground')}>
-              {dragging ? 'Drop' : <>Drop videos or <span className="text-primary">browse</span></>}
+              {dragging ? 'Drop' : preparing ? '…' : <>{carousel ? 'Drop images or a PDF' : 'Drop videos'} or <span className="text-primary">browse</span></>}
             </p>
           </div>
           <input ref={fileInput} type="file" multiple hidden onChange={(e) => { add(e.target.files); e.target.value = '' }} />
 
-          {videos.length > 1 && <Segmented value={mode} onChange={setMode} />}
+          {carousel && slides.length > 0 && (
+            <SlideSorter
+              items={slides.map((x) => ({ id: x.id, name: x.file.name, src: x.url }))}
+              onReorder={(ids) => setSlides((s) => ids.map((id) => s.find((x) => x.id === id)!))}
+              onRemove={removeSlide}
+            />
+          )}
 
-          {videos.length > 0 && (
+          {!carousel && videos.length > 1 && <Segmented value={mode} onChange={setMode} />}
+
+          {!carousel && videos.length > 0 && (
             <ul className="space-y-1.5">
               {videos.map((p, i) => (
                 <li key={p.id} className={cn(row, separate && 'flex-wrap py-2')}>
@@ -238,7 +301,7 @@ export default function ClientUpload() {
             {!showScript && <button type="button" className={secondary} onClick={() => setShowScript(true)}>+ Script</button>}
           </div>
 
-          <button type="submit" disabled={sending}
+          <button type="submit" disabled={sending || preparing}
             className="w-full min-h-[48px] rounded-xl bg-primary text-white text-sm font-semibold hover:brightness-110 disabled:opacity-50">
             {sending ? 'Sending…' : separate ? `Send ${videos.length} videos` : 'Send'}
           </button>

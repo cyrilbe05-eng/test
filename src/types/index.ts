@@ -88,6 +88,8 @@ export interface Project {
   client_revision_count: number
   created_at: string
   updated_at: string
+  /** 'carousel' (migration 019); null/absent = video. */
+  kind?: 'video' | 'carousel' | null
 }
 
 /** Team sub-type (migration 006): copywriters are team members who can also
@@ -111,6 +113,8 @@ export interface ProjectFile {
   preview_file_size?: number | null
   /** First time the client downloaded this deliverable (migration 005). */
   downloaded_at?: string | null
+  /** Slide position (migration 019). */
+  sort_order?: number | null
 }
 
 export interface ProjectAssignment {
@@ -139,6 +143,8 @@ export interface TimelineComment {
   resolved?: number
   resolved_by?: string | null
   resolved_at?: string | null
+  /** Carousel slide number, 1-based (migration 019). */
+  slide?: number | null
 }
 
 export interface Notification {

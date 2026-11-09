@@ -14,6 +14,8 @@ import { ReviewCopyControl } from '@/components/project/ReviewCopyControl'
 import { ProjectInstagram } from '@/components/care/ProjectInstagram'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { TimelineCommentor } from '@/components/project/TimelineCommentor'
+import { CarouselReview, SlideManager, SlideSorter } from '@/components/carousel/Carousel'
+import { slidesOf } from '@/lib/slides'
 import { cn, projectTimeLabel } from '@/lib/utils'
 
 function formatBytes(bytes: number | null): string {
@@ -219,6 +221,11 @@ export default function TeamProjectDetail() {
   const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable')
   const latestDeliverable = deliverables[0]
   const sourceFiles = (files ?? []).filter((f) => f.file_type !== 'deliverable')
+  // Carousel (Stage G): finished slides = deliverables, client images = sources, both in order.
+  const isCarousel = project?.kind === 'carousel'
+  const slides = slidesOf(files, 'deliverable')
+  const clientSlides = slidesOf(files, 'source_video')
+  const filesChanged = () => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }); qc.invalidateQueries({ queryKey: ['project', id] }) }
 
   const canUpload = project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment'
   const canSubmitReview = canUpload && deliverables.length > 0
@@ -300,7 +307,19 @@ export default function TeamProjectDetail() {
             </div>
 
             {/* Same player as the review screen: timeline + comment markers */}
-            {latestDeliverable && profile && (
+            {isCarousel && slides.length > 0 && profile && (
+              <CarouselReview
+                projectId={project.id}
+                slides={slides}
+                comments={comments ?? []}
+                userId={profile.id}
+                canComment={false}
+                canResolve
+                revisionRound={project.client_revision_count + 1}
+                onChanged={() => refetchComments()}
+              />
+            )}
+            {!isCarousel && latestDeliverable && profile && (
               <TimelineCommentor
                 storageKey={latestDeliverable.storage_key}
                 fileId={latestDeliverable.id}
@@ -320,6 +339,11 @@ export default function TeamProjectDetail() {
                 <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Source Files from Client</h3>
                 <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{sourceFiles.length}</span>
               </div>
+              {isCarousel && clientSlides.length > 0 && (
+                <div className="p-3 pb-1">
+                  <SlideSorter items={clientSlides.map((f) => ({ id: f.id, name: f.file_name, fileId: f.id }))} onReorder={() => {}} disabled />
+                </div>
+              )}
               <div className="p-2">
                 {sourceFiles.length === 0 ? (
                   <p className="text-muted-foreground text-sm px-3 py-4 text-center">No source files uploaded yet</p>
@@ -349,7 +373,7 @@ export default function TeamProjectDetail() {
             </div>
 
             {/* Revision comments (the player above lists them once there's a video) */}
-            {!latestDeliverable && comments && comments.length > 0 && (
+            {!(isCarousel ? slides.length : latestDeliverable) && comments && comments.length > 0 && (
               <div className="clay-card overflow-hidden">
                 <div className="px-4 py-3 border-b border-border/60 flex items-center gap-2">
                   <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -417,8 +441,14 @@ export default function TeamProjectDetail() {
             <div className="clay-card overflow-hidden">
               <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between gap-2 overflow-hidden">
                 <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground truncate">Your Deliverable</h3>
-                <div className="flex-shrink-0"><DeliverableCounter used={deliverables.length} max={project.max_deliverables} /></div>
+                {!isCarousel && <div className="flex-shrink-0"><DeliverableCounter used={deliverables.length} max={project.max_deliverables} /></div>}
               </div>
+              {isCarousel && (
+                <div className="p-3">
+                  <SlideManager projectId={project.id} slides={slides} canEdit={canUpload} onChanged={filesChanged} />
+                </div>
+              )}
+              {!isCarousel && (<>
               <div className="p-3 space-y-1">
                 {deliverables.map((f) => (
                   <div key={f.id}>
@@ -451,6 +481,7 @@ export default function TeamProjectDetail() {
                   />
                 </div>
               )}
+              </>)}
               {!canUpload && (
                 <p className="px-4 pb-3 text-xs text-muted-foreground">
                   {project.status === 'in_review' || project.status === 'admin_approved'

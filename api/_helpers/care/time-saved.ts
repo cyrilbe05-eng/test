@@ -46,9 +46,15 @@ async function load(clientId?: string): Promise<Record<string, TimeSaved>> {
   const where = clientId ? 'AND p.client_id = ?' : ''
   const args = clientId ? [clientId] : []
   // Delivery moment = the latest move to Client Approved (else last update).
-  const delivered = await dbQuery<{ client_id: string; delivered_at: string }>(
-    `SELECT p.client_id, COALESCE((SELECT MAX(h.created_at) FROM status_history h WHERE h.project_id = p.id AND h.new_status = 'client_approved'), p.updated_at) AS delivered_at
-     FROM projects p WHERE p.status = 'client_approved' ${where}`, args)
+  const sql = (kind: string) =>
+    `SELECT p.client_id, ${kind} COALESCE((SELECT MAX(h.created_at) FROM status_history h WHERE h.project_id = p.id AND h.new_status = 'client_approved'), p.updated_at) AS delivered_at
+     FROM projects p WHERE p.status = 'client_approved' ${where}`
+  let delivered: { client_id: string; delivered_at: string; kind?: string | null }[]
+  try {
+    delivered = await dbQuery(sql('p.kind,'), args)
+  } catch {
+    delivered = await dbQuery(sql(''), args) // before migration 019: all videos
+  }
   let contracts: (ContractLite & { client_id: string })[] = []
   try {
     contracts = await dbQuery(`SELECT client_id, start_date, end_date, package FROM client_contracts${clientId ? ' WHERE client_id = ?' : ''}`, args)

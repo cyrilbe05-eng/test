@@ -43,6 +43,7 @@
     "jose": "^5.9.6",
     "lucide-react": "^0.462.0",
     "nodemailer": "^8.0.2",
+    "pdfjs-dist": "4.10.38",
     "plyr": "^3.7.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

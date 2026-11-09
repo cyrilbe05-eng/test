@@ -66,6 +66,7 @@ function TeamKanban({ projects }: { projects: (Project & { is_assigned?: boolean
                   <Link to={`/team/projects/${p.id}`} className="block">
                     <div className="flex items-start justify-between gap-1 mb-0.5">
                       <p className="font-medium text-sm text-foreground line-clamp-2 leading-snug flex-1">{p.title}</p>
+                      {p.kind === 'carousel' && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 flex-shrink-0 mt-0.5">Carousel</span>}
                       {(p as any).is_assigned && (
                         <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary flex-shrink-0 mt-0.5">Mine</span>
                       )}
