@@ -27,6 +27,8 @@ export interface ProjectInput {
   editor_ids: string[]
   /** The client has uploaded footage for this request. */
   has_footage?: boolean
+  /** The client has uploaded anything (footage or a file) for this request. */
+  has_upload?: boolean
 }
 
 export interface CareFields {

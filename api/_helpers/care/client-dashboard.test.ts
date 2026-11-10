@@ -48,6 +48,11 @@ describe('buildDashboard', () => {
     ])
   })
 
+  it('needs: a project with any client upload (even just a file) needs no Upload', () => {
+    const d = buildDashboard({ ...base, projects: [project({ id: 'pdf', title: 'Brief only', status: 'pending_assignment', has_footage: false, has_upload: true })] }, NOW)
+    expect(d.needs.filter((n) => n.type === 'footage')).toEqual([])
+  })
+
   it('plan: client/both steps are tickable, Pingu steps are not', () => {
     const d = buildDashboard({ ...base, plan: [step({ id: 'a', date: '2026-11-20', owner: 'pingu' }), step({ id: 'b', date: '2026-11-21', owner: 'client', sort_order: 1 })] }, NOW)
     expect(d.plan.map((p) => [p.id, p.can_tick])).toEqual([['a', false], ['b', true]])

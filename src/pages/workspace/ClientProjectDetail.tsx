@@ -19,6 +19,7 @@ import { downloadAll, uniqueNames } from '@/lib/zipDownload'
 import type { ProjectFile } from '@/types'
 import { MarkPosted } from '@/components/project/MarkPosted'
 import { ScriptCard } from '@/components/project/ScriptCard'
+import { useQueryClient } from '@tanstack/react-query'
 
 function IconArrowLeft() {
   return (
@@ -145,6 +146,9 @@ export default function ClientProjectDetail() {
   const [activeTab, setActiveTab] = useState<'review' | 'storage'>('review')
   const { data: project, refetch: refetchProject } = useProject(id)
   const { data: files, refetch: refetchFiles } = useProjectFiles(id)
+  const qc = useQueryClient()
+  // Home's "Upload" to-do goes away once anything is uploaded.
+  const filesUploaded = () => { refetchFiles(); qc.invalidateQueries({ queryKey: ['client', 'dashboard'] }) }
   const { data: comments, refetch: refetchComments } = useTimelineComments(id)
   const [submitting, setSubmitting] = useState(false)
 
@@ -339,7 +343,7 @@ export default function ClientProjectDetail() {
             approvedDeliverables={approvedDeliverables}
             projectId={id!}
             onDownload={handleDownload}
-            onUploaded={refetchFiles}
+            onUploaded={filesUploaded}
           />
         )}
 
@@ -417,7 +421,7 @@ export default function ClientProjectDetail() {
             <div className="animate-fade-in space-y-4">
               <ScriptCard entry={project.script_entry ?? { script: project.video_script, inspiration_url: project.inspiration_url, comments: project.instructions }} />
               {files && !hasFootage && !latestDeliverable ? (
-                <FileUploader projectId={id!} fileType="source_video" accept="video/*,image/*,.pdf,.zip,.doc,.docx" onUploaded={refetchFiles} />
+                <FileUploader projectId={id!} fileType="source_video" accept="video/*,image/*,.pdf,.zip,.doc,.docx" onUploaded={filesUploaded} />
               ) : (
               <div className="aspect-video bg-muted/20 rounded-xl flex items-center justify-center border border-dashed border-border">
                 <div className="text-center">

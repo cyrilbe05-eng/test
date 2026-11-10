@@ -12,8 +12,8 @@ import { useProjects } from '@/hooks/useProjects'
 import { projectTimeLabel } from '@/lib/utils'
 import type { Project } from '@/types'
 
-// Client home: contract timeline → what we need from you → active videos →
-// plan; Miro board and SOPs on the side. Home is also the "Active" list: a
+// Client home: contract timeline → one video list (to-dos first) →
+// plan; Miro board and SOPs on the side. Home is also the video list: a
 // tap on a video opens it.
 // Compact; labels and numbers only. Everything comes from /api/client/dashboard.
 
@@ -46,51 +46,51 @@ function Timeline({ c }: { c: NonNullable<Dashboard['contract']> }) {
   )
 }
 
-function Needs({ items, toPost }: { items: Dashboard['needs']; toPost: Project[] }) {
+// One list: what needs the client first (with its button), then the rest
+// with their status. Each video appears once.
+function Videos({ items, toPost, inWorks }: { items: Dashboard['needs']; toPost: Project[]; inWorks: Project[] }) {
+  const btn = 'min-h-[44px] px-3 inline-flex items-center rounded-lg text-sm font-semibold'
+  const videos = items.filter((n) => n.type !== 'plan_step').length + toPost.length + inWorks.length
   return (
-    <Card title="What we need from you">
+    <Card title={`Videos · ${videos}`}>
       <ul className="divide-y divide-border/60 -my-1">
         {items.map((n) => (
           <li key={n.type === 'plan_step' ? n.id : `${n.type}-${n.project_id}`} className="flex items-center gap-3 py-1.5 min-h-[44px]">
             <span className={cn('w-2 h-2 rounded-full flex-shrink-0', n.type === 'plan_step' ? 'bg-red-500' : 'bg-amber-500')} aria-hidden />
-            <span className="flex-1 min-w-0 text-sm break-words">{n.title}</span>
-            {n.type === 'plan_step' && <span className="text-xs font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">{n.days_late}d late</span>}
-            {n.type === 'review' && (
-              <Link to={`/workspace/projects/${n.project_id}`} className="min-h-[44px] px-3 inline-flex items-center rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110">Review</Link>
-            )}
-            {n.type === 'footage' && (
-              <Link to={`/workspace/projects/${n.project_id}`} className="min-h-[44px] px-3 inline-flex items-center rounded-lg border border-border text-sm hover:bg-muted">Upload</Link>
+            {n.type === 'plan_step' ? (
+              <>
+                <span className="flex-1 min-w-0 text-sm break-words">{n.title}</span>
+                <span className="text-xs font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">{n.days_late}d late</span>
+              </>
+            ) : (
+              <>
+                <Link to={`/workspace/projects/${n.project_id}`} className="flex-1 min-w-0 text-sm font-medium break-words hover:underline">{n.title}</Link>
+                {n.type === 'review'
+                  ? <Link to={`/workspace/projects/${n.project_id}`} className={cn(btn, 'bg-primary text-white hover:brightness-110')}>Review</Link>
+                  : <Link to={`/workspace/projects/${n.project_id}`} className={cn(btn, 'border border-border font-normal hover:bg-muted')}>Upload</Link>}
+              </>
             )}
           </li>
         ))}
         {toPost.map((p) => (
           <li key={`post-${p.id}`} className="flex items-center gap-3 py-1.5 min-h-[44px]">
             <span className="w-2 h-2 rounded-full flex-shrink-0 bg-green-500" aria-hidden />
-            <Link to={`/workspace/projects/${p.id}`} className="flex-1 min-w-0 text-sm break-words hover:underline">{p.title}</Link>
+            <Link to={`/workspace/projects/${p.id}`} className="flex-1 min-w-0 text-sm font-medium break-words hover:underline">{p.title}</Link>
             <MarkPosted project={p} />
           </li>
         ))}
+        {inWorks.map((p) => (
+          <li key={p.id}>
+            <Link to={`/workspace/projects/${p.id}`} className="flex items-center gap-3 min-h-[44px] py-1.5 hover:bg-muted/60 rounded-lg">
+              <span className="w-2 flex-shrink-0" aria-hidden />
+              <span className="flex-1 min-w-0 text-sm font-medium truncate">{p.title}</span>
+              <span className="hidden sm:inline text-xs text-muted-foreground whitespace-nowrap">{projectTimeLabel(p)}</span>
+              <ProjectStatusBadge status={p.status} />
+            </Link>
+          </li>
+        ))}
+        {items.length + toPost.length + inWorks.length === 0 && <li className="py-1.5 text-sm text-muted-foreground">—</li>}
       </ul>
-    </Card>
-  )
-}
-
-function Active({ projects }: { projects: Project[] }) {
-  return (
-    <Card title={`In the works · ${projects.length}`}>
-      {projects.length ? (
-        <ul className="divide-y divide-border/60 -my-1 -mx-2">
-          {projects.map((p) => (
-            <li key={p.id}>
-              <Link to={`/workspace/projects/${p.id}`} className="flex items-center gap-3 min-h-[44px] px-2 py-1.5 rounded-lg hover:bg-muted/60">
-                <span className="flex-1 min-w-0 text-sm font-medium truncate">{p.title}</span>
-                <span className="hidden sm:inline text-xs text-muted-foreground whitespace-nowrap">{projectTimeLabel(p)}</span>
-                <ProjectStatusBadge status={p.status} />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : <p className="text-sm text-muted-foreground">—</p>}
     </Card>
   )
 }
@@ -161,9 +161,7 @@ export default function ClientDashboard() {
             {data.contract && <Timeline c={data.contract} />}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
               <div className="space-y-4 min-w-0">
-                {(data.needs.length > 0 || toPost.length > 0) && <Needs items={data.needs} toPost={toPost} />}
-                {/* Each video shows once: if it's waiting on the client it's listed above. */}
-                {inWorks.length > 0 && <Active projects={inWorks} />}
+                <Videos items={data.needs} toPost={toPost} inWorks={inWorks} />
                 {data.plan.length > 0 && <Plan steps={data.plan} />}
               </div>
               <ClientBrief brief={data} noStyle />

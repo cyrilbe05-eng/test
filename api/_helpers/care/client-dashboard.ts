@@ -50,7 +50,7 @@ export function buildDashboard(client: ClientInput, now: number) {
     ...overdueClientSteps(plan, now).map((s) => ({ type: 'plan_step' as const, id: s.id, title: s.title, date: s.date, days_late: s.days_late })),
     ...client.projects.filter((p) => p.status === 'client_reviewing')
       .map((p) => ({ type: 'review' as const, project_id: p.id, title: p.title })),
-    ...client.projects.filter((p) => (p.status === 'pending_assignment' || p.status === 'in_progress') && !p.has_footage)
+    ...client.projects.filter((p) => (p.status === 'pending_assignment' || p.status === 'in_progress') && !(p.has_upload ?? p.has_footage))
       .map((p) => ({ type: 'footage' as const, project_id: p.id, title: p.title })),
   ]
 

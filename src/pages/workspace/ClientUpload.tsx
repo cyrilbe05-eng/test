@@ -144,7 +144,7 @@ export default function ClientUpload() {
           enqueue(slides.map((sl, n) => ({
             file: sl.file,
             label: `${sl.file.name} · ${names[i]}`,
-            invalidate: [['project_files', id], ['projects']],
+            invalidate: [['project_files', id], ['projects'], ['client', 'dashboard']],
             run: ({ onProgress, onConnectionState }) =>
               storage.upload({ file: sl.file, projectId: id, fileType: 'source_video', onProgress, onConnectionState })
                 .then(({ fileId }) => fileId
@@ -159,7 +159,7 @@ export default function ClientUpload() {
         ].map(({ file, fileType }) => ({
           file,
           label: `${file.name} · ${names[i]}`,
-          invalidate: [['project_files', id], ['projects']],
+          invalidate: [['project_files', id], ['projects'], ['client', 'dashboard']],
           run: ({ onProgress, onConnectionState }) =>
             storage.upload({ file, projectId: id, fileType, onProgress, onConnectionState }).then(() => undefined),
         })))
