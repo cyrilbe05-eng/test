@@ -2,7 +2,7 @@
 // style (their "Your style" onboarding answers). Shown on the client's Home
 // on the copywriter's client page, and on the team project page (editors too).
 //
-//   GET /api/team/clients/:id/brief   admins, assigned copywriters, team on one of their videos
+//   GET /api/team/clients/:id/brief   all admins and the whole team
 
 import { dbQuery } from '../db.js'
 import { loadClientRevisions } from './sop.js'
