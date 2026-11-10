@@ -18,6 +18,7 @@ import { slidesOf } from '@/lib/slides'
 import { downloadAll, uniqueNames } from '@/lib/zipDownload'
 import type { ProjectFile } from '@/types'
 import { MarkPosted } from '@/components/project/MarkPosted'
+import { ScriptCard } from '@/components/project/ScriptCard'
 
 function IconArrowLeft() {
   return (
@@ -152,6 +153,7 @@ export default function ClientProjectDetail() {
   const deliverables = (files ?? []).filter((f) => f.file_type === 'deliverable')
   const approvedDeliverables = deliverables.filter((f) => f.approved)
   const latestDeliverable = deliverables[0]
+  const hasFootage = (files ?? []).some((f) => f.file_type === 'source_video')
   // Carousel (Stage G): the deliverables are the slides, in order.
   const isCarousel = project?.kind === 'carousel'
   const slides = slidesOf(files, 'deliverable')
@@ -412,7 +414,11 @@ export default function ClientProjectDetail() {
               </div>
             </div>
           ) : (
-            <div className="animate-fade-in">
+            <div className="animate-fade-in space-y-4">
+              <ScriptCard entry={project.script_entry ?? { script: project.video_script, inspiration_url: project.inspiration_url, comments: project.instructions }} />
+              {files && !hasFootage && !latestDeliverable ? (
+                <FileUploader projectId={id!} fileType="source_video" accept="video/*,image/*,.pdf,.zip,.doc,.docx" onUploaded={refetchFiles} />
+              ) : (
               <div className="aspect-video bg-muted/20 rounded-xl flex items-center justify-center border border-dashed border-border">
                 <div className="text-center">
                   <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-3 text-muted-foreground">
@@ -423,6 +429,7 @@ export default function ClientProjectDetail() {
                   <p className="text-muted-foreground text-sm">Your {noun} will appear here when it's ready</p>
                 </div>
               </div>
+              )}
             </div>
           )
         )}

@@ -92,6 +92,8 @@ export interface Project {
   kind?: 'video' | 'carousel' | null
   /** Set once the client has published it (migration 009). */
   posted_at?: string | null
+  /** Single-project GET only: the calendar script it was created from. */
+  script_entry?: { script: string | null; caption: string | null; comments: string | null; inspiration_url: string | null } | null
 }
 
 /** Team sub-type (migration 006): copywriters are team members who can also

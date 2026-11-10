@@ -688,8 +688,19 @@ async function handleGetProject(req: VercelRequest, res: VercelResponse) {
     // Team members can view any project (all projects are visible on their dashboard)
 
     const { profile_full_name, profile_email, profile_avatar_url, profile_plan_id, ...project } = row
+    // The calendar script this project was created from (migration 007), so
+    // the client sees what the copywriter wrote. Guarded: never fails the GET.
+    let script_entry = null
+    try {
+      const [e] = await dbQuery<any>(
+        'SELECT script, caption, comments, inspiration_url FROM calendar_events WHERE project_id = ? ORDER BY created_at LIMIT 1',
+        [projectId],
+      )
+      script_entry = e ?? null
+    } catch { /* pre-migration */ }
     res.json({
       ...project,
+      script_entry,
       profiles: {
         full_name: profile_full_name,
         email: profile_email,

@@ -77,7 +77,7 @@ function Needs({ items, toPost }: { items: Dashboard['needs']; toPost: Project[]
 
 function Active({ projects }: { projects: Project[] }) {
   return (
-    <Card title={`Active · ${projects.length}`}>
+    <Card title={`In the works · ${projects.length}`}>
       {projects.length ? (
         <ul className="divide-y divide-border/60 -my-1 -mx-2">
           {projects.map((p) => (
@@ -138,6 +138,8 @@ export default function ClientDashboard() {
   const active = ((projects ?? []) as Project[])
     .filter((p) => p.status !== 'client_approved')
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+  const needIds = new Set((data?.needs ?? []).flatMap((n) => (n.type === 'plan_step' ? [] : [n.project_id])))
+  const inWorks = active.filter((p) => !needIds.has(p.id))
   // Onboarding opens before the dashboard until it's done.
   if (data?.needs_onboarding) return <Navigate to="/workspace/onboarding" replace />
   return (
@@ -160,7 +162,8 @@ export default function ClientDashboard() {
             <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
               <div className="space-y-4 min-w-0">
                 {(data.needs.length > 0 || toPost.length > 0) && <Needs items={data.needs} toPost={toPost} />}
-                <Active projects={active} />
+                {/* Each video shows once: if it's waiting on the client it's listed above. */}
+                {inWorks.length > 0 && <Active projects={inWorks} />}
                 {data.plan.length > 0 && <Plan steps={data.plan} />}
               </div>
               <ClientBrief brief={data} noStyle />
