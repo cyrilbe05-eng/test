@@ -54,6 +54,7 @@ import AdminEditorPerformance from '@/pages/admin/AdminEditorPerformance'
 import ClientDashboard from '@/pages/workspace/ClientDashboard'
 import TeamPlans from '@/pages/team/TeamPlans'
 import TeamPlan from '@/pages/team/TeamPlan'
+import ClientSops from '@/pages/team/ClientSops'
 import TeamClientOnboarding from '@/pages/team/TeamClientOnboarding'
 import ClientOnboarding from '@/pages/workspace/ClientOnboarding'
 import AdminOnboardingQuestions from '@/pages/admin/AdminOnboardingQuestions'
@@ -155,6 +156,8 @@ function ProductionApp() {
           <Route path="/admin/gallery" element={<ProtectedRoute allowedRoles={['admin']}><AdminGallery /></ProtectedRoute>} />
           <Route path="/admin/messages" element={<ProtectedRoute allowedRoles={['admin']}><AdminMessages /></ProtectedRoute>} />
           <Route path="/admin/calendar" element={<ProtectedRoute allowedRoles={['admin']}><AdminCalendar /></ProtectedRoute>} />
+          <Route path="/admin/sops" element={<ProtectedRoute allowedRoles={['admin']}><ClientSops /></ProtectedRoute>} />
+          <Route path="/admin/sops/:clientId" element={<ProtectedRoute allowedRoles={['admin']}><ClientSops /></ProtectedRoute>} />
           <Route path="/admin/care" element={<ProtectedRoute allowedRoles={['admin']}><AdminClientCare /></ProtectedRoute>} />
           <Route path="/admin/editors" element={<ProtectedRoute allowedRoles={['admin']}><AdminEditorPerformance /></ProtectedRoute>} />
           <Route path="/admin/onboarding-questions" element={<ProtectedRoute allowedRoles={['admin']}><AdminOnboardingQuestions /></ProtectedRoute>} />
@@ -181,6 +184,8 @@ function ProductionApp() {
           <Route path="/team/stats" element={<ProtectedRoute allowedRoles={['team']}><TeamStats /></ProtectedRoute>} />
           <Route path="/team/plans" element={<ProtectedRoute allowedRoles={['team']}><TeamPlans /></ProtectedRoute>} />
           <Route path="/team/plans/:contractId" element={<ProtectedRoute allowedRoles={['team']}><TeamPlan /></ProtectedRoute>} />
+          <Route path="/team/sops" element={<ProtectedRoute allowedRoles={['team']}><ClientSops /></ProtectedRoute>} />
+          <Route path="/team/sops/:clientId" element={<ProtectedRoute allowedRoles={['team']}><ClientSops /></ProtectedRoute>} />
           <Route path="/team/clients/:clientId/onboarding" element={<ProtectedRoute allowedRoles={['team']}><TeamClientOnboarding /></ProtectedRoute>} />
 
           <Route path="/" element={<RootRedirect />} />

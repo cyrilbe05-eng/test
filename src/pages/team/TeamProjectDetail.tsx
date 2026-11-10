@@ -18,8 +18,6 @@ import { CarouselReview, SlideManager, SlideSorter } from '@/components/carousel
 import { VersionTabs } from '@/components/project/VersionTabs'
 import { currentVersions, commentsForVersion } from '@/lib/versions'
 import { slidesOf } from '@/lib/slides'
-import { useClientBrief } from '@/hooks/useOnboarding'
-import { ClientBrief } from '@/components/onboarding/ClientBrief'
 import { cn, projectTimeLabel } from '@/lib/utils'
 
 function formatBytes(bytes: number | null): string {
@@ -167,8 +165,6 @@ export default function TeamProjectDetail() {
   const apiFetch = useApiFetch()
   const { profile } = useAuth()
   const { data: project } = useProject(id)
-  // The client's Miro board, SOPs and style (hidden if not allowed).
-  const { data: brief } = useClientBrief(project?.client_id)
   const { data: files, refetch: refetchFiles } = useProjectFiles(id)
   const { data: comments, refetch: refetchComments } = useTimelineComments(id)
   const { data: assignments, refetch: refetchAssignments } = useProjectAssignments(id)
@@ -293,6 +289,9 @@ export default function TeamProjectDetail() {
             <div className="clay-card p-5">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <h1 className="text-xl font-heading font-semibold tracking-tight">{project.title}</h1>
+                <Link to={`/team/sops/${project.client_id}`} className="min-h-[44px] px-3 inline-flex items-center rounded-lg border border-border text-sm font-medium hover:bg-muted whitespace-nowrap flex-shrink-0 -my-1.5">
+                  Client SOPs
+                </Link>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                 {clientName && (
@@ -594,8 +593,6 @@ export default function TeamProjectDetail() {
                 </div>
               </div>
             </div>
-
-            {brief && <ClientBrief brief={brief} />}
           </div>
         </div>
       </main>

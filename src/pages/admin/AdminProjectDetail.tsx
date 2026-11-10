@@ -506,8 +506,11 @@ export default function AdminProjectDetail() {
         {/* ── Main ── */}
         <div className="flex-1 overflow-y-auto">
           <div className={cn('px-6 pt-6 pb-12 mx-auto transition-all duration-300', theater ? 'max-w-full' : 'max-w-3xl')}>
-            <div className="mb-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
               <h1 className="text-xl font-heading font-semibold tracking-tight">{project.title}</h1>
+              <Link to={`/admin/sops/${project.client_id}`} className="min-h-[44px] px-3 inline-flex items-center rounded-lg border border-border text-sm font-medium hover:bg-muted whitespace-nowrap flex-shrink-0 -my-1.5">
+                Client SOPs
+              </Link>
             </div>
 
             {/* Tabs */}

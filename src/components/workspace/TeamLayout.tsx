@@ -48,6 +48,8 @@ const NAV_LINKS = [
 // editors' menus are unchanged.
 const PLANS_LINK = { to: '/team/plans', label: 'Plans', exact: false, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> }
 
+const SOPS_LINK = { to: '/team/sops', label: 'SOPs', exact: false, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> }
+
 const ALL_PROJECTS_LINK = { to: '/team/all', label: 'All projects', exact: true, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg> }
 
 interface TeamLayoutProps {
@@ -57,9 +59,9 @@ interface TeamLayoutProps {
 export function TeamLayout({ children }: TeamLayoutProps) {
   const { profile, impersonating, stopImpersonating } = useAuth()
   // Editors: "Home" (their videos + limit) and the full board under "All projects".
-  const links = profile?.team_role === 'copywriter'
+  const links = [...(profile?.team_role === 'copywriter'
     ? [...NAV_LINKS, PLANS_LINK]
-    : [{ ...NAV_LINKS[0], label: 'Home' }, ALL_PROJECTS_LINK, ...NAV_LINKS.slice(1)]
+    : [{ ...NAV_LINKS[0], label: 'Home' }, ALL_PROJECTS_LINK, ...NAV_LINKS.slice(1)]), SOPS_LINK]
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -204,7 +206,8 @@ export function TeamLayout({ children }: TeamLayoutProps) {
 
       {/* ── Bottom nav — mobile only ── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-card/90 backdrop-blur-xl border-t border-border flex items-stretch h-16 safe-area-bottom">
-        {links.map(({ to, label, icon, exact }) => {
+        {/* Bottom bar is full; SOPs stays in the ☰ menu on phones. */}
+        {links.filter((l) => l !== SOPS_LINK).map(({ to, label, icon, exact }) => {
           const active = isActive(to, exact)
           return (
             <Link
