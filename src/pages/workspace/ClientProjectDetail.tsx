@@ -17,6 +17,7 @@ import { currentVersions, commentsForVersion } from '@/lib/versions'
 import { slidesOf } from '@/lib/slides'
 import { downloadAll, uniqueNames } from '@/lib/zipDownload'
 import type { ProjectFile } from '@/types'
+import { MarkPosted } from '@/components/project/MarkPosted'
 
 function IconArrowLeft() {
   return (
@@ -395,7 +396,7 @@ export default function ClientProjectDetail() {
                     </div>
                   )}
                   {isApproved && approvedDeliverables.length > 0 && (
-                    <div className="animate-slide-up stagger-3">
+                    <div className="animate-slide-up stagger-3 flex flex-wrap items-center gap-3">
                       <button
                         onClick={() => (isCarousel ? handleDownloadSlides() : handleDownload(shown))}
                         disabled={zipping}
@@ -404,6 +405,7 @@ export default function ClientProjectDetail() {
                         <IconDownload />
                         {isCarousel ? (zipping ? 'Downloading…' : 'Download Slides') : 'Download Video'}
                       </button>
+                      <MarkPosted project={project} className="rounded-xl" />
                     </div>
                   )}
                 </div>

@@ -90,6 +90,8 @@ export interface Project {
   updated_at: string
   /** 'carousel' (migration 019); null/absent = video. */
   kind?: 'video' | 'carousel' | null
+  /** Set once the client has published it (migration 009). */
+  posted_at?: string | null
 }
 
 /** Team sub-type (migration 006): copywriters are team members who can also

@@ -860,6 +860,8 @@ async function handleProjectPosted(req: VercelRequest, res: VercelResponse) {
     } catch {
       res.status(400).json({ error: 'Marking as posted needs database migration 009 — run db/migrations/009_project_posted.sql' }); return
     }
+    // The script entry this project was created from shows the same mark.
+    try { await dbExecute('UPDATE calendar_events SET posted = ? WHERE project_id = ?', [posted ? 1 : 0, projectId]) } catch { /* pre-migration */ }
     res.json({ ok: true, posted })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -3146,6 +3148,13 @@ async function handleCalendarEvent(req: VercelRequest, res: VercelResponse) {
         values.push(nowIso())
         values.push(id)
         await dbExecute(`UPDATE calendar_events SET ${fields.join(', ')} WHERE id = ?`, values)
+      }
+      // A script entry linked to a project: posting one posts the other.
+      const linkedProject = (event as { project_id?: string | null }).project_id
+      if (posted !== undefined && linkedProject) {
+        try {
+          await dbExecute('UPDATE projects SET posted_at = ? WHERE id = ?', [posted ? nowIso() : null, linkedProject])
+        } catch { /* pre-migration */ }
       }
 
       if (assigned_client_ids !== undefined || assigned_team_ids !== undefined) {

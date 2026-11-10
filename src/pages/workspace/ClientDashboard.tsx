@@ -6,6 +6,7 @@ import { useClientDashboard, useTickClientStep, type ClientDashboard as Dashboar
 import { cn } from '@/lib/utils'
 import { ClientBrief } from '@/components/onboarding/ClientBrief'
 import { ClientStats } from '@/components/workspace/ClientStats'
+import { MarkPosted } from '@/components/project/MarkPosted'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { useProjects } from '@/hooks/useProjects'
 import { projectTimeLabel } from '@/lib/utils'
@@ -45,7 +46,7 @@ function Timeline({ c }: { c: NonNullable<Dashboard['contract']> }) {
   )
 }
 
-function Needs({ items }: { items: Dashboard['needs'] }) {
+function Needs({ items, toPost }: { items: Dashboard['needs']; toPost: Project[] }) {
   return (
     <Card title="What we need from you">
       <ul className="divide-y divide-border/60 -my-1">
@@ -60,6 +61,13 @@ function Needs({ items }: { items: Dashboard['needs'] }) {
             {n.type === 'footage' && (
               <Link to={`/workspace/projects/${n.project_id}`} className="min-h-[44px] px-3 inline-flex items-center rounded-lg border border-border text-sm hover:bg-muted">Upload</Link>
             )}
+          </li>
+        ))}
+        {toPost.map((p) => (
+          <li key={`post-${p.id}`} className="flex items-center gap-3 py-1.5 min-h-[44px]">
+            <span className="w-2 h-2 rounded-full flex-shrink-0 bg-green-500" aria-hidden />
+            <Link to={`/workspace/projects/${p.id}`} className="flex-1 min-w-0 text-sm break-words hover:underline">{p.title}</Link>
+            <MarkPosted project={p} />
           </li>
         ))}
       </ul>
@@ -123,6 +131,10 @@ function Plan({ steps }: { steps: Dashboard['plan'] }) {
 export default function ClientDashboard() {
   const { data, isLoading, error } = useClientDashboard()
   const { data: projects } = useProjects()
+  // Approved in the last 30 days and not marked posted yet.
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
+  const toPost = ((projects ?? []) as Project[])
+    .filter((p) => p.status === 'client_approved' && !p.posted_at && p.updated_at >= since)
   const active = ((projects ?? []) as Project[])
     .filter((p) => p.status !== 'client_approved')
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
@@ -147,7 +159,7 @@ export default function ClientDashboard() {
             {data.contract && <Timeline c={data.contract} />}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
               <div className="space-y-4 min-w-0">
-                {data.needs.length > 0 && <Needs items={data.needs} />}
+                {(data.needs.length > 0 || toPost.length > 0) && <Needs items={data.needs} toPost={toPost} />}
                 <Active projects={active} />
                 {data.plan.length > 0 && <Plan steps={data.plan} />}
               </div>
