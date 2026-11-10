@@ -78,8 +78,20 @@ async function dashboardFor(clientId: string) {
   await processRevisionsSafely(clientId)
   const [client] = await loadClients(clientId)
   if (!client) throw Object.assign(new Error('Not found'), { status: 404 })
+  // Scripts on their calendar (theirs, or written for them) that aren't a
+  // video yet: Home shows them with an Upload button. Guarded.
+  let scripts: { id: string; title: string; date: string; script: string | null; caption: string | null; comments: string | null; inspiration_url: string | null }[] = []
+  try {
+    scripts = await dbQuery(
+      `SELECT e.id, e.title, e.date, e.script, e.caption, e.comments, e.inspiration_url
+       FROM calendar_events e
+       WHERE e.project_id IS NULL AND COALESCE(e.posted, 0) = 0 AND TRIM(COALESCE(e.script, '')) <> ''
+         AND (e.owner_id = ? OR EXISTS (SELECT 1 FROM calendar_event_participants c
+               WHERE c.event_id = e.id AND c.profile_id = ? AND c.role = 'client'))
+       ORDER BY e.date, e.created_at`, [clientId, clientId])
+  } catch { /* pre-migration */ }
   // Miro board, SOPs, style — same brief the copywriter sees.
-  return { ...buildDashboard(client, Date.now()), ...(await loadBrief(clientId)) }
+  return { ...buildDashboard(client, Date.now()), scripts, ...(await loadBrief(clientId)) }
 }
 
 /** Router entry. `rest` = path after /api/client. */

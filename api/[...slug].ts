@@ -2727,6 +2727,7 @@ interface CalendarProjectRow {
 // Calendar lifecycle colours (migration 007). One entry, three states, so a
 // month view reads as progress at a glance rather than a wall of one colour.
 const CAL_COLOR_PLANNED  = 'bg-violet-500' // created, nothing delivered yet
+const CAL_COLOR_RECORDED = 'bg-amber-500'  // client uploaded footage/files, being edited
 const CAL_COLOR_DELIVERED = 'bg-blue-500'  // a deliverable has been uploaded
 const CAL_COLOR_APPROVED = 'bg-green-500'  // client approved — done
 const CAL_COLOR_POSTED   = 'bg-gray-400'   // client published it (migration 008)
@@ -2734,10 +2735,23 @@ const CAL_COLOR_POSTED   = 'bg-gray-400'   // client published it (migration 008
 /** Colour for a project's calendar presence. "Something uploaded" is measured
  *  as an actual deliverable file existing, not a status guess, because status
  *  can move for other reasons (e.g. admin assigning a team member). */
-function projectLifecycleColor(status: string, hasDeliverable: boolean): string {
+function projectLifecycleColor(status: string, hasDeliverable: boolean, hasClientUpload = false): string {
   if (status === 'client_approved') return CAL_COLOR_APPROVED
   if (hasDeliverable) return CAL_COLOR_DELIVERED
+  if (hasClientUpload) return CAL_COLOR_RECORDED
   return CAL_COLOR_PLANNED
+}
+
+/** Which of these project ids have something the client uploaded. */
+async function projectsWithClientUploads(projectIds: string[]): Promise<Set<string>> {
+  if (projectIds.length === 0) return new Set()
+  const rows = await dbQuery<{ project_id: string }>(
+    `SELECT DISTINCT pf.project_id FROM project_files pf JOIN projects pr ON pr.id = pf.project_id
+     WHERE pf.file_type IN ('source_video', 'attachment') AND pf.uploader_id = pr.client_id
+       AND pf.project_id IN (${projectIds.map(() => '?').join(',')})`,
+    projectIds,
+  )
+  return new Set(rows.map((r) => r.project_id))
 }
 
 /** Which of these project ids have at least one deliverable uploaded. */
@@ -2782,13 +2796,14 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
     // Lifecycle state for every project the caller can see. Used both for the
     // automatic project entries below and for manual entries linked to one.
     const deliveredSet = await projectsWithDeliverables(projects.map((p) => p.id))
+    const uploadedSet = await projectsWithClientUploads(projects.map((p) => p.id))
     const lifecycleById = new Map<string, { status: string; color: string; posted: boolean }>()
     for (const p of projects) {
       const isPosted = !!p.posted_at
       lifecycleById.set(p.id, {
         status: p.status,
         posted: isPosted,
-        color: isPosted ? CAL_COLOR_POSTED : projectLifecycleColor(p.status, deliveredSet.has(p.id)),
+        color: isPosted ? CAL_COLOR_POSTED : projectLifecycleColor(p.status, deliveredSet.has(p.id), uploadedSet.has(p.id)),
       })
     }
 
@@ -2801,6 +2816,7 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         lifecycle.posted ? 'Posted'
         : lifecycle.color === CAL_COLOR_APPROVED ? 'Approved ✓'
         : lifecycle.color === CAL_COLOR_DELIVERED ? 'In review'
+        : lifecycle.color === CAL_COLOR_RECORDED ? 'Editing'
         : 'Created'
       events.push({
         id: `ce-created-${p.id}`,
@@ -2899,12 +2915,13 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         missingIds,
       )
       const extraDelivered = await projectsWithDeliverables(extra.map((p) => p.id))
+      const extraUploaded = await projectsWithClientUploads(extra.map((p) => p.id))
       for (const p of extra) {
         const isPosted = !!p.posted_at
         lifecycleById.set(p.id, {
           status: p.status,
           posted: isPosted,
-          color: isPosted ? CAL_COLOR_POSTED : projectLifecycleColor(p.status, extraDelivered.has(p.id)),
+          color: isPosted ? CAL_COLOR_POSTED : projectLifecycleColor(p.status, extraDelivered.has(p.id), extraUploaded.has(p.id)),
         })
       }
     }

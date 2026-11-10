@@ -14,6 +14,8 @@ export interface ClientDashboard extends Brief {
     | { type: 'footage'; project_id: string; title: string }
   )[]
   plan: { id: string; date: string; title: string; owner: DashboardOwner; done: boolean; state: string; can_tick: boolean }[]
+  /** Calendar scripts not made into a video yet. */
+  scripts?: { id: string; title: string; date: string; script: string | null; caption: string | null; comments: string | null; inspiration_url: string | null }[]
 }
 
 export function useClientDashboard() {

@@ -48,9 +48,9 @@ function Timeline({ c }: { c: NonNullable<Dashboard['contract']> }) {
 
 // One list: what needs the client first (with its button), then the rest
 // with their status. Each video appears once.
-function Videos({ items, toPost, inWorks }: { items: Dashboard['needs']; toPost: Project[]; inWorks: Project[] }) {
+function Videos({ items, scripts, toPost, inWorks }: { items: Dashboard['needs']; scripts: NonNullable<Dashboard['scripts']>; toPost: Project[]; inWorks: Project[] }) {
   const btn = 'min-h-[44px] px-3 inline-flex items-center rounded-lg text-sm font-semibold'
-  const videos = items.filter((n) => n.type !== 'plan_step').length + toPost.length + inWorks.length
+  const videos = scripts.length + items.filter((n) => n.type !== 'plan_step').length + toPost.length + inWorks.length
   return (
     <Card title={`Videos · ${videos}`}>
       <ul className="divide-y divide-border/60 -my-1">
@@ -72,6 +72,27 @@ function Videos({ items, toPost, inWorks }: { items: Dashboard['needs']; toPost:
             )}
           </li>
         ))}
+        {scripts.map((e) => {
+          // Same hand-off as the calendar's "Create project": the upload page
+          // opens with this script on top and links the new video to it.
+          const prefill = {
+            title: e.title,
+            video_script: e.script ?? '',
+            inspiration_url: e.inspiration_url ?? '',
+            instructions: [e.comments?.trim(), e.caption?.trim() ? `Caption:\n${e.caption.trim()}` : ''].filter(Boolean).join('\n\n'),
+            fromEventTitle: e.title,
+            fromEventId: e.id,
+            entry: { script: e.script, caption: e.caption, comments: e.comments, inspiration_url: e.inspiration_url },
+          }
+          return (
+            <li key={`script-${e.id}`} className="flex items-center gap-3 py-1.5 min-h-[44px]">
+              <span className="w-2 h-2 rounded-full flex-shrink-0 bg-amber-500" aria-hidden />
+              <Link to="/workspace/new" state={{ prefill }} className="flex-1 min-w-0 text-sm font-medium break-words hover:underline">{e.title}</Link>
+              <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">{day(e.date)}</span>
+              <Link to="/workspace/new" state={{ prefill }} className={cn(btn, 'border border-border font-normal hover:bg-muted')}>Upload</Link>
+            </li>
+          )
+        })}
         {toPost.map((p) => (
           <li key={`post-${p.id}`} className="flex items-center gap-3 py-1.5 min-h-[44px]">
             <span className="w-2 h-2 rounded-full flex-shrink-0 bg-green-500" aria-hidden />
@@ -89,7 +110,7 @@ function Videos({ items, toPost, inWorks }: { items: Dashboard['needs']; toPost:
             </Link>
           </li>
         ))}
-        {items.length + toPost.length + inWorks.length === 0 && <li className="py-1.5 text-sm text-muted-foreground">—</li>}
+        {scripts.length + items.length + toPost.length + inWorks.length === 0 && <li className="py-1.5 text-sm text-muted-foreground">—</li>}
       </ul>
     </Card>
   )
@@ -161,7 +182,7 @@ export default function ClientDashboard() {
             {data.contract && <Timeline c={data.contract} />}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
               <div className="space-y-4 min-w-0">
-                <Videos items={data.needs} toPost={toPost} inWorks={inWorks} />
+                <Videos items={data.needs} scripts={data.scripts ?? []} toPost={toPost} inWorks={inWorks} />
                 {data.plan.length > 0 && <Plan steps={data.plan} />}
               </div>
               <ClientBrief brief={data} noStyle />

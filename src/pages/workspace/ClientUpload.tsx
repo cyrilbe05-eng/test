@@ -11,6 +11,7 @@ import { autoTitles, isVideo } from '@/lib/autoTitle'
 import { cn } from '@/lib/utils'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { GalleryPickerModal } from '@/components/gallery/GalleryPickerModal'
+import { ScriptCard, type ScriptEntry } from '@/components/project/ScriptCard'
 import { SlideSorter } from '@/components/carousel/Carousel'
 import { isImage, isPdf, toSlides } from '@/lib/pdfSlides'
 import type { GalleryFile } from '@/types'
@@ -25,7 +26,7 @@ type Picked = { id: string; file: File }
 type Slide = Picked & { url: string }
 type Kind = 'video' | 'carousel'
 type Mode = 'separate' | 'one'
-type Prefill = { title?: string; inspiration_url?: string; video_script?: string; instructions?: string; fromEventTitle?: string; fromEventId?: string }
+type Prefill = { title?: string; inspiration_url?: string; video_script?: string; instructions?: string; fromEventTitle?: string; fromEventId?: string; entry?: ScriptEntry }
 
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`
 const input = 'w-full min-h-[44px] px-3 bg-muted border border-border rounded-xl text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30'
@@ -67,11 +68,14 @@ export default function ClientUpload() {
   const [mode, setMode] = useState<Mode | null>(null)
   const [asking, setAsking] = useState(false)
   const [titles, setTitles] = useState<Record<string, string>>({}) // edited titles; '' key = the single title
-  const [notes, setNotes] = useState(prefill.instructions ?? '')
+  // From a calendar script: it's shown read-only on top (still sent with the
+  // video), so the boxes below are only for the client's own additions.
+  const fromEntry = !!prefill.fromEventId
+  const [notes, setNotes] = useState(fromEntry ? '' : prefill.instructions ?? '')
   const [link, setLink] = useState(prefill.inspiration_url ?? '')
   const [script, setScript] = useState(prefill.video_script ?? '')
-  const [showLink, setShowLink] = useState(!!prefill.inspiration_url)
-  const [showScript, setShowScript] = useState(!!prefill.video_script)
+  const [showLink, setShowLink] = useState(!fromEntry && !!prefill.inspiration_url)
+  const [showScript, setShowScript] = useState(!fromEntry && !!prefill.video_script)
   const [picker, setPicker] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [sending, setSending] = useState(false)
@@ -117,7 +121,8 @@ export default function ClientUpload() {
   const drop = (id: string) => setVideos((s) => s.filter((p) => p.id !== id))
 
   // Nothing attached or written yet: nothing to send.
-  const empty = !videos.length && !files.length && !gallery.length && !slides.length && !script.trim() && !notes.trim() && !link.trim()
+  // From a script, the recording is what's missing.
+  const empty = !videos.length && !files.length && !gallery.length && !slides.length && (fromEntry || (!script.trim() && !notes.trim() && !link.trim()))
 
   const send = async () => {
     const groups = separate ? videos.map((v) => ({ key: v.id, videos: [v] })) : [{ key: '', videos: carousel ? [] : videos }]
@@ -134,7 +139,7 @@ export default function ClientUpload() {
             title: names[i],
             inspiration_url: link.trim() || null,
             video_script: script.trim() || null,
-            instructions: notes.trim() || undefined,
+            instructions: [fromEntry ? prefill.instructions?.trim() : '', notes.trim()].filter(Boolean).join('\n\n') || undefined,
             // One calendar entry = one video: only the first is linked.
             calendar_event_id: i === 0 ? prefill.fromEventId ?? null : null,
             ...(carousel ? { kind: 'carousel' } : {}),
@@ -147,7 +152,7 @@ export default function ClientUpload() {
           enqueue(slides.map((sl, n) => ({
             file: sl.file,
             label: `${sl.file.name} · ${names[i]}`,
-            invalidate: [['project_files', id], ['projects'], ['client', 'dashboard']],
+            invalidate: [['project_files', id], ['projects'], ['client', 'dashboard'], ['calendar_events']],
             run: ({ onProgress, onConnectionState }) =>
               storage.upload({ file: sl.file, projectId: id, fileType: 'source_video', onProgress, onConnectionState })
                 .then(({ fileId }) => fileId
@@ -162,7 +167,7 @@ export default function ClientUpload() {
         ].map(({ file, fileType }) => ({
           file,
           label: `${file.name} · ${names[i]}`,
-          invalidate: [['project_files', id], ['projects'], ['client', 'dashboard']],
+          invalidate: [['project_files', id], ['projects'], ['client', 'dashboard'], ['calendar_events']],
           run: ({ onProgress, onConnectionState }) =>
             storage.upload({ file, projectId: id, fileType, onProgress, onConnectionState }).then(() => undefined),
         })))
@@ -205,6 +210,7 @@ export default function ClientUpload() {
               <span className="min-w-0 truncate text-xs font-medium px-2.5 py-1 rounded-full bg-primary/10 text-primary">{prefill.fromEventTitle}</span>
             )}
           </div>
+          {fromEntry && <ScriptCard entry={prefill.entry ?? { script: prefill.video_script, comments: prefill.instructions, inspiration_url: prefill.inspiration_url }} />}
 
           <div role="radiogroup" aria-label="Type" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted">
             {([['video', 'Video'], ['carousel', 'Carousel']] as const).map(([k, label]) => (
@@ -302,8 +308,8 @@ export default function ClientUpload() {
 
           <div className="flex flex-wrap gap-2">
             <button type="button" className={secondary} onClick={() => setPicker(true)}>Gallery</button>
-            {!showLink && <button type="button" className={secondary} onClick={() => setShowLink(true)}>+ Link</button>}
-            {!showScript && <button type="button" className={secondary} onClick={() => setShowScript(true)}>+ Script</button>}
+            {!fromEntry && !showLink && <button type="button" className={secondary} onClick={() => setShowLink(true)}>+ Link</button>}
+            {!fromEntry && !showScript && <button type="button" className={secondary} onClick={() => setShowScript(true)}>+ Script</button>}
           </div>
 
           <button type="submit" disabled={sending || preparing || empty}
