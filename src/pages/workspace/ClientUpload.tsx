@@ -116,6 +116,9 @@ export default function ClientUpload() {
   }
   const drop = (id: string) => setVideos((s) => s.filter((p) => p.id !== id))
 
+  // Nothing attached or written yet: nothing to send.
+  const empty = !videos.length && !files.length && !gallery.length && !slides.length && !script.trim() && !notes.trim() && !link.trim()
+
   const send = async () => {
     const groups = separate ? videos.map((v) => ({ key: v.id, videos: [v] })) : [{ key: '', videos: carousel ? [] : videos }]
     const names = groups.map((g, i) => titleFor(g.key, i).trim())
@@ -193,7 +196,9 @@ export default function ClientUpload() {
   return (
     <ClientLayout>
       <main className="max-w-2xl px-4 md:px-6 pt-5 pb-24 md:py-8">
-        <form noValidate className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (!sending) void send() }}>
+        <form noValidate className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (!sending && !empty) void send() }}
+          // Enter in a one-line box must not send (it created empty videos).
+          onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') e.preventDefault() }}>
           <div className="flex items-center justify-between gap-3 min-w-0">
             <h1 className="text-xl md:text-2xl font-heading font-semibold tracking-tight">{carousel ? 'New carousel' : 'New video'}</h1>
             {prefill.fromEventTitle && (
@@ -301,7 +306,7 @@ export default function ClientUpload() {
             {!showScript && <button type="button" className={secondary} onClick={() => setShowScript(true)}>+ Script</button>}
           </div>
 
-          <button type="submit" disabled={sending || preparing}
+          <button type="submit" disabled={sending || preparing || empty}
             className="w-full min-h-[48px] rounded-xl bg-primary text-white text-sm font-semibold hover:brightness-110 disabled:opacity-50">
             {sending ? 'Sending…' : separate ? `Send ${videos.length} videos` : 'Send'}
           </button>
