@@ -5,6 +5,7 @@ import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { useClientDashboard, useTickClientStep, type ClientDashboard as Dashboard, type DashboardOwner } from '@/hooks/useClientDashboard'
 import { cn } from '@/lib/utils'
 import { ClientBrief } from '@/components/onboarding/ClientBrief'
+import { ClientStats } from '@/components/workspace/ClientStats'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { useProjects } from '@/hooks/useProjects'
 import { projectTimeLabel } from '@/lib/utils'
@@ -142,6 +143,7 @@ export default function ClientDashboard() {
           <div className="clay-card p-5 text-sm">{(error as Error).message}</div>
         ) : data ? (
           <>
+            <ClientStats projects={(projects ?? []) as Project[]} />
             {data.contract && <Timeline c={data.contract} />}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
               <div className="space-y-4 min-w-0">
