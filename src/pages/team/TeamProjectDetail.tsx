@@ -18,6 +18,8 @@ import { CarouselReview, SlideManager, SlideSorter } from '@/components/carousel
 import { VersionTabs } from '@/components/project/VersionTabs'
 import { currentVersions, commentsForVersion } from '@/lib/versions'
 import { slidesOf } from '@/lib/slides'
+import { useClientBrief } from '@/hooks/useOnboarding'
+import { ClientBrief } from '@/components/onboarding/ClientBrief'
 import { cn, projectTimeLabel } from '@/lib/utils'
 
 function formatBytes(bytes: number | null): string {
@@ -165,6 +167,8 @@ export default function TeamProjectDetail() {
   const apiFetch = useApiFetch()
   const { profile } = useAuth()
   const { data: project } = useProject(id)
+  // The client's Miro board, SOPs and style (hidden if not allowed).
+  const { data: brief } = useClientBrief(project?.client_id)
   const { data: files, refetch: refetchFiles } = useProjectFiles(id)
   const { data: comments, refetch: refetchComments } = useTimelineComments(id)
   const { data: assignments, refetch: refetchAssignments } = useProjectAssignments(id)
@@ -590,6 +594,8 @@ export default function TeamProjectDetail() {
                 </div>
               </div>
             </div>
+
+            {brief && <ClientBrief brief={brief} />}
           </div>
         </div>
       </main>

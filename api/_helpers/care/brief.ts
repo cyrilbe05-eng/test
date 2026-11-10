@@ -1,8 +1,8 @@
 // A client's working brief: Miro board, SOPs (recurring feedback rules) and
 // style (their "Your style" onboarding answers). Shown on the client's Home
-// and on the copywriter's client page.
+// on the copywriter's client page, and on the team project page (editors too).
 //
-//   GET /api/team/clients/:id/brief   admins + assigned copywriters
+//   GET /api/team/clients/:id/brief   admins, assigned copywriters, team on one of their videos
 
 import { dbQuery } from '../db.js'
 import { loadClientRevisions } from './sop.js'

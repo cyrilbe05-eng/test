@@ -37,6 +37,20 @@ async function requireClientAccess(caller: Caller, clientId: string) {
   if (!(await isAssigned(clientId, caller.id))) throw Object.assign(new Error('Forbidden'), { status: 403 })
 }
 
+async function requireBriefAccess(req: VercelRequest, clientId: string) {
+  const { profile } = await requireAuth(req)
+  const p = profile as any
+  if (p.role === 'admin') return
+  if (p.role === 'team') {
+    if (p.team_role === 'copywriter' && (await isAssigned(clientId, p.id))) return
+    const [onProject] = await dbQuery<{ n: number }>(
+      `SELECT 1 AS n FROM project_assignments pa JOIN projects pr ON pr.id = pa.project_id
+       WHERE pr.client_id = ? AND pa.team_member_id = ? LIMIT 1`, [clientId, p.id])
+    if (onProject) return
+  }
+  throw Object.assign(new Error('Forbidden'), { status: 403 })
+}
+
 async function contractById(contractId: string) {
   const [k] = await dbQuery<{ id: string; client_id: string; number: number; package: string; start_date: string; end_date: string }>(
     'SELECT id, client_id, number, package, start_date, end_date FROM client_contracts WHERE id = ?', [contractId])
@@ -116,11 +130,11 @@ export async function handleTeamRoute(req: VercelRequest, res: VercelResponse, r
       await requireClientAccess(caller, rest[1])
       return await handleTeamOnboarding(req, res, caller, rest[1], rest.slice(3))
     }
-    // /clients/:id/brief
+    // /clients/:id/brief — admins, the client's copywriters, and anyone on
+    // the team working on one of this client's videos (editors).
     if (rest[0] === 'clients' && rest[2] === 'brief' && rest.length === 3) {
       if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
-      const caller = await requirePlanner(req)
-      await requireClientAccess(caller, rest[1])
+      await requireBriefAccess(req, rest[1])
       res.json(await loadBrief(rest[1])); return
     }
     if (rest[0] !== 'plans') { res.status(404).json({ error: 'Not found' }); return }
