@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
-import { setToken } from '@/lib/auth'
+import { setToken, clearToken } from '@/lib/auth'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Profile } from '@/types'
 
@@ -51,6 +51,9 @@ export default function Login() {
         return
       }
 
+      // A fresh sign-in replaces everything, including a leftover "view as"
+      // token, which would otherwise win and bounce back to this page.
+      clearToken()
       setToken(json.token)
       qc.setQueryData(['profile', json.token], json.profile as Profile)
 
