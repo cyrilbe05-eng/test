@@ -7,6 +7,7 @@ import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { cn, projectTimeLabel } from '@/lib/utils'
 import type { Project, Plan } from '@/types'
+import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
 
 function IconVideo() {
   return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg>
@@ -42,6 +43,7 @@ function StatCard({ label, value, sub, icon, color, delay = '' }: {
 
 export default function ClientWorkspace() {
   const { data: projects, isLoading } = useProjects()
+  const canCreate = useCanCreateVideo()
   const { profile } = useAuth()
   const apiFetch = useApiFetch()
   const [searchParams] = useSearchParams()
@@ -86,8 +88,8 @@ export default function ClientWorkspace() {
           <StatCard label="Time Saved" value={timeSaved === null ? '—' : `${timeSaved}h`} icon={<IconClock />} color="bg-amber-50 text-amber-700" delay="stagger-4" />
         </div>
 
-        {/* New project CTA */}
-        <div className="mb-6 animate-slide-up stagger-5">
+        {/* New project CTA (not for full-package clients: they record their scripts) */}
+        {canCreate && <div className="mb-6 animate-slide-up stagger-5">
           <div className="clay-card p-4 flex items-center gap-4">
             <div className="flex-1">
               <p className="text-sm font-semibold">Start a new video</p>
@@ -107,7 +109,7 @@ export default function ClientWorkspace() {
               </Link>
             )}
           </div>
-        </div>
+        </div>}
 
         {/* Project list + preview */}
         {isLoading ? (
@@ -117,9 +119,9 @@ export default function ClientWorkspace() {
             <p className="text-muted-foreground text-sm mb-4">
               {tab === 'active' ? 'No active videos yet' : 'No completed videos yet'}
             </p>
-            {tab === 'active' && !projectLimitReached && (
+            {tab === 'active' && !projectLimitReached && canCreate && (
               <Link to="/workspace/new" className="text-primary hover:underline text-sm font-medium">
-                Create your first project →
+                Create your first video →
               </Link>
             )}
           </div>

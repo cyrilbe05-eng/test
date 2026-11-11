@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { ClientBrief } from '@/components/onboarding/ClientBrief'
 import { ClientStats } from '@/components/workspace/ClientStats'
 import { MarkPosted } from '@/components/project/MarkPosted'
+import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { useProjects } from '@/hooks/useProjects'
 import { projectTimeLabel } from '@/lib/utils'
@@ -151,6 +152,7 @@ function Plan({ steps }: { steps: Dashboard['plan'] }) {
 
 export default function ClientDashboard() {
   const { data, isLoading, error } = useClientDashboard()
+  const canCreate = useCanCreateVideo()
   const { data: projects } = useProjects()
   // Approved in the last 30 days and not marked posted yet.
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
@@ -168,9 +170,9 @@ export default function ClientDashboard() {
       <main className="px-4 md:px-6 py-5 md:py-6 space-y-4 max-w-5xl">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-heading font-semibold tracking-tight truncate">{data?.name ?? ''}</h1>
-          <Link to="/workspace/new" className="min-h-[44px] px-4 inline-flex items-center rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 flex-shrink-0">
+          {canCreate && <Link to="/workspace/new" className="min-h-[44px] px-4 inline-flex items-center rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 flex-shrink-0">
             + New video
-          </Link>
+          </Link>}
         </div>
         {isLoading ? (
           <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>

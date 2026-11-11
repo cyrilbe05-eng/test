@@ -10,6 +10,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { ProductionChatPanel } from '@/components/chat/ProductionChatPanel'
 import { ThemeToggle } from '@/lib/theme'
 import { cn } from '@/lib/utils'
+import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
 import type { Project } from '@/types'
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -55,6 +56,8 @@ interface ClientLayoutProps {
 }
 
 export function ClientLayout({ children }: ClientLayoutProps) {
+  // Full-package clients record the scripts on their Home: no free "New video".
+  const canCreate = useCanCreateVideo()
   const { profile, impersonating, stopImpersonating } = useAuth()
   const { data: projects = [] } = useProjects()
   const { pathname } = useLocation()
@@ -79,7 +82,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     { to: '/workspace/videos', label: 'Videos', icon: <IconVideo /> },
     { to: '/workspace/messages', label: 'Messages', icon: <IconChat /> },
     { to: '/workspace/calendar', label: 'Calendar', icon: <IconCalendar /> },
-    { to: '/workspace/new', label: 'New video', icon: <IconPlus /> },
+    ...(canCreate ? [{ to: '/workspace/new', label: 'New video', icon: <IconPlus /> }] : []),
   ]
 
   const SidebarContent = ({ onClick }: { onClick?: () => void }) => (
@@ -153,7 +156,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       {/* Videos live on Home (active) and Completed — no list here. */}
       <div className="flex-1" />
 
-      <div className="p-3 border-t border-border/60">
+      {canCreate && <div className="p-3 border-t border-border/60">
         <Link
           to="/workspace/new"
           onClick={onClick}
@@ -161,7 +164,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         >
           <IconPlus /><span>New video</span>
         </Link>
-      </div>
+      </div>}
     </>
   )
 
@@ -255,13 +258,13 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               </Link>
             ))}
             <div className="flex-1" />
-            <Link
+            {canCreate && <Link
               to="/workspace/new"
               title="New video"
               className="w-9 h-9 rounded-xl flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20 transition-colors mb-1"
             >
               <IconPlus />
-            </Link>
+            </Link>}
           </div>
 
           {/* Desktop: full sidebar */}

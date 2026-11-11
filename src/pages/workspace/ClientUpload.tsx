@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { GalleryPickerModal } from '@/components/gallery/GalleryPickerModal'
 import { ScriptCard, type ScriptEntry } from '@/components/project/ScriptCard'
+import { useIsFullPackage } from '@/hooks/useCanCreateVideo'
 import { SlideSorter } from '@/components/carousel/Carousel'
 import { isImage, isPdf, toSlides } from '@/lib/pdfSlides'
 import type { GalleryFile } from '@/types'
@@ -71,6 +72,7 @@ export default function ClientUpload() {
   // From a calendar script: it's shown read-only on top (still sent with the
   // video), so the boxes below are only for the client's own additions.
   const fromEntry = !!prefill.fromEventId
+  const fullPackage = useIsFullPackage()
   const [notes, setNotes] = useState(fromEntry ? '' : prefill.instructions ?? '')
   const [link, setLink] = useState(prefill.inspiration_url ?? '')
   const [script, setScript] = useState(prefill.video_script ?? '')
@@ -116,7 +118,7 @@ export default function ClientUpload() {
     const v = all.filter((p) => isVideo(p.file))
     setFiles((s) => [...s, ...all.filter((p) => !isVideo(p.file))])
     setVideos((s) => [...s, ...v])
-    if (videos.length + v.length > 1 && !mode) setAsking(true)
+    if (videos.length + v.length > 1 && !mode && !fromEntry) setAsking(true)
   }
   const drop = (id: string) => setVideos((s) => s.filter((p) => p.id !== id))
 
@@ -198,6 +200,10 @@ export default function ClientUpload() {
     </>
   )
 
+  // Full-package clients only record the scripts written for them (Home →
+  // Upload); without a script there's nothing to send from here.
+  if (fullPackage && !fromEntry) return <Navigate to="/workspace" replace />
+
   return (
     <ClientLayout>
       <main className="max-w-2xl px-4 md:px-6 pt-5 pb-24 md:py-8">
@@ -252,7 +258,8 @@ export default function ClientUpload() {
             />
           )}
 
-          {!carousel && videos.length > 1 && <Segmented value={mode} onChange={setMode} />}
+          {/* One script = one video: no splitting when recording a script. */}
+          {!carousel && !fromEntry && videos.length > 1 && <Segmented value={mode} onChange={setMode} />}
 
           {!carousel && videos.length > 0 && (
             <ul className="space-y-1.5">

@@ -33,6 +33,7 @@ import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
 import { attemptKeys, isLocked, recordFailure, clearFailures, endSessions } from './_helpers/login-guard.js'
+import { isFullPackage, isOpenScriptFor } from './_helpers/care/full-package.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
@@ -568,6 +569,13 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
     // Admins can specify a client_id override; otherwise use their own id
     const isAdmin = profile.role === 'admin'
     const effectiveClientId: string = isAdmin && bodyClientId ? bodyClientId : clerkUserId
+
+    // Full-package clients only record scripts written for them: the video
+    // must come from one of their scripts that isn't a video yet.
+    if (profile.role === 'client' && await isFullPackage(clerkUserId)
+        && !(typeof calendar_event_id === 'string' && await isOpenScriptFor(clerkUserId, calendar_event_id))) {
+      res.status(403).json({ error: 'full_package_needs_script' }); return
+    }
 
     let maxDeliverables = 1
     let maxRevisions = -1 // unlimited by default
