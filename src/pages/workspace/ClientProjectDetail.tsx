@@ -288,7 +288,7 @@ export default function ClientProjectDetail() {
             className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors"
           >
             <IconArrowLeft />
-            <span className="hidden sm:inline">My Workspace</span>
+            <span className="hidden sm:inline">Videos</span>
           </Link>
           <span className="text-border/60">/</span>
           <span className="text-sm font-medium truncate max-w-xs">{project.title}</span>
@@ -312,7 +312,7 @@ export default function ClientProjectDetail() {
 
         {/* Status banners */}
         <div className="space-y-2 mb-4">
-          {project.status === 'pending_assignment' && <StatusBanner color="amber">Your project is waiting for a team member to be assigned. We'll notify you when work begins.</StatusBanner>}
+          {project.status === 'pending_assignment' && <StatusBanner color="amber">Your {noun} is waiting for a team member to be assigned. We'll notify you when work begins.</StatusBanner>}
           {project.status === 'in_progress' && <StatusBanner color="blue">Our team is actively working on your {noun}. You'll be notified when it's ready to review.</StatusBanner>}
           {project.status === 'in_review' && <StatusBanner color="purple">Your {noun} is being quality-checked by our team. Almost there!</StatusBanner>}
           {project.status === 'revision_requested' && <StatusBanner color="red">Your feedback has been submitted. The team is working on the revisions.</StatusBanner>}

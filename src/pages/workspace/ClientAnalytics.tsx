@@ -136,7 +136,7 @@ export default function ClientAnalytics() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-heading font-semibold tracking-tight">Analytics</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Your project and content performance</p>
+            <p className="text-muted-foreground text-sm mt-0.5">Your videos and content performance</p>
           </div>
 
           {/* Timeframe picker */}
@@ -173,7 +173,7 @@ export default function ClientAnalytics() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Projects Started', value: rangeProjects.length, color: 'text-primary' },
+                  { label: 'Videos started', value: rangeProjects.length, color: 'text-primary' },
                   { label: 'Team Comments', value: rangeComments.filter((c) => c.author_role === 'team').length, color: 'text-foreground' },
                 ].map((kpi, i) => (
                   <div key={kpi.label} className={`clay-card p-4 text-center animate-slide-up stagger-${i + 1}`}>
@@ -189,7 +189,7 @@ export default function ClientAnalytics() {
               <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-3">All time</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'Total Projects', value: allProjects.length, color: 'text-foreground' },
+                  { label: 'All videos', value: allProjects.length, color: 'text-foreground' },
                   { label: 'Active', value: active.length, color: 'text-primary' },
                   { label: 'Completed', value: completed.length, color: 'text-green-600' },
                   { label: 'Revisions Used', value: totalRevisions, color: totalRevisions > 0 ? 'text-red-500' : 'text-green-600' },
@@ -204,14 +204,14 @@ export default function ClientAnalytics() {
 
             {/* Charts row */}
             <div className="clay-card p-5">
-              <h3 className="font-heading font-semibold text-sm mb-4">Projects started (last 6 months)</h3>
+              <h3 className="font-heading font-semibold text-sm mb-4">Videos started (last 6 months)</h3>
               <MiniBarChart data={projectsPerMonth} color="bg-primary" />
             </div>
 
             {/* Status breakdown */}
             {allProjects.length > 0 && (
               <div className="clay-card p-5">
-                <h3 className="font-heading font-semibold text-sm mb-4">Projects by status</h3>
+                <h3 className="font-heading font-semibold text-sm mb-4">Videos by status</h3>
                 <div className="space-y-2.5">
                   {Object.entries(statusCounts).map(([status, count]) => (
                     <div key={status} className="flex items-center gap-3">
@@ -238,7 +238,7 @@ export default function ClientAnalytics() {
                   {plan.max_active_projects !== -1 && (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-muted-foreground">Active Projects</span>
+                        <span className="text-xs text-muted-foreground">Active videos</span>
                         <span className="text-xs font-semibold">{active.length} / {plan.max_active_projects}</span>
                       </div>
                       <div className="bg-muted rounded-full h-2 overflow-hidden">
@@ -253,7 +253,7 @@ export default function ClientAnalytics() {
                   {/* Revision usage per project */}
                   {allProjects.filter((p) => p.max_client_revisions !== -1).length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-2">Revision usage per project</p>
+                      <p className="text-xs text-muted-foreground mb-2">Revision usage per video</p>
                       <div className="space-y-2">
                         {allProjects.filter((p) => p.max_client_revisions !== -1 && p.max_client_revisions > 0).map((p) => {
                           const pct = p.client_revision_count / p.max_client_revisions

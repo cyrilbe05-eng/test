@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -32,6 +34,16 @@ export function NotificationBell({ userId, isAdmin = false }: { userId: string; 
   const [open, setOpen] = useState(false)
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(userId)
   const urgent = useUrgentRequests(isAdmin && open)
+  const navigate = useNavigate()
+  const { profile } = useAuth()
+  // A notification about a project opens that project.
+  const base = profile?.role === 'admin' ? '/admin/projects/' : profile?.role === 'team' ? '/team/projects/' : '/workspace/projects/'
+  const openProject = (n: Notification) => {
+    if (!n.read) markRead(n.id)
+    if (!n.project_id) return
+    setOpen(false)
+    navigate(base + n.project_id)
+  }
 
   return (
     <div className="relative">
@@ -79,7 +91,7 @@ export function NotificationBell({ userId, isAdmin = false }: { userId: string; 
                     <div className="flex items-start gap-2">
                       {!n.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
                       <div className={cn('min-w-0', !n.read ? '' : 'ml-4')}>
-                        <p className="text-sm text-foreground">{n.message}</p>
+                        <button onClick={(e) => { e.stopPropagation(); openProject(n) }} className="text-sm text-foreground text-left hover:underline">{n.message}</button>
                         <p className="text-xs text-muted-foreground mt-0.5">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
                         <UrgentActions n={n} requests={urgent} />
                       </div>
@@ -88,7 +100,7 @@ export function NotificationBell({ userId, isAdmin = false }: { userId: string; 
                 ) : (
                   <button
                     key={n.id}
-                    onClick={() => markRead(n.id)}
+                    onClick={() => openProject(n)}
                     className={cn(
                       'w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0',
                       !n.read && 'bg-primary/5',

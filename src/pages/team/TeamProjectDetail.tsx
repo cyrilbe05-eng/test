@@ -172,6 +172,9 @@ export default function TeamProjectDetail() {
   const [claiming, setClaiming] = useState(false)
   const [addingSupport, setAddingSupport] = useState(false)
   const isAssignedToMe = (assignments ?? []).some((a: any) => a.team_member_id === profile?.id)
+  // Copywriters follow the project (comments, supporting files, SOPs); the
+  // edit itself — start, upload, submit — is the editors' (server enforces).
+  const isCopywriter = profile?.team_role === 'copywriter'
   // Editor limit: at the max, "Assign myself" becomes "Request urgent".
   const { data: limit, refetch: refetchLimit } = useQuery({
     queryKey: ['editor-limit', id],
@@ -225,7 +228,7 @@ export default function TeamProjectDetail() {
 
   // Editors upload only on projects assigned to them (server enforces it too).
   const canUpload = (project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment')
-    && (profile?.team_role !== 'editor' || isAssignedToMe)
+    && !isCopywriter && (profile?.team_role !== 'editor' || isAssignedToMe)
   const canSubmitReview = canUpload && deliverables.length > 0
 
   // Start Processing assigns the editor first (the server checks their
@@ -465,8 +468,8 @@ export default function TeamProjectDetail() {
           {/* ── Right: sidebar ── */}
           <div className="space-y-4">
 
-            {/* Deliverable upload */}
-            <div className="clay-card overflow-hidden">
+            {/* Deliverable upload (editors) */}
+            {!isCopywriter && <div className="clay-card overflow-hidden">
               <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between gap-2 overflow-hidden">
                 <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground truncate">Your Deliverable</h3>
                 {!isCarousel && <div className="flex-shrink-0"><DeliverableCounter used={deliverables.length} max={project.max_deliverables} /></div>}
@@ -524,7 +527,7 @@ export default function TeamProjectDetail() {
                     : 'Uploads not available in this status'}
                 </p>
               )}
-            </div>
+            </div>}
 
             {/* Assigned team (Start Processing assigns you) */}
             <div className="clay-card p-4 space-y-2.5">
@@ -563,7 +566,7 @@ export default function TeamProjectDetail() {
             </div>
 
             {/* Mark in progress */}
-            {project.status === 'pending_assignment' && !atLimit && (
+            {project.status === 'pending_assignment' && !atLimit && !isCopywriter && (
               <button
                 onClick={handleMarkInProgress}
                 disabled={claiming || updateStatus.isPending}

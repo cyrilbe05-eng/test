@@ -80,9 +80,9 @@ export default function ClientWorkspace() {
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-          <StatCard label="Active Projects" value={active.length} icon={<IconVideo />} color="bg-primary/10 text-primary" delay="stagger-1" />
+          <StatCard label="Active videos" value={active.length} icon={<IconVideo />} color="bg-primary/10 text-primary" delay="stagger-1" />
           <StatCard label="Completed" value={completed.length} icon={<IconCheck />} color="bg-green-50 text-green-700" delay="stagger-2" />
-          <StatCard label="Total Projects" value={allProjects.length} icon={<IconVideo />} color="bg-blue-50 text-blue-700" delay="stagger-3" />
+          <StatCard label="All videos" value={allProjects.length} icon={<IconVideo />} color="bg-blue-50 text-blue-700" delay="stagger-3" />
           <StatCard label="Time Saved" value={timeSaved === null ? '—' : `${timeSaved}h`} icon={<IconClock />} color="bg-amber-50 text-amber-700" delay="stagger-4" />
         </div>
 
@@ -90,7 +90,7 @@ export default function ClientWorkspace() {
         <div className="mb-6 animate-slide-up stagger-5">
           <div className="clay-card p-4 flex items-center gap-4">
             <div className="flex-1">
-              <p className="text-sm font-semibold">Start a new project</p>
+              <p className="text-sm font-semibold">Start a new video</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {projectLimitReached
                   ? `Monthly limit reached — ${plan!.max_active_projects}/${plan!.max_active_projects} active projects on the ${plan!.name} plan.`
@@ -99,11 +99,11 @@ export default function ClientWorkspace() {
             </div>
             {projectLimitReached ? (
               <div className="btn-gradient flex items-center gap-2 text-sm opacity-40 cursor-not-allowed pointer-events-none flex-shrink-0">
-                <IconPlus /><span>New Project</span>
+                <IconPlus /><span>New video</span>
               </div>
             ) : (
               <Link to="/workspace/new" className="btn-gradient flex items-center gap-2 text-sm flex-shrink-0">
-                <IconPlus /><span>New Project</span>
+                <IconPlus /><span>New video</span>
               </Link>
             )}
           </div>
@@ -115,7 +115,7 @@ export default function ClientWorkspace() {
         ) : displayProjects.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-border rounded-xl">
             <p className="text-muted-foreground text-sm mb-4">
-              {tab === 'active' ? 'No active projects yet' : 'No completed projects yet'}
+              {tab === 'active' ? 'No active videos yet' : 'No completed videos yet'}
             </p>
             {tab === 'active' && !projectLimitReached && (
               <Link to="/workspace/new" className="text-primary hover:underline text-sm font-medium">

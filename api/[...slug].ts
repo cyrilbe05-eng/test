@@ -827,6 +827,7 @@ async function handleClaimProject(req: VercelRequest, res: VercelResponse) {
   try {
     const { clerkUserId, profile } = await requireAuth(req)
     requireRole(profile, 'team')
+    if ((profile as any).team_role === 'copywriter') { res.status(403).json({ error: 'Only editors take on editing work' }); return }
 
     const projectId = req.query.id as string
     const [project] = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [projectId])
@@ -1085,6 +1086,7 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
     }
 
     if (profile.role === 'team') {
+      if ((profile as any).team_role === 'copywriter') { res.status(403).json({ error: 'Only editors change a project\'s status' }); return }
       if (!TEAM_ALLOWED_STATUSES.includes(status)) { res.status(403).json({ error: 'Forbidden' }); return }
     }
     // Team members can update status on any project they can see
@@ -1273,6 +1275,8 @@ async function handleGetProjectFiles(req: VercelRequest, res: VercelResponse) {
  *  they are assigned to. Returns the refusal message, or null if allowed.
  *  Other roles are unaffected. */
 async function editorUploadRefusal(profile: { id: string; role: string; team_role?: string | null }, projectId: string, fileType: string): Promise<string | null> {
+  // Copywriters add supporting files, never the edit.
+  if (profile.role === 'team' && profile.team_role === 'copywriter') return fileType === 'deliverable' ? 'Only editors upload the finished video' : null
   if (profile.role !== 'team' || profile.team_role !== 'editor') return null
   if (fileType !== 'deliverable') return 'Editors can only upload the finished video'
   const [assigned] = await dbQuery<{ id: string }>(
@@ -1491,6 +1495,10 @@ async function authorizeKeyForUpload(profile: any, key: string): Promise<void> {
   // work). Requiring an assignment row here made big uploads by unassigned
   // editors fail with "forbidden" at the very last step (complete), while
   // small single-PUT files — which never hit this check — went through.
+  // Copywriters: never the edit itself.
+  if (profile.role === 'team' && profile.team_role === 'copywriter' && key.split('/')[2] === 'deliverable') {
+    const e: any = new Error('Only editors upload the finished video'); e.status = 403; throw e
+  }
   // Editors: only on projects assigned to them (copywriters: any project).
   if (profile.role === 'team' && profile.team_role === 'editor') {
     const [assigned] = await dbQuery<{ id: string }>(

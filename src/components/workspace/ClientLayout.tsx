@@ -79,7 +79,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     { to: '/workspace/videos', label: 'Videos', icon: <IconVideo /> },
     { to: '/workspace/messages', label: 'Messages', icon: <IconChat /> },
     { to: '/workspace/calendar', label: 'Calendar', icon: <IconCalendar /> },
-    { to: '/workspace/new', label: 'New', icon: <IconPlus /> },
+    { to: '/workspace/new', label: 'New video', icon: <IconPlus /> },
   ]
 
   const SidebarContent = ({ onClick }: { onClick?: () => void }) => (
@@ -119,7 +119,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <IconOnboarding />
           <span>Onboarding</span>
         </Link>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-2">Projects</p>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-2">Videos</p>
         <Link
           to="/workspace/videos?tab=completed"
           onClick={onClick}
@@ -159,7 +159,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           onClick={onClick}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
         >
-          <IconPlus /><span>New Project</span>
+          <IconPlus /><span>New video</span>
         </Link>
       </div>
     </>
@@ -257,7 +257,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             <div className="flex-1" />
             <Link
               to="/workspace/new"
-              title="New Project"
+              title="New video"
               className="w-9 h-9 rounded-xl flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20 transition-colors mb-1"
             >
               <IconPlus />
