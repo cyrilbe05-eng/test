@@ -223,7 +223,9 @@ export default function TeamProjectDetail() {
   const commentedVersions = new Set((comments ?? []).filter((c) => c.file_id && versionIds.includes(c.file_id)).map((c) => c.file_id!))
   const filesChanged = () => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }); qc.invalidateQueries({ queryKey: ['project', id] }) }
 
-  const canUpload = project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment'
+  // Editors upload only on projects assigned to them (server enforces it too).
+  const canUpload = (project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment')
+    && (profile?.team_role !== 'editor' || isAssignedToMe)
   const canSubmitReview = canUpload && deliverables.length > 0
 
   // Start Processing assigns the editor first (the server checks their
@@ -378,9 +380,9 @@ export default function TeamProjectDetail() {
               </div>
               {/* Supporting files could previously only be added while creating
                   the project — editors had no way to add references later. */}
-              {/* Kept small so it isn't mistaken for the finished-video box
-                  (files here don't count as the edit). */}
-              <div className="px-3 pb-3">
+              {/* Not for editors (they only upload the finished video). Kept
+                  small so it isn't mistaken for the finished-video box. */}
+              {profile?.team_role !== 'editor' && <div className="px-3 pb-3">
                 {addingSupport ? (
                   <FileUploader
                     projectId={project.id}
@@ -395,7 +397,7 @@ export default function TeamProjectDetail() {
                     + Supporting files
                   </button>
                 )}
-              </div>
+              </div>}
             </div>
 
             {/* Revision comments (the player above lists them once there's a video) */}
@@ -517,6 +519,8 @@ export default function TeamProjectDetail() {
                     ? 'Client is reviewing'
                     : project.status === 'client_approved'
                     ? 'Project complete'
+                    : profile?.team_role === 'editor' && !isAssignedToMe
+                    ? 'Not assigned to you'
                     : 'Uploads not available in this status'}
                 </p>
               )}

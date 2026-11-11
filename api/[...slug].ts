@@ -1269,6 +1269,17 @@ async function handleGetProjectFiles(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+/** Editors add only the edit itself (deliverables), and only on a project
+ *  they are assigned to. Returns the refusal message, or null if allowed.
+ *  Other roles are unaffected. */
+async function editorUploadRefusal(profile: { id: string; role: string; team_role?: string | null }, projectId: string, fileType: string): Promise<string | null> {
+  if (profile.role !== 'team' || profile.team_role !== 'editor') return null
+  if (fileType !== 'deliverable') return 'Editors can only upload the finished video'
+  const [assigned] = await dbQuery<{ id: string }>(
+    'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?', [projectId, profile.id])
+  return assigned ? null : 'Only the assigned editor can upload to this project'
+}
+
 async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
@@ -1283,6 +1294,10 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
     const VALID_FILE_TYPES = ['source_video', 'deliverable', 'attachment']
     if (!VALID_FILE_TYPES.includes(file_type)) {
       res.status(400).json({ error: 'file_type must be source_video, deliverable, or attachment' }); return
+    }
+    const editorNo = await editorUploadRefusal(profile as any, project_id, file_type)
+    if (editorNo) {
+      res.status(403).json({ error: editorNo }); return
     }
 
     if (profile.role === 'client') {
@@ -1399,6 +1414,10 @@ async function handleGetProjectFileUploadUrl(req: VercelRequest, res: VercelResp
     if (!projectId || !fileType || !fileName) {
       res.status(400).json({ error: 'projectId, fileType, and fileName required' }); return
     }
+    const editorNo = await editorUploadRefusal(profile as any, projectId, fileType)
+    if (editorNo) {
+      res.status(403).json({ error: editorNo }); return
+    }
 
     // Review-copy artifacts attach to an EXISTING deliverable row (they never
     // become their own project_files row), so the deliverable cap does not
@@ -1472,6 +1491,13 @@ async function authorizeKeyForUpload(profile: any, key: string): Promise<void> {
   // work). Requiring an assignment row here made big uploads by unassigned
   // editors fail with "forbidden" at the very last step (complete), while
   // small single-PUT files — which never hit this check — went through.
+  // Editors: only on projects assigned to them (copywriters: any project).
+  if (profile.role === 'team' && profile.team_role === 'editor') {
+    const [assigned] = await dbQuery<{ id: string }>(
+      'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?', [projectId, profile.id])
+    if (assigned) return
+    const e: any = new Error('Only the assigned editor can upload to this project'); e.status = 403; throw e
+  }
   if (profile.role === 'team') return
   const e: any = new Error('forbidden'); e.status = 403; throw e
 }
@@ -1490,6 +1516,10 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
       }
     } else if (!projectId || !fileType || !fileName || !partCount) {
       res.status(400).json({ error: 'projectId, fileType, fileName, partCount required' }); return
+    }
+    const editorNo = gallery ? null : await editorUploadRefusal(profile as any, projectId, fileType)
+    if (editorNo) {
+      res.status(403).json({ error: editorNo }); return
     }
     if (typeof partCount !== 'number' || partCount < 1 || partCount > 10000) {
       res.status(400).json({ error: 'partCount must be 1..10000' }); return
