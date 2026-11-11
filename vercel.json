@@ -44,11 +44,11 @@
   "functions": {
     "api/[...slug].ts": {
       "maxDuration": 300,
-      "includeFiles": "api/_helpers/pingu-excited.png"
+      "includeFiles": "api/_helpers/pingu-logo.png"
     },
     "api/cron/budget-nudge.ts": {
       "maxDuration": 300,
-      "includeFiles": "api/_helpers/pingu-excited.png"
+      "includeFiles": "api/_helpers/pingu-logo.png"
     }
   },
   "crons": [

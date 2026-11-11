@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import pinguExcited from '@/assets/pingu-excited.png'
+import { Logo } from '@/components/brand/Logo'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -73,7 +73,7 @@ export default function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-[380px] animate-slide-up">
         <div className="flex flex-col items-center mb-10">
-          <img src={pinguExcited} alt="Pingu Studio" className="w-24 h-24 object-contain mb-1 drop-shadow-xl" />
+          <Logo className="w-24 h-24 mb-1" />
           <h1 className="text-2xl font-heading font-semibold text-foreground tracking-tight">Pingu Studio</h1>
           <p className="text-muted-foreground text-sm mt-1.5">Sign in to continue</p>
         </div>

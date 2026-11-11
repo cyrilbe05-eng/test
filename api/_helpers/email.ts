@@ -25,7 +25,7 @@ function getLogo(): Buffer | null {
   if (LOGO_BUFFER) return LOGO_BUFFER
   try {
     const here = path.dirname(fileURLToPath(import.meta.url))
-    LOGO_BUFFER = fs.readFileSync(path.join(here, 'pingu-excited.png'))
+    LOGO_BUFFER = fs.readFileSync(path.join(here, 'pingu-logo.png'))
     return LOGO_BUFFER
   } catch (err) {
     console.warn('[email] could not load logo asset:', (err as Error).message)
@@ -148,7 +148,7 @@ function renderBrandedHtml(
   const proseHtml = escapeHtml(prose).replace(/\n/g, '<br>')
   const subjectHtml = escapeHtml(subject)
   const logoImg = hasLogo
-    ? `<img src="cid:pingu-logo@projectpingu" alt="Pingu Studio" width="64" height="64" style="display:block;width:64px;height:64px;border:0;outline:none;" />`
+    ? `<img src="cid:pingu-logo@projectpingu" alt="Pingu Studio" width="64" height="54" style="display:block;width:64px;height:54px;border:0;outline:none;" />`
     : ''
   const ctaButton = ctaUrl
     ? `

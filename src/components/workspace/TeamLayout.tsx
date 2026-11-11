@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import pinguPhone from '@/assets/pingu-phone.png'
+import { Logo } from '@/components/brand/Logo'
 import { clearToken } from '@/lib/auth'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -133,7 +133,7 @@ export function TeamLayout({ children }: TeamLayoutProps) {
           <IconMenu />
         </button>
         <div className="flex items-center gap-2 mr-2">
-          <img src={pinguPhone} alt="Pingu Studio" className="w-8 h-8 object-contain flex-shrink-0" />
+          <Logo className="w-8 h-8" />
           <span className="font-heading font-semibold text-sm hidden sm:block">Pingu Studio</span>
         </div>
         <div className="flex-1" />
@@ -156,7 +156,7 @@ export function TeamLayout({ children }: TeamLayoutProps) {
           <aside className="absolute left-0 top-0 bottom-0 w-72 bg-background border-r border-border flex flex-col shadow-2xl animate-slide-in-left overflow-y-auto">
             <div className="flex items-center justify-between px-4 h-[52px] border-b border-border flex-shrink-0">
               <div className="flex items-center gap-2">
-                <img src={pinguPhone} alt="Pingu Studio" className="w-7 h-7 object-contain" />
+                <Logo className="w-7 h-7" />
                 <span className="font-heading font-semibold text-sm">Pingu Studio</span>
               </div>
               <button onClick={() => setDrawerOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
