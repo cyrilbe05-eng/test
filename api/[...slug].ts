@@ -2862,8 +2862,9 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
     const nowIsoStr = new Date().toISOString()
 
     for (const p of projects) {
-      // ONE entry per video: on the editor's deadline day when there is one,
-      // otherwise the day it was created. Its colour and word say where it is.
+      // ONE entry per video, on the day it was created — it never moves.
+      // The editor's deadline only shows as "Late" (red) once it has passed,
+      // and as the due date inside the entry.
       const lifecycle = lifecycleById.get(p.id)!
       const dls = deadlinesByProject.get(p.id) ?? []
       const open = dls.filter((d) => d.status === 'pending').sort((a, b) => a.due_at.localeCompare(b.due_at))[0]
@@ -2884,7 +2885,8 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         client_id: p.client_id,
         client_label: labelFor(p.client_id, p.title),
         title: `${p.title} — ${stateLabel}`,
-        date: (shownDeadline?.due_at ?? p.created_at).slice(0, 10),
+        date: p.created_at.slice(0, 10),
+        due_date: shownDeadline?.due_at.slice(0, 10),
         color,
         posted: lifecycle.posted,
         deadline_id: shownDeadline?.id,

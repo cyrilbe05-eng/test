@@ -192,21 +192,6 @@ export default function TeamProjectDetail() {
     }
   }
 
-  const handleClaim = async () => {
-    if (!id) return
-    setClaiming(true)
-    try {
-      await apiFetch(`/api/projects/${id}/claim`, { method: 'POST' })
-      toast.success('You are now assigned to this project')
-      refetchAssignments()
-      qc.invalidateQueries({ queryKey: ['projects'] })
-    } catch (e: any) {
-      if (e?.message === 'editor_limit_reached') { toast.error('Limit reached'); refetchLimit(); return }
-      toast.error(e?.message ?? 'Failed to assign yourself')
-    } finally {
-      setClaiming(false)
-    }
-  }
 
   const toggleResolved = async (comment: { id: string; resolved?: boolean | number | null }) => {
     try {
@@ -240,11 +225,28 @@ export default function TeamProjectDetail() {
   const canUpload = project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment'
   const canSubmitReview = canUpload && deliverables.length > 0
 
+  // Start Processing assigns the editor first (the server checks their
+  // active-video limit), then starts the project.
   const handleMarkInProgress = async () => {
     if (!id) return
-    await updateStatus.mutateAsync({ id, status: 'in_progress' })
-    toast.success('Project marked as in progress')
+    setClaiming(true)
+    try {
+      if (!isAssignedToMe) {
+        await apiFetch(`/api/projects/${id}/claim`, { method: 'POST' })
+        refetchAssignments()
+      }
+      await updateStatus.mutateAsync({ id, status: 'in_progress' })
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Started')
+    } catch (e: any) {
+      if (e?.message === 'editor_limit_reached') { toast.error('Limit reached'); refetchLimit(); return }
+      toast.error(e?.message ?? 'Failed')
+    } finally {
+      setClaiming(false)
+    }
   }
+  // At the limit without an approved urgent request: only "Request urgent".
+  const atLimit = !isAssignedToMe && !!limit?.limited && limit.request !== 'approved'
 
   const handleSubmitForReview = async () => {
     if (!id || !confirm('Submit for admin review?')) return
@@ -509,7 +511,7 @@ export default function TeamProjectDetail() {
               )}
             </div>
 
-            {/* Assigned team — visible to editors, with self-assign */}
+            {/* Assigned team (Start Processing assigns you) */}
             <div className="clay-card p-4 space-y-2.5">
               <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Assigned Team</h3>
               {(assignments ?? []).length === 0 && (
@@ -526,7 +528,7 @@ export default function TeamProjectDetail() {
                   )}
                 </div>
               ))}
-              {!isAssignedToMe && limit?.limited && limit.request !== 'approved' ? (
+              {atLimit && (
                 <div className="pt-1 space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Active</span>
@@ -540,27 +542,19 @@ export default function TeamProjectDetail() {
                       Request urgent
                     </button>
                   )}
-                  {limit.request === 'declined' && <p className="text-xs font-medium text-red-600 dark:text-red-400">Declined</p>}
+                  {limit?.request === 'declined' && <p className="text-xs font-medium text-red-600 dark:text-red-400">Declined</p>}
                 </div>
-              ) : !isAssignedToMe && (
-                <button
-                  onClick={handleClaim}
-                  disabled={claiming}
-                  className="w-full mt-1 py-2 rounded-xl border border-primary/40 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors disabled:opacity-50"
-                >
-                  {claiming ? 'Assigning…' : 'Assign myself to this project'}
-                </button>
               )}
             </div>
 
             {/* Mark in progress */}
-            {project.status === 'pending_assignment' && (
+            {project.status === 'pending_assignment' && !atLimit && (
               <button
                 onClick={handleMarkInProgress}
-                disabled={updateStatus.isPending}
-                className="w-full py-2.5 bg-blue-600 rounded-xl text-white font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
+                disabled={claiming || updateStatus.isPending}
+                className="w-full min-h-[44px] py-2.5 bg-blue-600 rounded-xl text-white font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
               >
-                {updateStatus.isPending ? 'Updating…' : 'Start Processing'}
+                {claiming || updateStatus.isPending ? 'Starting…' : 'Start Processing'}
               </button>
             )}
 

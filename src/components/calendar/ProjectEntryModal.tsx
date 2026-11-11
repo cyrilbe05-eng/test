@@ -20,6 +20,12 @@ export function ProjectEntryModal({ event, onClose, projectBase }: { event: Cale
             <span className="text-muted-foreground">Date</span>
             <span>{format(parseISO(event.date), 'd MMMM yyyy')}</span>
           </div>
+          {event.due_date && (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Due</span>
+              <span>{format(parseISO(event.due_date), 'd MMMM yyyy')}</span>
+            </div>
+          )}
           {event.type === 'project_created' && (
             <div className="flex items-center justify-between gap-3 min-h-[44px]">
               <span className="text-muted-foreground">Posted</span>

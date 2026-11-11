@@ -191,6 +191,8 @@ export interface CalendarEvent {
   title: string
   /** Staff calendars: the client's short name, shown before the title. */
   client_label?: string
+  /** Video entries on staff calendars: the editor's deadline, if any. */
+  due_date?: string
   date: string        // ISO date string (YYYY-MM-DD)
   color: string
   projectId?: string
