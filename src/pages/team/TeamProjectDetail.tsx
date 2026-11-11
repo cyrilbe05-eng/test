@@ -493,6 +493,7 @@ export default function TeamProjectDetail() {
                     projectId={project.id}
                     fileType="deliverable"
                     accept="video/*"
+                    label="Upload the finished video"
                     onUploaded={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
                   />
                 </div>
