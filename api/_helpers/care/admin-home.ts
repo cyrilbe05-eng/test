@@ -49,6 +49,19 @@ export async function handleAdminHome(req: VercelRequest, res: VercelResponse) {
          ORDER BY active DESC, e.full_name ASC`),
     ])
 
-    res.json({ max: CARE_CONFIG.editors.maxActiveProjects, to_review: toReview, unassigned, late, editors })
+    // Every "Submit for Review" by an editor in the last 8 days (the page
+    // groups them by the admin's local day). A resubmission after a revision
+    // counts too — it's another video sent for review.
+    const since = new Date(Date.now() - 8 * 86_400_000).toISOString()
+    let submitted: { editor_id: string; at: string }[] = []
+    try {
+      submitted = await dbQuery(
+        `SELECT h.actor_id AS editor_id, h.created_at AS at
+         FROM status_history h JOIN profiles e ON e.id = h.actor_id
+         WHERE h.new_status = 'in_review' AND e.role = 'team'
+           AND (e.team_role IS NULL OR e.team_role != 'copywriter') AND h.created_at >= ?`, [since])
+    } catch { /* no status history yet */ }
+
+    res.json({ max: CARE_CONFIG.editors.maxActiveProjects, to_review: toReview, unassigned, late, editors, submitted })
   } catch (e) { sendError(res, e) }
 }

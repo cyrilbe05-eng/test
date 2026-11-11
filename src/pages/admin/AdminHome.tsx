@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format, startOfDay, subDays, isSameDay } from 'date-fns'
 import { toast } from 'sonner'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { useApiFetch } from '@/lib/api'
@@ -18,6 +18,8 @@ type Home = {
   unassigned: (P & { created_at: string })[]
   late: (P & { editor: string; due_at: string })[]
   editors: { id: string; name: string; active: number }[]
+  /** Editors' "Submit for Review" times, last 8 days. */
+  submitted?: { editor_id: string; at: string }[]
 }
 
 const ago = (d: string) => formatDistanceToNow(new Date(d), { addSuffix: true })
@@ -34,6 +36,42 @@ function Card({ title, count, tone, children }: { title: string; count?: number;
       </div>
       {children}
     </section>
+  )
+}
+
+/** Videos each editor sent for review, per day: last 7 days, today on the
+ *  right, then the 7-day total. Days are the viewer's local days. */
+function Submitted({ editors, submitted }: { editors: Home['editors']; submitted: NonNullable<Home['submitted']> }) {
+  const today = startOfDay(new Date())
+  const days = Array.from({ length: 7 }, (_, i) => subDays(today, 6 - i))
+  const count = (id: string, d: Date) => submitted.filter((s) => s.editor_id === id && isSameDay(new Date(s.at), d)).length
+  const rows = editors.map((e) => ({ ...e, perDay: days.map((d) => count(e.id, d)) }))
+    .map((r) => ({ ...r, total: r.perDay.reduce((a, b) => a + b, 0) }))
+  const cell = 'w-7 text-center tabular-nums flex-shrink-0'
+  return (
+    <div className="-mx-1 overflow-x-auto">
+      <div className="min-w-[19rem] px-1">
+        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground pb-1.5">
+          <span className="flex-1" />
+          {days.map((d, i) => <span key={i} className={cn(cell, i === 6 && 'text-foreground font-semibold')}>{i === 6 ? 'Today' : format(d, 'EEEEE')}</span>)}
+          <span className={cn(cell, 'w-8')}>7d</span>
+        </div>
+        <ul className="divide-y divide-border/60">
+          {rows.map((r) => (
+            <li key={r.id} className="flex items-center gap-1 min-h-[40px] text-sm">
+              <span className="flex-1 min-w-0 truncate">
+                <span className="sm:hidden">{r.name.split(' ')[0]}</span>
+                <span className="hidden sm:inline">{r.name}</span>
+              </span>
+              {r.perDay.map((n, i) => (
+                <span key={i} className={cn(cell, n === 0 ? 'text-muted-foreground/40' : i === 6 ? 'font-semibold text-primary' : '')}>{n === 0 ? '·' : n}</span>
+              ))}
+              <span className={cn(cell, 'w-8 font-semibold')}>{r.total}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   )
 }
 
@@ -129,6 +167,7 @@ export default function AdminHome() {
               </Card>
             </div>
 
+            <div className="space-y-4 min-w-0">
             <Card title="Editors">
               {data.editors.length ? (
                 <ul className="space-y-3 pt-1">
@@ -149,6 +188,11 @@ export default function AdminHome() {
                 </ul>
               ) : empty}
             </Card>
+
+            <Card title="Submitted">
+              {data.editors.length ? <Submitted editors={data.editors} submitted={data.submitted ?? []} /> : empty}
+            </Card>
+            </div>
           </div>
         )}
       </main>
