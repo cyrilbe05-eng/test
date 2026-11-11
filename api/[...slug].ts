@@ -1306,8 +1306,18 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
       res.status(403).json({ error: editorNo }); return
     }
     // The address must be one issued for this project and file type — a
-    // record may never point at another project's (or client's) file.
-    if (typeof storage_key !== 'string' || !storage_key.startsWith(`projects/${project_id}/${file_type}/`)) {
+    // record may never point at another project's (or client's) file. One
+    // exception: "Pick from Gallery" attaches a file from the project's own
+    // client's gallery by its gallery address.
+    const ownAddress = typeof storage_key === 'string' && storage_key.startsWith(`projects/${project_id}/${file_type}/`)
+    let fromOwnGallery = false
+    if (!ownAddress && file_type === 'attachment' && typeof storage_key === 'string' && storage_key.startsWith('gallery/')) {
+      const [g] = await dbQuery<{ id: string }>(
+        `SELECT g.id FROM gallery_files g JOIN projects p ON p.id = ?
+         WHERE g.storage_key = ? AND g.owner_id = p.client_id LIMIT 1`, [project_id, storage_key])
+      fromOwnGallery = !!g
+    }
+    if (!ownAddress && !fromOwnGallery) {
       res.status(400).json({ error: 'invalid storage_key' }); return
     }
 
@@ -1704,7 +1714,9 @@ async function handleDeleteProjectFile(req: VercelRequest, res: VercelResponse) 
     }
 
     await dbExecute('DELETE FROM project_files WHERE id = ?', [fileId])
-    await deleteObject(file.storage_key)
+    // A file attached from the client's gallery stays in their gallery —
+    // removing it from the project must not erase the original.
+    if (!file.storage_key.startsWith('gallery/')) await deleteObject(file.storage_key)
     // Best-effort: also remove the low-bitrate review copy if one exists.
     if (file.preview_storage_key) {
       await deleteObject(file.preview_storage_key).catch(() => {})
