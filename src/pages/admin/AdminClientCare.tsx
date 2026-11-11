@@ -9,10 +9,12 @@ import { HEALTH_META } from '@/components/care/healthMeta'
 import { Switch } from '@/components/care/Switch'
 import { useCareOverview, useMarkContacted, useUndoContact } from '@/hooks/useCare'
 import { cn } from '@/lib/utils'
+import { shortReason, isAllClear } from '@/lib/careReasons'
 import type { CareOverview, Health, HealthCard, RenewalStatus } from '@/types/care'
 
 // Client Care (admin-only). Compact: most of it fits on one screen.
-// Labels and numbers only.
+// Labels and numbers only: reasons show as short tags (full sentence on hover
+// and in the client panel), each client's detail lives in the panel.
 
 const RENEWAL_LABEL: Record<RenewalStatus, string> = {
   not_discussed: 'Not discussed',
@@ -70,6 +72,21 @@ function QuickContacted({ item }: { item: CareOverview['text_today'][number] }) 
   )
 }
 
+/** Reasons as quiet short tags; the full sentence on hover. */
+function Tags({ reasons, max }: { reasons: string[]; max?: number }) {
+  const list = reasons.filter((r) => !isAllClear(r)).map(shortReason)
+  if (!list.length) return null
+  const shown = max ? list.slice(0, max) : list
+  return (
+    <span className="mt-1 flex flex-wrap gap-1">
+      {shown.map((r) => (
+        <span key={r.full} title={r.full} className="px-1.5 py-0.5 rounded-md bg-muted text-[11px] text-muted-foreground whitespace-nowrap">{r.label}</span>
+      ))}
+      {max && list.length > max && <span className="px-1 py-0.5 text-[11px] text-muted-foreground">+{list.length - max}</span>}
+    </span>
+  )
+}
+
 function TextToday({ items, onOpen }: { items: CareOverview['text_today']; onOpen: (id: string) => void }) {
   if (items.length === 0) return <p className="text-sm text-muted-foreground">—</p>
   return (
@@ -81,7 +98,7 @@ function TextToday({ items, onOpen }: { items: CareOverview['text_today']; onOpe
               <span className="text-sm font-semibold break-words">{item.name}</span>
               <HealthBadge health={item.health} />
             </span>
-            <span className="block text-xs text-muted-foreground break-words">{item.reasons.join(' · ')}</span>
+            <Tags reasons={item.reasons} />
           </button>
           <QuickContacted item={item} />
         </li>
@@ -97,7 +114,8 @@ function ClientCard({ c, onOpen }: { c: HealthCard; onOpen: (id: string) => void
   return (
     <button
       onClick={() => onOpen(c.client_id)}
-      className="w-full text-left rounded-lg border border-border bg-background px-3 py-1.5 min-h-[44px] hover:border-primary/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      title={c.health !== 'healthy' ? c.reasons.join('\n') : undefined}
+      className="w-full text-left rounded-lg px-3 py-2 min-h-[44px] hover:bg-muted/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
       <span className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold truncate min-w-0">{c.name}</span>
@@ -108,12 +126,6 @@ function ClientCard({ c, onOpen }: { c: HealthCard; onOpen: (id: string) => void
           </span>
         )}
       </span>
-      {c.instagram.length > 0 && (
-        <span className="block text-xs text-pink-700 dark:text-pink-300 truncate">{c.instagram.map((h) => `@${h}`).join(' · ')}</span>
-      )}
-      {c.health !== 'healthy' && (
-        <span className="block text-xs text-muted-foreground truncate">{c.reasons[0]}{c.reasons.length > 1 ? ` · +${c.reasons.length - 1}` : ''}</span>
-      )}
     </button>
   )
 }
@@ -131,7 +143,7 @@ function HealthBoard({ board, onOpen }: { board: CareOverview['health_board']; o
           </div>
           {board[h].length === 0
             ? <p className="text-sm text-muted-foreground">—</p>
-            : <div className="space-y-1">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
+            : <div className="-mx-3">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
         </div>
       ))}
     </div>
@@ -140,13 +152,15 @@ function HealthBoard({ board, onOpen }: { board: CareOverview['health_board']; o
 
 // ── Renewals ────────────────────────────────────────────────────────────────
 
-function RenewalPill({ status }: { status: RenewalStatus }) {
+/** Calm text; only "not discussed" with the end close (≤ 30 days) stands out. */
+function RenewalPill({ status, soon }: { status: RenewalStatus; soon: boolean }) {
   return (
-    <span className={cn('inline-block px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap',
-      status === 'renewed' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-        : status === 'declined' ? 'bg-muted text-muted-foreground line-through'
-          : status === 'discussed' ? 'bg-primary/10 text-primary'
-            : 'bg-muted text-foreground')}>
+    <span className={cn('text-xs whitespace-nowrap',
+      status === 'renewed' ? 'text-emerald-700 dark:text-emerald-300'
+        : status === 'declined' ? 'text-muted-foreground line-through'
+          : status === 'discussed' ? 'text-primary'
+            : soon ? 'px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-200 font-semibold'
+              : 'text-muted-foreground')}>
       {RENEWAL_LABEL[status]}
     </span>
   )
@@ -169,7 +183,7 @@ function Renewals({ rows, onOpen }: { rows: CareOverview['renewals']; onOpen: (i
               </span>
               <span className="flex items-center gap-3 flex-shrink-0">
                 <span className={cn('text-xs tabular-nums whitespace-nowrap', soon ? 'font-semibold' : 'text-muted-foreground')}>{daysLeft(r.days_left) ?? '—'}</span>
-                <RenewalPill status={r.renewal_status} />
+                <RenewalPill status={r.renewal_status} soon={soon && r.renewal_status === 'not_discussed'} />
               </span>
             </button>
           </li>

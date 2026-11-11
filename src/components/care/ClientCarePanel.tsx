@@ -451,9 +451,13 @@ function Videos({ detail }: { detail: ClientCareDetail }) {
 
 // ── Panel ───────────────────────────────────────────────────────────────────
 
+type Tab = 'overview' | 'plan' | 'feedback' | 'account' | 'onboarding'
+const TABS: [Tab, string][] = [['overview', 'Overview'], ['plan', 'Plan'], ['feedback', 'Feedback'], ['account', 'Account'], ['onboarding', 'Onboarding']]
+
 export function ClientCarePanel({ clientId, onClose }: { clientId: string; onClose: () => void }) {
   const { data, isLoading, error } = useCareClient(clientId)
-  const [tab, setTab] = useState<'care' | 'onboarding'>('care')
+  // One focused tab at a time instead of every section in one long column.
+  const [tab, setTab] = useState<Tab>('overview')
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -477,44 +481,57 @@ export function ClientCarePanel({ clientId, onClose }: { clientId: string; onClo
           <h3 className="min-w-0 flex-1 font-heading font-semibold truncate">{data?.client.name ?? ''}</h3>
           {data && <HealthBadge health={data.health} />}
         </header>
-        <div role="tablist" className="flex gap-1 px-4 md:px-5 border-b border-border flex-shrink-0">
-          {(['care', 'onboarding'] as const).map((t) => (
+        <div role="tablist" className="flex gap-1 px-4 md:px-5 border-b border-border flex-shrink-0 overflow-x-auto">
+          {TABS.map(([t, label]) => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-              className={cn('min-h-[44px] px-3 -mb-px border-b-2 text-sm', tab === t ? 'border-primary font-semibold' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-              {t === 'care' ? 'Care' : 'Onboarding'}
+              className={cn('min-h-[44px] px-3 -mb-px border-b-2 text-sm whitespace-nowrap', tab === t ? 'border-primary font-semibold' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+              {label}
             </button>
           ))}
         </div>
 
         <div className="flex-1 overflow-y-auto overscroll-contain pb-10">
           {tab === 'onboarding' ? (
-            <OnboardingAnswers clientId={clientId} compact />
+            <>
+              {data && <Onboarding detail={data} />}
+              <OnboardingAnswers clientId={clientId} compact />
+            </>
           ) : isLoading ? (
             <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
           ) : error ? (
             <p className="p-6 text-sm">{errMsg(error)}</p>
           ) : data ? (
-            <>
-              <ContactedTick detail={data} />
-              {(data.health !== 'healthy' || data.info.length > 0) && (
-                <Block title="Why">
-                  <ul className="space-y-1.5 text-sm">
-                    {data.health !== 'healthy' && data.reasons.map((r) => <li key={r} className="break-words">{r}</li>)}
-                    {data.info.map((r) => <li key={r} className="break-words text-primary">{r}</li>)}
-                  </ul>
-                </Block>
-              )}
-              <Stats detail={data} />
-              <PlanSection detail={data} />
-              <Copywriters detail={data} />
-              <Contracts detail={data} />
-              <SopRules detail={data} miro={<MiroForm detail={data} />} />
-              <RevisionBacklog detail={data} />
-              <InstagramSection detail={data} />
-              <NotesForm detail={data} />
-              <Onboarding detail={data} />
-              <Videos detail={data} />
-            </>
+            tab === 'overview' ? (
+              <>
+                <ContactedTick detail={data} />
+                {(data.health !== 'healthy' || data.info.length > 0) && (
+                  <Block title="Why">
+                    <ul className="space-y-1.5 text-sm">
+                      {data.health !== 'healthy' && data.reasons.map((r) => <li key={r} className="break-words">{r}</li>)}
+                      {data.info.map((r) => <li key={r} className="break-words text-primary">{r}</li>)}
+                    </ul>
+                  </Block>
+                )}
+                <Stats detail={data} />
+                <Videos detail={data} />
+              </>
+            ) : tab === 'plan' ? (
+              <>
+                <PlanSection detail={data} />
+                <Copywriters detail={data} />
+              </>
+            ) : tab === 'feedback' ? (
+              <>
+                <SopRules detail={data} miro={<MiroForm detail={data} />} />
+                <RevisionBacklog detail={data} />
+              </>
+            ) : (
+              <>
+                <Contracts detail={data} />
+                <InstagramSection detail={data} />
+                <NotesForm detail={data} />
+              </>
+            )
           ) : null}
         </div>
       </aside>
