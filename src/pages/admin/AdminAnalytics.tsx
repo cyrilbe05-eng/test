@@ -141,6 +141,8 @@ function Overview({ range, projects, perf, assignments }: {
 }) {
   const colors = useChartColors()
   const tip = { background: colors.card, border: `1px solid ${colors.border}`, borderRadius: 10, fontSize: 12, color: colors.text }
+  // The chart library colours tooltip text separately (black on the pie): use the theme's text colour.
+  const tipText = { color: colors.text }
   const axis = { stroke: colors.axis, tick: { fontSize: 11 }, tickLine: false, axisLine: false } as const
   const requests = projects.filter((p) => inRange(p.created_at, range))
   const delivered = (perf?.client_split.clients ?? []).reduce((a, c) => a + c.videos, 0)
@@ -203,7 +205,7 @@ function Overview({ range, projects, perf, assignments }: {
               <CartesianGrid vertical={false} stroke={colors.grid} />
               <XAxis dataKey="label" {...axis} minTickGap={16} />
               <YAxis {...axis} allowDecimals={false} />
-              <Tooltip contentStyle={tip} formatter={(v: number) => [v, 'Requests']} />
+              <Tooltip contentStyle={tip} itemStyle={tipText} labelStyle={tipText} formatter={(v: number) => [v, 'Requests']} />
               <Line type="monotone" dataKey="count" stroke={colors.bar} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -219,7 +221,7 @@ function Overview({ range, projects, perf, assignments }: {
                     <Pie data={byStatus} dataKey="n" nameKey="label" innerRadius="62%" outerRadius="100%" paddingAngle={2} stroke="none">
                       {byStatus.map((x) => <Cell key={x.key} fill={x.hex} />)}
                     </Pie>
-                    <Tooltip contentStyle={tip} />
+                    <Tooltip contentStyle={tip} itemStyle={tipText} labelStyle={tipText} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -246,7 +248,7 @@ function Overview({ range, projects, perf, assignments }: {
                 <CartesianGrid vertical={false} stroke={colors.grid} />
                 <XAxis dataKey="name" {...axis} />
                 <YAxis {...axis} allowDecimals={false} />
-                <Tooltip contentStyle={tip} cursor={{ fill: colors.grid, opacity: 0.4 }} />
+                <Tooltip contentStyle={tip} itemStyle={tipText} labelStyle={tipText} cursor={{ fill: colors.grid, opacity: 0.4 }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" iconSize={8} />
                 <Bar dataKey="met" name="Met" stackId="d" fill="#16a34a" maxBarSize={36} />
                 <Bar dataKey="missed" name="Missed" stackId="d" fill="#dc2626" radius={[4, 4, 0, 0]} maxBarSize={36} />
@@ -262,7 +264,7 @@ function Overview({ range, projects, perf, assignments }: {
                 <CartesianGrid vertical={false} stroke={colors.grid} />
                 <XAxis dataKey="name" {...axis} />
                 <YAxis {...axis} allowDecimals={false} />
-                <Tooltip contentStyle={tip} cursor={{ fill: colors.grid, opacity: 0.4 }} formatter={(v: number) => [v, 'Projects']} />
+                <Tooltip contentStyle={tip} itemStyle={tipText} labelStyle={tipText} cursor={{ fill: colors.grid, opacity: 0.4 }} formatter={(v: number) => [v, 'Projects']} />
                 <Bar dataKey="count" fill={colors.bar} radius={[4, 4, 0, 0]} maxBarSize={36} />
               </BarChart>
             </ResponsiveContainer>
