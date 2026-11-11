@@ -10,18 +10,12 @@ import { Switch } from '@/components/care/Switch'
 import { useCareOverview, useMarkContacted, useUndoContact } from '@/hooks/useCare'
 import { cn } from '@/lib/utils'
 import { shortReason, isAllClear } from '@/lib/careReasons'
-import type { CareOverview, Health, HealthCard, RenewalStatus } from '@/types/care'
+import type { CareOverview, Health, HealthCard } from '@/types/care'
 
 // Client Care (admin-only). Compact: most of it fits on one screen.
 // Labels and numbers only: reasons show as short tags (full sentence on hover
 // and in the client panel), each client's detail lives in the panel.
 
-const RENEWAL_LABEL: Record<RenewalStatus, string> = {
-  not_discussed: 'Not discussed',
-  discussed: 'Discussed',
-  renewed: 'Renewed',
-  declined: 'Declined',
-}
 
 const fmt = (n: number | null, suffix = '') => (n == null ? '—' : `${n}${suffix}`)
 const day = (d: string) => format(new Date(`${d.slice(0, 10)}T12:00:00Z`), 'd MMM yyyy')
@@ -110,22 +104,13 @@ function TextToday({ items, onOpen }: { items: CareOverview['text_today']; onOpe
 // ── Health board ────────────────────────────────────────────────────────────
 
 function ClientCard({ c, onOpen }: { c: HealthCard; onOpen: (id: string) => void }) {
-  const left = daysLeft(c.days_left_on_contract)
   return (
     <button
       onClick={() => onOpen(c.client_id)}
       title={c.health !== 'healthy' ? c.reasons.join('\n') : undefined}
-      className="w-full text-left rounded-lg px-3 py-2 min-h-[44px] hover:bg-muted/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="w-full text-left rounded-lg border border-border bg-background px-3 py-2 min-h-[44px] hover:border-primary/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
-      <span className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold truncate min-w-0">{c.name}</span>
-        {left && (
-          <span className={cn('text-xs tabular-nums whitespace-nowrap',
-            (c.days_left_on_contract ?? 99) <= 30 ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-muted-foreground')}>
-            {left}
-          </span>
-        )}
-      </span>
+      <span className="block text-sm font-semibold truncate">{c.name}</span>
     </button>
   )
 }
@@ -143,7 +128,7 @@ function HealthBoard({ board, onOpen }: { board: CareOverview['health_board']; o
           </div>
           {board[h].length === 0
             ? <p className="text-sm text-muted-foreground">—</p>
-            : <div className="-mx-3">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
+            : <div className="space-y-1.5">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
         </div>
       ))}
     </div>
@@ -151,20 +136,6 @@ function HealthBoard({ board, onOpen }: { board: CareOverview['health_board']; o
 }
 
 // ── Renewals ────────────────────────────────────────────────────────────────
-
-/** Calm text; only "not discussed" with the end close (≤ 30 days) stands out. */
-function RenewalPill({ status, soon }: { status: RenewalStatus; soon: boolean }) {
-  return (
-    <span className={cn('text-xs whitespace-nowrap',
-      status === 'renewed' ? 'text-emerald-700 dark:text-emerald-300'
-        : status === 'declined' ? 'text-muted-foreground line-through'
-          : status === 'discussed' ? 'text-primary'
-            : soon ? 'px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-200 font-semibold'
-              : 'text-muted-foreground')}>
-      {RENEWAL_LABEL[status]}
-    </span>
-  )
-}
 
 function Renewals({ rows, onOpen }: { rows: CareOverview['renewals']; onOpen: (id: string) => void }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">—</p>
@@ -177,13 +148,10 @@ function Renewals({ rows, onOpen }: { rows: CareOverview['renewals']; onOpen: (i
             <button onClick={() => onOpen(r.client_id)} className="w-full min-h-[44px] py-1.5 flex items-center justify-between gap-3 text-left rounded-lg hover:bg-muted/50 px-2 -mx-2">
               <span className="min-w-0">
                 <span className="block text-sm font-medium truncate">{r.name}</span>
-                <span className="block text-xs text-muted-foreground tabular-nums">
-                  {r.contract_number ? `#${r.contract_number} · ` : ''}{day(r.contract_end)}
-                </span>
+                {r.contract_start && <span className="block text-xs text-muted-foreground tabular-nums">Started {day(r.contract_start)}</span>}
               </span>
-              <span className="flex items-center gap-3 flex-shrink-0">
-                <span className={cn('text-xs tabular-nums whitespace-nowrap', soon ? 'font-semibold' : 'text-muted-foreground')}>{daysLeft(r.days_left) ?? '—'}</span>
-                <RenewalPill status={r.renewal_status} soon={soon && r.renewal_status === 'not_discussed'} />
+              <span className={cn('text-xs tabular-nums whitespace-nowrap flex-shrink-0', soon ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-muted-foreground')}>
+                {daysLeft(r.days_left) ?? '—'}
               </span>
             </button>
           </li>

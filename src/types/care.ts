@@ -34,7 +34,7 @@ export interface CareOverview {
     agency: OutputRate
     per_client: (OutputRate & { client_id: string; name: string })[]
   }
-  renewals: { client_id: string; name: string; contract_end: string; contract_number: number | null; days_left: number | null; renewal_status: RenewalStatus }[]
+  renewals: { client_id: string; name: string; contract_start?: string | null; contract_end: string; contract_number: number | null; days_left: number | null; renewal_status: RenewalStatus }[]
 }
 
 export type ContractPackage = 'editing_only' | 'full_package'

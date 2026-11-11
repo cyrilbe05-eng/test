@@ -74,6 +74,7 @@ async function handleOverview(req: VercelRequest, res: VercelResponse) {
         return {
           client_id: c.id,
           name: c.full_name,
+          contract_start: c.care!.contract_start ?? null,
           contract_end: c.care!.contract_end,
           contract_number: c.contract?.number ?? null,
           days_left: ev.stats.days_left_on_contract,
