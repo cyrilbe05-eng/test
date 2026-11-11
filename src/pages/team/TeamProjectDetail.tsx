@@ -170,6 +170,7 @@ export default function TeamProjectDetail() {
   const { data: assignments, refetch: refetchAssignments } = useProjectAssignments(id)
   const updateStatus = useUpdateProjectStatus()
   const [claiming, setClaiming] = useState(false)
+  const [addingSupport, setAddingSupport] = useState(false)
   const isAssignedToMe = (assignments ?? []).some((a: any) => a.team_member_id === profile?.id)
   // Editor limit: at the max, "Assign myself" becomes "Request urgent".
   const { data: limit, refetch: refetchLimit } = useQuery({
@@ -377,14 +378,23 @@ export default function TeamProjectDetail() {
               </div>
               {/* Supporting files could previously only be added while creating
                   the project — editors had no way to add references later. */}
+              {/* Kept small so it isn't mistaken for the finished-video box
+                  (files here don't count as the edit). */}
               <div className="px-3 pb-3">
-                <FileUploader
-                  projectId={project.id}
-                  fileType="attachment"
-                  label="Add supporting files (references, b-roll, notes)"
-                  context={project.title}
-                  onUploaded={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
-                />
+                {addingSupport ? (
+                  <FileUploader
+                    projectId={project.id}
+                    fileType="attachment"
+                    label="Add supporting files (references, b-roll, notes)"
+                    context={project.title}
+                    onUploaded={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
+                  />
+                ) : (
+                  <button onClick={() => setAddingSupport(true)}
+                    className="min-h-[44px] px-3 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted">
+                    + Supporting files
+                  </button>
+                )}
               </div>
             </div>
 
