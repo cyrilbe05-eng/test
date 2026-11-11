@@ -2732,14 +2732,16 @@ const CAL_COLOR_RECORDED = 'bg-amber-500'  // client uploaded footage/files, bei
 const CAL_COLOR_DELIVERED = 'bg-blue-500'  // a deliverable has been uploaded
 const CAL_COLOR_APPROVED = 'bg-green-500'  // client approved — done
 const CAL_COLOR_POSTED   = 'bg-gray-400'   // client published it (migration 008)
+const CAL_COLOR_LATE     = 'bg-red-500'    // editor's deadline passed, nothing delivered
 
-/** Colour for a project's calendar presence. "Something uploaded" is measured
- *  as an actual deliverable file existing, not a status guess, because status
- *  can move for other reasons (e.g. admin assigning a team member). */
+/** Colour for a project's calendar presence: approved → in review (submitted
+ *  for review) → editing (footage in, editor working, or a revision asked) →
+ *  waiting. A deliverable file alone isn't "in review": an editor may still be
+ *  uploading slides or a draft. */
 function projectLifecycleColor(status: string, hasDeliverable: boolean, hasClientUpload = false): string {
   if (status === 'client_approved') return CAL_COLOR_APPROVED
-  if (hasDeliverable) return CAL_COLOR_DELIVERED
-  if (hasClientUpload) return CAL_COLOR_RECORDED
+  if (status === 'in_review' || status === 'client_reviewing') return CAL_COLOR_DELIVERED
+  if (hasClientUpload || hasDeliverable || status === 'in_progress' || status === 'revision_requested') return CAL_COLOR_RECORDED
   return CAL_COLOR_PLANNED
 }
 
@@ -2808,32 +2810,27 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    for (const p of projects) {
-      // ONE entry per project that changes colour as it progresses
-      // (violet → blue → green), replacing the old fixed-blue "Created" entry
-      // plus a separate green "Approved" entry on a different day.
-      const lifecycle = lifecycleById.get(p.id)!
-      const stateLabel =
-        lifecycle.posted ? 'Posted'
-        : lifecycle.color === CAL_COLOR_APPROVED ? 'Approved ✓'
-        : lifecycle.color === CAL_COLOR_DELIVERED ? 'In review'
-        : lifecycle.color === CAL_COLOR_RECORDED ? 'Editing'
-        : 'Created'
-      events.push({
-        id: `ce-created-${p.id}`,
-        project_id: p.id,
-        type: 'project_created',
-        client_id: p.client_id,
-        title: `${p.title} — ${stateLabel}`,
-        date: p.created_at.slice(0, 10),
-        color: lifecycle.color,
-        posted: lifecycle.posted,
-        created_at: p.created_at,
-      })
+    // Staff calendars put the client first ("Atlas · FAQ short"), sent as a
+    // separate label so editable titles never get it saved into them. First
+    // word of the client's name, or the full name if two clients share it.
+    const clientLabel = new Map<string, string>()
+    if (profile.role !== 'client') {
+      const cs = await dbQuery<{ id: string; full_name: string }>("SELECT id, full_name FROM profiles WHERE role = 'client'")
+      const first = (n: string) => n.trim().split(/\s+/)[0] || n
+      const uses = new Map<string, number>()
+      for (const c of cs) uses.set(first(c.full_name).toLowerCase(), (uses.get(first(c.full_name).toLowerCase()) ?? 0) + 1)
+      for (const c of cs) clientLabel.set(c.id, (uses.get(first(c.full_name).toLowerCase()) ?? 0) > 1 ? c.full_name : first(c.full_name))
+    }
+    const labelFor = (clientId: string | null | undefined, title: string) => {
+      const l = clientId ? clientLabel.get(clientId) : undefined
+      // Auto titles like "Atlas · Nov 9" already start with the client.
+      return l && !title.toLowerCase().startsWith(l.toLowerCase()) ? l : undefined
     }
 
+    // Deadlines are folded into their project's single entry (below), not
+    // shown as a second entry for the same video.
+    let deadlineRows: CalendarDeadlineRow[] = []
     if (profile.role !== 'client') {
-      let deadlineRows: CalendarDeadlineRow[]
       const projectIds = projects.map((p) => p.id)
 
       if (projectIds.length === 0) {
@@ -2858,27 +2855,42 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         )
       }
 
-      for (const dl of deadlineRows) {
-        const color =
-          dl.status === 'met'    ? 'bg-green-500' :
-          dl.status === 'missed' ? 'bg-red-500'   :
-          'bg-orange-500'
+    }
 
-        const suffix = profile.role === 'admin' ? ` · ${dl.member_full_name}` : ''
+    const deadlinesByProject = new Map<string, CalendarDeadlineRow[]>()
+    for (const dl of deadlineRows) deadlinesByProject.set(dl.project_id, [...(deadlinesByProject.get(dl.project_id) ?? []), dl])
+    const nowIsoStr = new Date().toISOString()
 
-        events.push({
-          id: `ce-deadline-${dl.id}`,
-          project_id: dl.project_id,
-          type: 'deadline',
-          client_id: dl.project_client_id,
-          title: `⏰ ${dl.project_title}${suffix}`,
-          date: dl.due_at.slice(0, 10),
-          color,
-          deadline_id: dl.id,
-          team_member_id: dl.team_member_id,
-          created_at: dl.created_at,
-        })
-      }
+    for (const p of projects) {
+      // ONE entry per video: on the editor's deadline day when there is one,
+      // otherwise the day it was created. Its colour and word say where it is.
+      const lifecycle = lifecycleById.get(p.id)!
+      const dls = deadlinesByProject.get(p.id) ?? []
+      const open = dls.filter((d) => d.status === 'pending').sort((a, b) => a.due_at.localeCompare(b.due_at))[0]
+      const shownDeadline = open ?? [...dls].sort((a, b) => b.due_at.localeCompare(a.due_at))[0]
+      const late = !!open && open.due_at < nowIsoStr && !deliveredSet.has(p.id) && !lifecycle.posted && p.status !== 'client_approved'
+      const color = late ? CAL_COLOR_LATE : lifecycle.color
+      const stateLabel =
+        late ? 'Late'
+        : lifecycle.posted ? 'Posted'
+        : color === CAL_COLOR_APPROVED ? 'Approved'
+        : color === CAL_COLOR_DELIVERED ? 'In review'
+        : color === CAL_COLOR_RECORDED ? 'Editing'
+        : 'Waiting'
+      events.push({
+        id: `ce-created-${p.id}`,
+        project_id: p.id,
+        type: 'project_created',
+        client_id: p.client_id,
+        client_label: labelFor(p.client_id, p.title),
+        title: `${p.title} — ${stateLabel}`,
+        date: (shownDeadline?.due_at ?? p.created_at).slice(0, 10),
+        color,
+        posted: lifecycle.posted,
+        deadline_id: shownDeadline?.id,
+        team_member_id: shownDeadline?.team_member_id,
+        created_at: p.created_at,
+      })
     }
 
     const manualRows = await dbQuery<{
@@ -2934,9 +2946,11 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
       // Posted is the terminal state — it outranks the lifecycle colour, and
       // an author-chosen colour, because the piece is already out.
       const isPosted = Boolean(m.posted)
+      const forClients = manualParticipants.filter((p) => p.event_id === m.id && p.role === 'client').map((p) => p.profile_id)
       events.push({
         id: m.id,
         type: 'manual',
+        client_label: forClients.length === 1 ? labelFor(forClients[0], m.title) : undefined,
         owner_id: m.owner_id,
         project_id: m.project_id ?? undefined,
         posted: isPosted,

@@ -25,6 +25,8 @@ import {
   useDeleteCalendarEvent,
 } from '@/hooks/useCalendar'
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
+import { ProjectEntryModal } from '@/components/calendar/ProjectEntryModal'
+import { calendarLabel } from '@/lib/calendarLabel'
 import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus, Profile } from '@/types'
@@ -279,6 +281,9 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
     })
   }
 
+  // Project entries: date, status and a way into the project.
+  if (!isManual) return <ProjectEntryModal event={event} onClose={onClose} projectBase="/team/projects" />
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '90vh' }}>
@@ -530,7 +535,7 @@ export default function TeamCalendar() {
                         {event.posted && <span className="text-white/90 text-[9px] leading-none flex-shrink-0" title="Posted">✓</span>}
                         {event.double_down && <span className="text-[9px] leading-none">🔥</span>}
                         {event.content_type && <span className="text-white/70 text-[9px] leading-none font-bold uppercase tracking-tight flex-shrink-0">{event.content_type.slice(0, 1)}</span>}
-                        <span className="text-white text-[10px] font-medium truncate leading-tight">{event.title}</span>
+                        <span className="text-white text-[10px] font-medium truncate leading-tight">{calendarLabel(event)}</span>
                       </button>
                     ))}
                     {overflow > 0 && (

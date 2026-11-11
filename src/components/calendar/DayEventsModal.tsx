@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type { CalendarEvent } from '@/types'
+import { calendarLabel } from '@/lib/calendarLabel'
 
 /** Every entry on one day.
  *
@@ -46,7 +47,7 @@ export function DayEventsModal({
               <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', event.color ?? 'bg-slate-500')} />
               {event.posted && <span className="text-[10px] leading-none flex-shrink-0 text-muted-foreground" title="Posted">✓</span>}
               {event.double_down && <span className="text-[10px] leading-none flex-shrink-0">🔥</span>}
-              <span className="text-sm font-medium truncate flex-1">{event.title}</span>
+              <span className="text-sm font-medium truncate flex-1">{calendarLabel(event)}</span>
               {event.content_type && (
                 <span className="text-[10px] font-semibold text-muted-foreground uppercase flex-shrink-0">{event.content_type}</span>
               )}

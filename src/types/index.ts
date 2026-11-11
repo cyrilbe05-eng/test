@@ -189,6 +189,8 @@ export interface CalendarEvent {
   id: string
   type: CalendarEventType
   title: string
+  /** Staff calendars: the client's short name, shown before the title. */
+  client_label?: string
   date: string        // ISO date string (YYYY-MM-DD)
   color: string
   projectId?: string
