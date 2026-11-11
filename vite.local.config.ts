@@ -11,5 +11,13 @@ export default mergeConfig(base, defineConfig({
     port: 5173,
     strictPort: true,
     proxy: { '/api': 'http://localhost:3001' },
+    // Same security headers as production (vercel.json), so local testing
+    // behaves like the live site.
+    headers: {
+      'X-Frame-Options': 'SAMEORIGIN',
+      'Content-Security-Policy': "frame-ancestors 'self'",
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+    },
   },
 }))

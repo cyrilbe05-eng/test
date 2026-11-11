@@ -2,9 +2,10 @@
 //   PUT /api/project-files/order { project_id, ids: [fileId, …], from? }
 //     → saves slide order: ids[i] gets position from + i (from defaults to 0,
 //       so a single slide uploaded on its own can say where it goes).
-// Clients may order their own project's source images; editors and admins
-// order the finished slides (editors only while uploads are open, the same
-// rule as deleting a slide).
+// Clients may order their own project's source images; admins, and the
+// editor assigned to the carousel, order the finished slides (editors only
+// while uploads are open, the same rule as deleting a slide). Copywriters
+// don't reorder slides.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAuth } from '../auth.js'
@@ -32,10 +33,18 @@ export async function handleFileOrder(req: VercelRequest, res: VercelResponse) {
     if (files.length !== ids.length) { res.status(400).json({ error: 'Unknown file' }); return }
 
     const role = profile.role
+    let editorOk = false
+    if (role === 'team' && (profile as { team_role?: string | null }).team_role !== 'copywriter'
+        && ['pending_assignment', 'in_progress', 'revision_requested'].includes(project.status)
+        && files.every((f) => f.file_type === 'deliverable')) {
+      const [assigned] = await dbQuery<{ id: string }>(
+        'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?', [project_id, clerkUserId])
+      editorOk = !!assigned
+    }
     const ok =
       role === 'admin' ||
       (role === 'client' && project.client_id === clerkUserId && files.every((f) => f.file_type !== 'deliverable')) ||
-      (role === 'team' && ['pending_assignment', 'in_progress', 'revision_requested'].includes(project.status))
+      editorOk
     if (!ok) { res.status(403).json({ error: 'Forbidden' }); return }
 
     for (const [i, id] of (ids as string[]).entries()) {
