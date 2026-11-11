@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/brand/Logo'
-import { ProjectSearch } from '@/components/admin/ProjectSearch'
 import { clearToken } from '@/lib/auth'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -146,10 +145,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <span className="font-heading font-semibold text-sm hidden sm:block">Pingu Studio</span>
         </div>
 
-        {/* Find any project by name, client or editor (phones: an icon) */}
-        <div className="flex-1 flex justify-end md:justify-center md:px-6 min-w-0">
-          <ProjectSearch />
-        </div>
+        <div className="flex-1" />
 
         <div className="flex items-center gap-2">
           {profile && <NotificationBell userId={profile.id} isAdmin />}

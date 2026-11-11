@@ -15,6 +15,7 @@ import { useApiFetch } from '@/lib/api'
 import { useStorageAdapter } from '@/lib/storage'
 import { cn, projectTimeLabel, sortByRecentActivity } from '@/lib/utils'
 import type { Profile } from '@/types'
+import { ProjectSearch } from '@/components/admin/ProjectSearch'
 
 function IconLayout() {
   return (
@@ -242,12 +243,17 @@ export default function AdminProjects() {
     <AdminLayout>
       {showCreate && <CreateProjectModal onClose={() => setShowCreate(false)} />}
       <main className="px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
+        {/* Wraps on phones so the Kanban/List switch never runs off-screen. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h2 className="text-2xl font-heading font-bold">Projects</h2>
             <p className="text-muted-foreground text-sm mt-0.5">{projects?.length ?? 0} total</p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Find a project by name, client or editor (phones: an icon) */}
+            <div className="flex md:w-64 lg:w-72">
+              <ProjectSearch />
+            </div>
             <button
               onClick={() => setShowCreate(true)}
               className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold shadow-sm hover:brightness-110 transition-all active:scale-[0.98]"
