@@ -32,6 +32,7 @@ import { handleFileOrder } from './_helpers/care/carousel.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
+import { attemptKeys, isLocked, recordFailure, clearFailures, endSessions } from './_helpers/login-guard.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
@@ -448,6 +449,7 @@ async function handleResetUserPassword(req: VercelRequest, res: VercelResponse) 
       [tempHash, nowIso(), targetId]
     )
 
+    await endSessions(targetId) // signed out everywhere until they use the new password
     res.json({ temporary_password: tempPassword })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
@@ -1303,6 +1305,11 @@ async function handleRegisterProjectFile(req: VercelRequest, res: VercelResponse
     if (editorNo) {
       res.status(403).json({ error: editorNo }); return
     }
+    // The address must be one issued for this project and file type — a
+    // record may never point at another project's (or client's) file.
+    if (typeof storage_key !== 'string' || !storage_key.startsWith(`projects/${project_id}/${file_type}/`)) {
+      res.status(400).json({ error: 'invalid storage_key' }); return
+    }
 
     if (profile.role === 'client') {
       const [row] = await dbQuery<{ id: string }>('SELECT id FROM projects WHERE id = ? AND client_id = ?', [project_id, clerkUserId])
@@ -1736,6 +1743,9 @@ async function handleProjectFilePreview(req: VercelRequest, res: VercelResponse)
     if (req.method === 'POST') {
       const { storage_key, file_size } = req.body
       if (!storage_key) { res.status(400).json({ error: 'storage_key required' }); return }
+      if (typeof storage_key !== 'string' || !storage_key.startsWith(`projects/${file.project_id}/`)) {
+        res.status(400).json({ error: 'invalid storage_key' }); return
+      }
       const previous = file.preview_storage_key
       try {
         await dbExecute(
@@ -2521,6 +2531,10 @@ async function handleRegisterGalleryFile(req: VercelRequest, res: VercelResponse
 
     // Admins can specify an ownerId to register files on behalf of a client
     const ownerId = (profile.role === 'admin' && bodyOwnerId) ? bodyOwnerId : clerkUserId
+    // Only an address issued for this gallery (same rule as the upload URL).
+    if (typeof storageKey !== 'string' || !storageKey.startsWith(`gallery/${ownerId}/`)) {
+      res.status(400).json({ error: 'invalid storageKey' }); return
+    }
 
     const id = newId()
     const now = nowIso()
@@ -4253,17 +4267,23 @@ async function handleAuthLogin(req: VercelRequest, res: VercelResponse) {
     const { email, password } = req.body as { email: string; password: string }
     if (!email || !password) { res.status(400).json({ error: 'Email and password required' }); return }
 
+    const cleanEmail = email.toLowerCase().trim()
+    // Too many wrong passwords (per email, per network address): pause.
+    const keys = attemptKeys(cleanEmail, req.headers['x-forwarded-for'])
+    if (await isLocked(keys)) { res.status(429).json({ error: 'Too many attempts. Try again in 15 minutes.' }); return }
+
     const rows = await dbQuery<Profile & { password_hash: string | null }>(
       'SELECT * FROM profiles WHERE email = ? AND disabled = 0',
-      [email.toLowerCase().trim()]
+      [cleanEmail]
     )
     const user = rows[0]
-    if (!user) { res.status(401).json({ error: 'Invalid email or password' }); return }
+    if (!user) { await recordFailure(keys); res.status(401).json({ error: 'Invalid email or password' }); return }
 
     if (!user.password_hash) { res.status(401).json({ error: 'Account not yet activated. Contact your administrator.' }); return }
 
     const valid = await comparePassword(password, user.password_hash)
-    if (!valid) { res.status(401).json({ error: 'Invalid email or password' }); return }
+    if (!valid) { await recordFailure(keys); res.status(401).json({ error: 'Invalid email or password' }); return }
+    await clearFailures(cleanEmail)
 
     const token = await signJwt({ sub: user.id, role: user.role })
     const { password_hash: _ph, ...profile } = user
@@ -4277,17 +4297,30 @@ async function handleAuthChangePassword(req: VercelRequest, res: VercelResponse)
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     const { clerkUserId } = await requireAuth(req)
-    const { password } = req.body as { password: string }
+    const { password, current_password } = req.body as { password: string; current_password?: string }
     if (!password || password.length < 12) { res.status(400).json({ error: 'Password must be at least 12 characters' }); return }
+
+    // The current password is required, so a borrowed or stolen session
+    // can't lock the owner out.
+    const [me] = await dbQuery<{ password_hash: string | null; email: string }>('SELECT password_hash, email FROM profiles WHERE id = ?', [clerkUserId])
+    const keys = attemptKeys(me?.email ?? clerkUserId, req.headers['x-forwarded-for'])
+    if (await isLocked(keys)) { res.status(429).json({ error: 'Too many attempts. Try again in 15 minutes.' }); return }
+    if (!me?.password_hash || !current_password || !(await comparePassword(current_password, me.password_hash))) {
+      await recordFailure(keys)
+      res.status(400).json({ error: 'Current password is incorrect' }); return
+    }
 
     const hash = await hashPassword(password)
     await dbExecute(
       'UPDATE profiles SET password_hash = ?, password_changed = 1, updated_at = ? WHERE id = ?',
       [hash, nowIso(), clerkUserId]
     )
+    // Sign out every other device; this one gets a fresh token.
+    await endSessions(clerkUserId)
     const rows = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [clerkUserId])
     const p = rows[0]
-    res.json({ ...publicProfile(p), password_changed: Boolean(p.password_changed), disabled: Boolean(p.disabled) })
+    const token = await signJwt({ sub: p.id, role: p.role })
+    res.json({ ...publicProfile(p), password_changed: Boolean(p.password_changed), disabled: Boolean(p.disabled), token })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }

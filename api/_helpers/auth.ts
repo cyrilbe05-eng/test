@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 const { hash, compare } = bcrypt
 import type { IncomingMessage } from 'http'
 import { dbQuery } from './db.js'
+import { isEndedSession } from './login-guard.js'
 import type { Profile } from '../../src/types/index.js'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET!)
@@ -38,9 +39,11 @@ export async function requireAuth(req: IncomingMessage): Promise<AuthContext> {
   const token = authHeader.replace('Bearer ', '')
 
   let clerkUserId: string
+  let issuedAt: number | undefined
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     clerkUserId = payload.sub as string
+    issuedAt = payload.iat
   } catch {
     throw Object.assign(new Error('Unauthorized'), { status: 401 })
   }
@@ -51,6 +54,10 @@ export async function requireAuth(req: IncomingMessage): Promise<AuthContext> {
   )
   if (!rows[0]) {
     throw Object.assign(new Error('Profile not found'), { status: 404 })
+  }
+  // Password changed/reset since this token was issued: signed out.
+  if (isEndedSession(issuedAt, (rows[0] as any).sessions_valid_after)) {
+    throw Object.assign(new Error('Unauthorized'), { status: 401 })
   }
 
   return { clerkUserId, profile: rows[0] }
