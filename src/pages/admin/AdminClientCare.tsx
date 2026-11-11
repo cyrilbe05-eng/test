@@ -184,16 +184,27 @@ function Output({ output }: { output: CareOverview['output_rate'] }) {
       </div>
       <Switch checked={byClient} onChange={setByClient} label="By client" className="mt-2" />
       {byClient && (
-        <ul className="divide-y divide-border/60 mt-2">
-          {output.per_client.map((c) => (
-            <li key={c.client_id} className="py-1.5 text-sm flex items-baseline justify-between gap-3">
-              <span className="font-medium break-words min-w-0">{c.name}</span>
-              <span className="text-sm tabular-nums text-muted-foreground whitespace-nowrap">
-                {c.delivered} · {fmt(c.avg_turnaround_days, ' d')} · {fmt(c.on_time_pct, '%')}
-              </span>
-            </li>
-          ))}
-        </ul>
+        // Same three measures as the tiles above, per client, with headers.
+        <table className="w-full mt-2 text-sm">
+          <thead>
+            <tr className="text-xs text-muted-foreground">
+              <th className="text-left font-normal py-1.5" />
+              <th className="text-right font-normal py-1.5 pl-3 whitespace-nowrap">Delivered</th>
+              <th className="text-right font-normal py-1.5 pl-3 whitespace-nowrap">Turnaround</th>
+              <th className="text-right font-normal py-1.5 pl-3 whitespace-nowrap">On time</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/60">
+            {output.per_client.map((c) => (
+              <tr key={c.client_id}>
+                <td className="py-1.5 font-medium break-words">{c.name}</td>
+                <td className="py-1.5 pl-3 text-right tabular-nums">{c.delivered}</td>
+                <td className="py-1.5 pl-3 text-right tabular-nums text-muted-foreground">{fmt(c.avg_turnaround_days, ' d')}</td>
+                <td className="py-1.5 pl-3 text-right tabular-nums text-muted-foreground">{fmt(c.on_time_pct, '%')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </>
   )
