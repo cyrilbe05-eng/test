@@ -31,6 +31,7 @@ import { handleGalleryThumbnail, handleGalleryThumbnails } from './_helpers/care
 import { handleFileOrder } from './_helpers/care/carousel.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
+import { publicProfile, stripSecrets } from './_helpers/secrets.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
 import type { Profile, Project, ProjectFile, Plan, Notification, Deadline, TeamNote, CalendarEvent } from '../src/types'
 
@@ -101,7 +102,7 @@ async function handleGetUsers(req: VercelRequest, res: VercelResponse) {
     )
 
     const mapped = users.map(({ plan_name, storage_limit_mb, ...u }) => ({
-      ...u,
+      ...publicProfile(u),
       password_changed: Boolean(u.password_changed),
       disabled: Boolean(u.disabled),
       plans: plan_name ? { name: plan_name, storage_limit_mb: storage_limit_mb ?? -1 } : null,
@@ -127,7 +128,7 @@ async function handleGetClients(req: VercelRequest, res: VercelResponse) {
     )
 
     const shaped = clients.map((c) => ({
-      ...c,
+      ...publicProfile(c),
       password_changed: Boolean(c.password_changed),
       disabled: Boolean(c.disabled),
     }))
@@ -150,7 +151,7 @@ async function handleGetTeam(req: VercelRequest, res: VercelResponse) {
     )
 
     const shaped = members.map((m) => ({
-      ...m,
+      ...publicProfile(m),
       password_changed: Boolean(m.password_changed),
       disabled: Boolean(m.disabled),
     }))
@@ -378,7 +379,7 @@ async function handleUpdateUser(req: VercelRequest, res: VercelResponse) {
     }
 
     const [updated] = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [targetId])
-    res.json({ ...updated, password_changed: Boolean(updated.password_changed), disabled: Boolean(updated.disabled) })
+    res.json({ ...publicProfile(updated), password_changed: Boolean(updated.password_changed), disabled: Boolean(updated.disabled) })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
@@ -466,7 +467,7 @@ async function handleImpersonateUser(req: VercelRequest, res: VercelResponse) {
 
     // Issue a short-lived token (2 hours) for the target user
     const token = await signJwt({ sub: target.id, role: target.role }, '2h')
-    res.json({ token, profile: target })
+    res.json({ token, profile: publicProfile(target) })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
@@ -3617,7 +3618,7 @@ async function handleProfile(req: VercelRequest, res: VercelResponse) {
 
       const rows = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [clerkUserId])
       const p = rows[0]
-      res.json({ ...p, password_changed: Boolean(p.password_changed), disabled: Boolean(p.disabled) })
+      res.json({ ...publicProfile(p), password_changed: Boolean(p.password_changed), disabled: Boolean(p.disabled) })
 
     } else {
       res.status(405).json({ error: 'Method not allowed' })
@@ -4232,7 +4233,7 @@ async function handleAuthChangePassword(req: VercelRequest, res: VercelResponse)
     )
     const rows = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ?', [clerkUserId])
     const p = rows[0]
-    res.json({ ...p, password_changed: Boolean(p.password_changed), disabled: Boolean(p.disabled) })
+    res.json({ ...publicProfile(p), password_changed: Boolean(p.password_changed), disabled: Boolean(p.disabled) })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
@@ -4264,6 +4265,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // final status code regardless of which handler resolved the request.
   const caller = readCallerFromHeader(req.headers.authorization)
   const startedAt = Date.now()
+  // Safety net: no response ever carries a password hash, whatever a
+  // handler selects (see _helpers/secrets.ts).
+  const sendJson = res.json.bind(res)
+  res.json = ((body: unknown) => sendJson(stripSecrets(body))) as typeof res.json
   res.on('finish', () => {
     const line = {
       role: caller.role ?? 'anon',
