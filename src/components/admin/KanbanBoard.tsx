@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useUpdateProjectStatus } from '@/hooks/useProjects'
 import { cn, projectTimeLabel } from '@/lib/utils'
 import type { ProjectStatus } from '@/types'
 import { isBackward } from '@/lib/statusFlow'
-import { useTheme } from '@/lib/theme'
-import { statusColor } from '@/lib/dsStatus'
-import { COLUMNS, STEPS, columnLabel, originFrom, type SheetOrigin } from '@/lib/board'
+import { COLUMNS, columnLabel, type BoardProject } from '@/lib/board'
 import { ClientMark, EditorAvatar, StatusDot } from '@/components/ds'
-import { ProjectSheet, type SheetProject } from '@/components/admin/ProjectSheet'
 
 // Admins can move a card to ANY column. Backwards (an earlier stage outside
 // the normal flow) asks first, and the API sends no notifications for it.
 
 interface Props {
-  projects: SheetProject[]
+  projects: BoardProject[]
 }
 
 /** Card tilt toward the cursor (max ±3.5°) + the sheen position, written to
@@ -41,12 +39,9 @@ function untilt(e: React.MouseEvent<HTMLElement>) {
 }
 
 export function KanbanBoard({ projects }: Props) {
-  const { theme } = useTheme()
-  const dark = theme === 'dark'
   const [dragging, setDragging] = useState<{ id: string; fromStatus: ProjectStatus } | null>(null)
   const [back, setBack] = useState<{ id: string; to: ProjectStatus; title: string } | null>(null)
   const [over, setOver] = useState<ProjectStatus | null>(null)
-  const [open, setOpen] = useState<{ id: string; origin: SheetOrigin } | null>(null)
   // Moves show at once (the card replays its rise) while the API catches up;
   // undone if it fails.
   const [moved, setMoved] = useState<Record<string, ProjectStatus>>({})
@@ -94,8 +89,6 @@ export function KanbanBoard({ projects }: Props) {
     await move(id, toStatus)
   }
 
-  const openProject = shown.find((p) => p.id === open?.id)
-
   return (
     <>
       {back && (
@@ -114,10 +107,6 @@ export function KanbanBoard({ projects }: Props) {
             </div>
           </div>
         </>
-      )}
-
-      {openProject && open && (
-        <ProjectSheet project={openProject} origin={open.origin} steps={STEPS} onClose={() => setOpen(null)} />
       )}
 
       <div className="ds-lanes" style={{ padding: '4px 20px 40px' }}>
@@ -141,7 +130,7 @@ export function KanbanBoard({ projects }: Props) {
               onDrop={() => handleDrop(col.dropTarget)}
             >
               <div className="ds-lane-head" style={{ animationDelay: `${li * 60}ms` }}>
-                <StatusDot color={statusColor(col.dropTarget, dark)} />
+                <StatusDot status={col.dropTarget} />
                 <h2 style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--strong)' }}>{col.label}</h2>
                 <span style={{ fontSize: 12.5, color: 'var(--faint)', padding: '1px 7px', borderRadius: 999, background: 'var(--pill)' }}>{cards.length}</span>
               </div>
@@ -165,10 +154,7 @@ export function KanbanBoard({ projects }: Props) {
                     onMouseMove={tilt}
                     onMouseLeave={untilt}
                   >
-                    <button
-                      type="button" className="ds-hit" aria-label={`Open ${project.title}`}
-                      onClick={(e) => setOpen({ id: project.id, origin: originFrom(e.currentTarget.parentElement ?? e.currentTarget) })}
-                    />
+                    <Link to={`/admin/projects/${project.id}`} className="ds-hit" aria-label={`Open ${project.title}`} draggable={false} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <ClientMark name={client} />
                       <span className="truncate" style={{ flex: 1, fontSize: 12.5, color: 'var(--muted)' }}>{client}</span>

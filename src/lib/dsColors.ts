@@ -18,10 +18,10 @@ const CLIENT_PALETTE: [string, string][] = [
   ['#8D9BFF', '#4F5FD6'], ['#F2B35B', '#A8690F'], ['#F29BC4', '#BE4682'], ['#6FD3A2', '#1F8A57'],
   ['#66C3E8', '#1B7DA4'], ['#C9A2FF', '#7A4FD6'], ['#FF9F80', '#B4532F'], ['#B8D46A', '#5E7A12'],
 ]
-export function clientTint(name: string, dark: boolean) {
+/** Both themes' colours, so the page can switch theme without re-rendering. */
+export function clientTintBoth(name: string) {
   const pair = CLIENT_KNOWN[name] ?? CLIENT_PALETTE[hash(name) % CLIENT_PALETTE.length]
-  const c = dark ? pair[0] : pair[1]
-  return { color: c, background: hexA(c, dark ? 0.14 : 0.12) }
+  return { dark: pair[0], darkBg: hexA(pair[0], 0.14), light: pair[1], lightBg: hexA(pair[1], 0.12) }
 }
 
 const EDITOR_KNOWN: Record<string, string> = { 'Nora Cut': '#F5B07A', 'Elias Editor': '#9FAEFF', 'Sami Frames': '#79D9B6' }

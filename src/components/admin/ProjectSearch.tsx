@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
 import { cn } from '@/lib/utils'
 import { searchProjects, type SearchRow as Row } from '@/lib/projectSearch'
-import { useTheme } from '@/lib/theme'
-import { statusColor, statusLabel } from '@/lib/dsStatus'
+import { statusLabel } from '@/lib/dsStatus'
 import { ClientMark, StatusDot } from '@/components/ds'
 
 // Projects page: find any project by its name, the client, or the editor.
@@ -16,7 +15,6 @@ const SearchIcon = ({ className }: { className?: string }) => (
 )
 
 function Results({ results, active, onPick, onHover }: { results: Row[]; active: number; onPick: (p: Row) => void; onHover: (i: number) => void }) {
-  const { theme } = useTheme()
   if (!results.length) return <p style={{ padding: '14px 16px', fontSize: 13.5, color: 'var(--faint)' }}>No projects</p>
   return (
     <ul role="listbox" style={{ padding: 4, margin: 0, listStyle: 'none' }}>
@@ -37,7 +35,7 @@ function Results({ results, active, onPick, onHover }: { results: Row[]; active:
               </span>
             </span>
             <span className="flex items-center gap-2 whitespace-nowrap" style={{ fontSize: 12, color: 'var(--soft-text)' }}>
-              <StatusDot color={statusColor(p.status, theme === 'dark')} size={7} />
+              <StatusDot status={p.status} size={7} />
               {statusLabel(p.status)}
             </span>
           </button>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,11 +12,9 @@ import { AdminLayout, HeaderTools } from '@/components/admin/AdminLayout'
 import { useApiFetch } from '@/lib/api'
 import { useStorageAdapter } from '@/lib/storage'
 import { cn, projectTimeLabel, sortByRecentActivity } from '@/lib/utils'
-import { useTheme } from '@/lib/theme'
-import { statusColor, statusLabel } from '@/lib/dsStatus'
-import { STEPS, originFrom, type SheetOrigin } from '@/lib/board'
+import { statusLabel } from '@/lib/dsStatus'
+import { type BoardProject } from '@/lib/board'
 import { ClientMark, StatusDot } from '@/components/ds'
-import { ProjectSheet, type SheetProject } from '@/components/admin/ProjectSheet'
 import type { Profile } from '@/types'
 import { ProjectSearch } from '@/components/admin/ProjectSearch'
 
@@ -83,7 +81,7 @@ function DropZone({ label, files, onFiles, onRemove, accept, dragging, onDragCha
   )
 }
 
-function CreateProjectModal({ onClose, origin }: { onClose: () => void; origin: SheetOrigin }) {
+function CreateProjectModal({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
   const apiFetch = useApiFetch()
   const storageAdapter = useStorageAdapter()
@@ -145,8 +143,7 @@ function CreateProjectModal({ onClose, origin }: { onClose: () => void; origin: 
   return (
     <>
       <div className="ds-veil" onClick={onClose} />
-      <section className="ds-sheet" role="dialog" aria-modal="true" aria-label="New project"
-        style={{ '--dx': `${origin.dx}px`, '--dy': `${origin.dy}px`, '--s': origin.s } as React.CSSProperties}>
+      <section className="ds-sheet" role="dialog" aria-modal="true" aria-label="New project">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '26px 28px 0' }}>
           <h2 style={{ flex: 1, margin: 0, fontSize: 28, fontWeight: 650, letterSpacing: '-.03em', color: 'var(--strong)' }}>New project</h2>
           <button type="button" className="ds-ibtn" aria-label="Close" onClick={onClose} style={{ width: 32, height: 32 }}>
@@ -221,14 +218,14 @@ function CreateProjectModal({ onClose, origin }: { onClose: () => void; origin: 
 
 export default function AdminProjects() {
   const [view, setView] = useState<View>('kanban')
-  const [create, setCreate] = useState<SheetOrigin | null>(null)
+  const [create, setCreate] = useState(false)
   const { data: projects, isLoading } = useProjects()
 
   if (isLoading) return <PageLoader />
 
   return (
     <AdminLayout bare>
-      {create && <CreateProjectModal origin={create} onClose={() => setCreate(null)} />}
+      {create && <CreateProjectModal onClose={() => setCreate(false)} />}
       <main className="flex flex-col min-w-0">
         <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '22px 28px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginRight: 8 }}>
@@ -244,32 +241,27 @@ export default function AdminProjects() {
           {/* Find a project by name, client or editor (phones: an icon) */}
           <ProjectSearch />
           <div className="hidden md:block"><HeaderTools /></div>
-          <button type="button" className="ds-primary" onClick={(e) => setCreate(originFrom(e.currentTarget))}>
+          <button type="button" className="ds-primary" onClick={() => setCreate(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
             New project
           </button>
         </header>
 
         {view === 'kanban' ? (
-          <KanbanBoard projects={(projects ?? []) as SheetProject[]} />
+          <KanbanBoard projects={(projects ?? []) as BoardProject[]} />
         ) : (
-          <ProjectList projects={sortByRecentActivity(projects ?? []) as SheetProject[]} />
+          <ProjectList projects={sortByRecentActivity(projects ?? []) as BoardProject[]} />
         )}
       </main>
     </AdminLayout>
   )
 }
 
-/** List view: 52px rows; a row opens the same sheet as a card. */
-function ProjectList({ projects }: { projects: SheetProject[] }) {
-  const { theme } = useTheme()
-  const dark = theme === 'dark'
-  const [open, setOpen] = useState<{ id: string; origin: SheetOrigin } | null>(null)
-  const openProject = projects.find((p) => p.id === open?.id)
+/** List view: 52px rows; a row opens the project. */
+function ProjectList({ projects }: { projects: BoardProject[] }) {
   const cols = 'minmax(220px,2.4fr) minmax(150px,1.4fr) minmax(150px,1.3fr) minmax(150px,1.3fr) 150px'
   return (
     <div style={{ padding: '4px 16px 40px', overflowX: 'auto' }}>
-      {openProject && open && <ProjectSheet project={openProject} origin={open.origin} steps={STEPS} onClose={() => setOpen(null)} />}
       <div style={{ minWidth: 760, display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 16, padding: '0 20px 10px', fontSize: 12.5, color: 'var(--faint)' }}>
           <span>Project</span><span>Client</span><span>Status</span><span>Editor</span><span style={{ textAlign: 'right' }}>Updated</span>
@@ -277,14 +269,13 @@ function ProjectList({ projects }: { projects: SheetProject[] }) {
         {projects.map((p, i) => {
           const client = p.profiles?.full_name ?? '—'
           return (
-            <button key={p.id} type="button" className="ds-lrow" style={{ gridTemplateColumns: cols, animationDelay: `${Math.min(i, 20) * 35}ms` }}
-              onClick={(e) => setOpen({ id: p.id, origin: originFrom(e.currentTarget) })}>
+            <Link key={p.id} to={`/admin/projects/${p.id}`} className="ds-lrow" style={{ gridTemplateColumns: cols, animationDelay: `${Math.min(i, 20) * 35}ms` }}>
               <span className="truncate" style={{ fontWeight: 600, color: 'var(--strong)' }}>{p.title}</span>
               <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--muted)' }}><ClientMark name={client} size={18} /><span className="truncate">{client}</span></span>
-              <span className="flex items-center gap-2" style={{ color: 'var(--soft-text)' }}><StatusDot color={statusColor(p.status, dark)} size={7} />{statusLabel(p.status)}</span>
+              <span className="flex items-center gap-2" style={{ color: 'var(--soft-text)' }}><StatusDot status={p.status} size={7} />{statusLabel(p.status)}</span>
               <span className="truncate" style={{ color: p.assigned_team_names ? 'var(--soft-text)' : 'var(--faint)' }}>{p.assigned_team_names || 'Unassigned'}</span>
               <span className="truncate" style={{ textAlign: 'right', fontSize: 12.5, color: 'var(--faint)' }}>{projectTimeLabel(p)}</span>
-            </button>
+            </Link>
           )
         })}
       </div>

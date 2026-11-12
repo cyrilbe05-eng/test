@@ -13,5 +13,4 @@ export const STATUS_META: Record<ProjectStatus, { label: string; colors: [string
   client_approved:    { label: 'Client approved',    colors: ['#6FD3A2', '#1F8A57'] },
 }
 
-export const statusColor = (s: ProjectStatus, dark: boolean) => (STATUS_META[s] ?? STATUS_META.pending_assignment).colors[dark ? 0 : 1]
 export const statusLabel = (s: ProjectStatus) => (STATUS_META[s] ?? { label: s }).label

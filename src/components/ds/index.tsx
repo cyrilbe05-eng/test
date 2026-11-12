@@ -1,6 +1,8 @@
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
-import { clientTint, editorColor, hexA, initials } from '@/lib/dsColors'
+import { clientTintBoth, editorColor, hexA, initials } from '@/lib/dsColors'
+import { STATUS_META } from '@/lib/dsStatus'
+import type { ProjectStatus } from '@/types'
 
 // Small building blocks of the new design (DESIGN.md).
 
@@ -9,30 +11,26 @@ export function Ms({ name, className, style }: { name: string; className?: strin
   return <span className={cn('ds-ms', className)} style={style} aria-hidden="true">{name}</span>
 }
 
-/** Theme toggle with the soft fade: a layer in the new background colour
- *  fades in, the theme swaps underneath, then the layer fades out. Instant
- *  when the system asks for reduced motion. */
+/** Theme toggle. The content fades out (0.16s), the theme switches while
+ *  it's hidden, then it fades back in (0.42s); the page background glides
+ *  underneath. Only opacity + one background animate, so it stays fluid.
+ *  Instant with reduced motion. */
 export function ThemeFadeButton() {
   const { theme, toggle } = useTheme()
   const dark = theme === 'dark'
   const swap = () => {
-    if (document.querySelector('.ds-curtain')) return
+    const root = document.documentElement
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { toggle(); return }
-    const layer = document.createElement('div')
-    layer.className = 'ds-curtain in'
-    layer.style.background = dark ? '#F5F5F7' : '#0E0E10'
-    layer.addEventListener('animationend', function done() {
-      if (layer.classList.contains('in')) {
-        toggle()
-        layer.classList.replace('in', 'out')
-      } else {
-        layer.removeEventListener('animationend', done)
-        layer.remove()
-      }
-    })
-    document.body.appendChild(layer)
-    // Safety net: never leave the layer on screen if an animation is skipped.
-    setTimeout(() => { if (layer.isConnected) { if (layer.classList.contains('in')) toggle(); layer.remove() } }, 1600)
+    if (root.classList.contains('theme-out') || root.classList.contains('theme-in')) return
+    root.classList.add('theme-out')
+    window.setTimeout(() => {
+      toggle()
+      // Two frames: let the new theme paint while the content is hidden.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        root.classList.replace('theme-out', 'theme-in')
+        window.setTimeout(() => root.classList.remove('theme-in'), 500)
+      }))
+    }, 170)
   }
   return (
     <button type="button" className="ds-ibtn ds-theme-btn" onClick={swap} aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}>
@@ -41,12 +39,13 @@ export function ThemeFadeButton() {
   )
 }
 
-/** Client mark: rounded square with the client's initial in their colour. */
+/** Client mark: rounded square with the client's initial in their colour.
+ *  Both themes' colours are set as CSS variables; CSS picks one (no re-render
+ *  on theme switch). */
 export function ClientMark({ name, size = 20 }: { name: string; size?: number }) {
-  const { theme } = useTheme()
-  const t = clientTint(name || '?', theme === 'dark')
+  const t = clientTintBoth(name || '?')
   return (
-    <span aria-hidden="true" style={{ width: size, height: size, borderRadius: size >= 26 ? 8 : size <= 18 ? 5 : 6, background: t.background, color: t.color, display: 'grid', placeItems: 'center', fontSize: size >= 26 ? 12 : size <= 18 ? 10 : 10.5, fontWeight: 700, flex: 'none' }}>
+    <span aria-hidden="true" className="ds-cm" style={{ '--cm-d': t.dark, '--cm-db': t.darkBg, '--cm-l': t.light, '--cm-lb': t.lightBg, width: size, height: size, borderRadius: size >= 26 ? 8 : size <= 18 ? 5 : 6, display: 'grid', placeItems: 'center', fontSize: size >= 26 ? 12 : size <= 18 ? 10 : 10.5, fontWeight: 700, flex: 'none' } as React.CSSProperties}>
       {(name || '?').charAt(0).toUpperCase()}
     </span>
   )
@@ -62,7 +61,8 @@ export function EditorAvatar({ name, size = 22 }: { name?: string | null; size?:
   )
 }
 
-/** Status dot with its 3px halo. */
-export function StatusDot({ color, size = 8 }: { color: string; size?: number }) {
-  return <span aria-hidden="true" style={{ width: size, height: size, borderRadius: 999, background: color, boxShadow: `0 0 0 3px ${hexA(color, 0.15)}`, flex: 'none' }} />
+/** Status dot with its 3px halo (both themes' colours as CSS variables). */
+export function StatusDot({ status, size = 8 }: { status: ProjectStatus; size?: number }) {
+  const [d, l] = (STATUS_META[status] ?? STATUS_META.pending_assignment).colors
+  return <span aria-hidden="true" className="ds-dot" style={{ '--sd-d': d, '--sh-d': hexA(d, 0.15), '--sd-l': l, '--sh-l': hexA(l, 0.15), width: size, height: size, borderRadius: 999, flex: 'none' } as React.CSSProperties} />
 }

@@ -116,13 +116,18 @@ html.dark .ds {
 .ds-field:focus{box-shadow:inset 0 0 0 1px rgba(94,114,228,.6),0 0 0 4px rgba(94,114,228,.12)}
 textarea.ds-field{height:auto;padding:10px 12px;resize:none}
 
-/* ── Theme switch: soft fade (DESIGN.md §7) ── */
-.ds-curtain{position:fixed;inset:0;z-index:200;pointer-events:none}
-.ds-curtain.in{animation:ds-curtain-in .4s cubic-bezier(.4,0,.6,1) both}
-/* Lives outside .ds (on <body>), so no var() here. */
-.ds-curtain.out{animation:ds-curtain-out .65s cubic-bezier(.16,1,.3,1) both}
-@keyframes ds-curtain-in{from{opacity:0}to{opacity:1}}
-@keyframes ds-curtain-out{from{opacity:1}to{opacity:0}}
+/* ── Theme-picked colours (no React re-render on theme switch) ── */
+.ds-cm{color:var(--cm-l);background:var(--cm-lb)}
+html.dark .ds-cm{color:var(--cm-d);background:var(--cm-db)}
+.ds-dot{background:var(--sd-l);box-shadow:0 0 0 3px var(--sh-l)}
+html.dark .ds-dot{background:var(--sd-d);box-shadow:0 0 0 3px var(--sh-d)}
+
+/* ── Theme switch: content dims out, theme swaps while hidden, content
+   comes back; the page background glides underneath (one layer). Only
+   opacity + one background animate, so it stays fluid. ── */
+html.theme-out .ds, html.theme-in .ds { transition: background-color .45s cubic-bezier(.4,0,.2,1) }
+html.theme-out .ds > * { opacity: 0; transition: opacity .16s ease-out }
+html.theme-in .ds > * { transition: opacity .42s cubic-bezier(.16,1,.3,1) }
 
 @media (prefers-reduced-motion: reduce){
   .ds *,.ds *::before,.ds *::after{animation-duration:.01ms !important;animation-delay:0s !important;transition-duration:.01ms !important}
