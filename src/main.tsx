@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import App from './App'
 import { ThemeProvider } from './lib/theme'
 import './index.css'
+import './styles/ds.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {

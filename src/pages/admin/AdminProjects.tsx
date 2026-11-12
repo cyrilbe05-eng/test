@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { formatDistanceToNow } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -8,29 +7,18 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { useProjects } from '@/hooks/useProjects'
 import { KanbanBoard } from '@/components/admin/KanbanBoard'
-import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { useUploadManager } from '@/lib/uploadManager'
-import { AdminLayout } from '@/components/admin/AdminLayout'
+import { AdminLayout, HeaderTools } from '@/components/admin/AdminLayout'
 import { useApiFetch } from '@/lib/api'
 import { useStorageAdapter } from '@/lib/storage'
 import { cn, projectTimeLabel, sortByRecentActivity } from '@/lib/utils'
+import { useTheme } from '@/lib/theme'
+import { statusColor, statusLabel } from '@/lib/dsStatus'
+import { STEPS, originFrom, type SheetOrigin } from '@/lib/board'
+import { ClientMark, StatusDot } from '@/components/ds'
+import { ProjectSheet, type SheetProject } from '@/components/admin/ProjectSheet'
 import type { Profile } from '@/types'
 import { ProjectSearch } from '@/components/admin/ProjectSearch'
-
-function IconLayout() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-    </svg>
-  )
-}
-function IconList() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-    </svg>
-  )
-}
 
 type View = 'kanban' | 'list'
 
@@ -45,14 +33,14 @@ const createSchema = z.object({
 })
 type CreateFormData = z.infer<typeof createSchema>
 
-const inputCls = 'w-full px-3.5 py-2.5 bg-muted border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all'
+const inputCls = 'ds-field'
 
 function FieldRow({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <label className="text-sm font-medium">{label}</label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{ fontSize: 12.5, color: 'var(--faint)' }}>{label}</label>
       {children}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p style={{ margin: 0, fontSize: 12, color: '#E5584B' }}>{error}</p>}
     </div>
   )
 }
@@ -64,7 +52,8 @@ function DropZone({ label, files, onFiles, onRemove, accept, dragging, onDragCha
   return (
     <div>
       <div
-        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-muted/50'}`}
+        className="ds-slot"
+        style={{ height: 72, cursor: 'pointer', ...(dragging ? { borderColor: 'rgba(94,114,228,.5)', color: 'var(--accent)' } : {}) }}
         onDragOver={(e) => { e.preventDefault(); onDragChange(true) }}
         onDragLeave={() => onDragChange(false)}
         onDrop={(e) => { e.preventDefault(); onDragChange(false); onFiles(e.dataTransfer.files) }}
@@ -75,17 +64,17 @@ function DropZone({ label, files, onFiles, onRemove, accept, dragging, onDragCha
           input.click()
         }}
       >
-        <p className={dragging ? 'text-sm text-primary font-semibold' : 'text-sm text-muted-foreground'}>
-          {dragging ? 'Release to upload here' : <>{label} or <span className="text-primary font-medium">browse</span></>}
+        <p style={{ margin: 0, fontSize: 12.5 }}>
+          {dragging ? 'Release to upload here' : <>{label} or <span style={{ color: 'var(--accent)', fontWeight: 500 }}>browse</span></>}
         </p>
       </div>
       {files.length > 0 && (
         <ul className="mt-2 space-y-1.5">
           {files.map((f, i) => (
-            <li key={i} className="flex items-center gap-2 text-sm bg-muted rounded-xl px-3.5 py-2 border border-border/60">
+            <li key={i} className="flex items-center gap-2" style={{ fontSize: 13, padding: '8px 12px', borderRadius: 10, background: 'var(--panel)', boxShadow: 'inset 0 0 0 1px var(--panel-ring)' }}>
               <span className="flex-1 truncate">{f.name}</span>
-              <span className="text-muted-foreground text-xs">{(f.size / 1024 / 1024).toFixed(1)} MB</span>
-              <button type="button" onClick={() => onRemove(i)} className="text-muted-foreground hover:text-destructive ml-1 text-lg leading-none">×</button>
+              <span style={{ fontSize: 12, color: 'var(--faint)' }}>{(f.size / 1024 / 1024).toFixed(1)} MB</span>
+              <button type="button" onClick={() => onRemove(i)} aria-label={`Remove ${f.name}`} className="ds-ibtn" style={{ width: 28, height: 28, fontSize: 18 }}>×</button>
             </li>
           ))}
         </ul>
@@ -94,7 +83,7 @@ function DropZone({ label, files, onFiles, onRemove, accept, dragging, onDragCha
   )
 }
 
-function CreateProjectModal({ onClose }: { onClose: () => void }) {
+function CreateProjectModal({ onClose, origin }: { onClose: () => void; origin: SheetOrigin }) {
   const navigate = useNavigate()
   const apiFetch = useApiFetch()
   const storageAdapter = useStorageAdapter()
@@ -154,14 +143,18 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-heading font-bold text-lg">New Project</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-2xl leading-none">×</button>
+    <>
+      <div className="ds-veil" onClick={onClose} />
+      <section className="ds-sheet" role="dialog" aria-modal="true" aria-label="New project"
+        style={{ '--dx': `${origin.dx}px`, '--dy': `${origin.dy}px`, '--s': origin.s } as React.CSSProperties}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '26px 28px 0' }}>
+          <h2 style={{ flex: 1, margin: 0, fontSize: 28, fontWeight: 650, letterSpacing: '-.03em', color: 'var(--strong)' }}>New project</h2>
+          <button type="button" className="ds-ibtn" aria-label="Close" onClick={onClose} style={{ width: 32, height: 32 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="ds-sheet-in" style={{ padding: '22px 28px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <FieldRow label="Project Title" error={errors.title?.message}>
             <input {...register('title')} className={inputCls} placeholder="e.g. Q1 Brand Video" />
           </FieldRow>
@@ -187,8 +180,8 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
             <textarea {...register('instructions')} rows={3} className={inputCls + ' resize-none'} placeholder="Style, music, references, etc." />
           </FieldRow>
 
-          <div>
-            <p className="text-sm font-medium mb-2">Source Video</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--faint)' }}>Source video</p>
             <DropZone
               label="Drop raw footage here"
               files={sourceFiles}
@@ -200,8 +193,8 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
-          <div>
-            <p className="text-sm font-medium mb-2">Attachments <span className="text-muted-foreground font-normal">(optional)</span></p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--faint)' }}>Attachments (optional)</p>
             <DropZone
               label="Drop logos, scripts, music, etc."
               files={attachments}
@@ -212,21 +205,15 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-all">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 py-2.5 bg-primary rounded-xl text-white font-semibold text-sm shadow-clay hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
-            >
-              {submitting ? 'Creating…' : 'Create Project'}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
+            <button type="button" onClick={onClose} className="ds-ghost-btn">Cancel</button>
+            <button type="submit" disabled={submitting} className="ds-primary" style={submitting ? { opacity: 0.6 } : undefined}>
+              {submitting ? 'Creating…' : 'Create project'}
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </section>
+    </>
   )
 }
 
@@ -234,91 +221,81 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
 
 export default function AdminProjects() {
   const [view, setView] = useState<View>('kanban')
-  const [showCreate, setShowCreate] = useState(false)
+  const [create, setCreate] = useState<SheetOrigin | null>(null)
   const { data: projects, isLoading } = useProjects()
 
   if (isLoading) return <PageLoader />
 
   return (
-    <AdminLayout>
-      {showCreate && <CreateProjectModal onClose={() => setShowCreate(false)} />}
-      <main className="px-6 py-8">
-        {/* Wraps on phones so the Kanban/List switch never runs off-screen. */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div>
-            <h2 className="text-2xl font-heading font-bold">Projects</h2>
-            <p className="text-muted-foreground text-sm mt-0.5">{projects?.length ?? 0} total</p>
+    <AdminLayout bare>
+      {create && <CreateProjectModal origin={create} onClose={() => setCreate(null)} />}
+      <main className="flex flex-col min-w-0">
+        <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '22px 28px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginRight: 8 }}>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 650, letterSpacing: '-.025em', color: 'var(--strong)' }}>Projects</h1>
+            <span style={{ fontSize: 14, color: 'var(--faint)' }}>{projects?.length ?? 0}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Find a project by name, client or editor (phones: an icon) */}
-            <div className="flex md:w-64 lg:w-72">
-              <ProjectSearch />
-            </div>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold shadow-sm hover:brightness-110 transition-all active:scale-[0.98]"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Create
-            </button>
-          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 border border-border">
-            {(['kanban', 'list'] as View[]).map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-all capitalize',
-                  view === v ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {v === 'kanban' ? <IconLayout /> : <IconList />}
-                {v}
-              </button>
-            ))}
+          <div className="ds-seg" role="group" aria-label="View">
+            <div className="ds-seg-ind" style={{ transform: `translateX(${view === 'kanban' ? 0 : 76}px)` }} />
+            <button type="button" className={cn(view === 'kanban' && 'on')} aria-pressed={view === 'kanban'} onClick={() => setView('kanban')}>Board</button>
+            <button type="button" className={cn(view === 'list' && 'on')} aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
           </div>
-          </div>
-        </div>
+          <div style={{ flex: 1 }} />
+          {/* Find a project by name, client or editor (phones: an icon) */}
+          <ProjectSearch />
+          <div className="hidden md:block"><HeaderTools /></div>
+          <button type="button" className="ds-primary" onClick={(e) => setCreate(originFrom(e.currentTarget))}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            New project
+          </button>
+        </header>
 
         {view === 'kanban' ? (
-          <KanbanBoard projects={projects ?? []} />
+          <KanbanBoard projects={(projects ?? []) as SheetProject[]} />
         ) : (
-          <div className="clay-card overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  {['Client', 'Title', 'Status', 'Assigned', 'Created', 'Updated'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wide text-left">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {sortByRecentActivity(projects ?? []).map((p) => (
-                  <tr key={p.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3 text-muted-foreground">{(p as any).profiles?.full_name ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      <Link to={`/admin/projects/${p.id}`} className="text-primary hover:underline font-medium">{p.title}</Link>
-                    </td>
-                    <td className="px-4 py-3"><ProjectStatusBadge status={p.status} /></td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{(p as any).assigned_team_names ?? '—'}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{projectTimeLabel(p)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ProjectList projects={sortByRecentActivity(projects ?? []) as SheetProject[]} />
         )}
       </main>
     </AdminLayout>
   )
 }
 
+/** List view: 52px rows; a row opens the same sheet as a card. */
+function ProjectList({ projects }: { projects: SheetProject[] }) {
+  const { theme } = useTheme()
+  const dark = theme === 'dark'
+  const [open, setOpen] = useState<{ id: string; origin: SheetOrigin } | null>(null)
+  const openProject = projects.find((p) => p.id === open?.id)
+  const cols = 'minmax(220px,2.4fr) minmax(150px,1.4fr) minmax(150px,1.3fr) minmax(150px,1.3fr) 150px'
+  return (
+    <div style={{ padding: '4px 16px 40px', overflowX: 'auto' }}>
+      {openProject && open && <ProjectSheet project={openProject} origin={open.origin} steps={STEPS} onClose={() => setOpen(null)} />}
+      <div style={{ minWidth: 760, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 16, padding: '0 20px 10px', fontSize: 12.5, color: 'var(--faint)' }}>
+          <span>Project</span><span>Client</span><span>Status</span><span>Editor</span><span style={{ textAlign: 'right' }}>Updated</span>
+        </div>
+        {projects.map((p, i) => {
+          const client = p.profiles?.full_name ?? '—'
+          return (
+            <button key={p.id} type="button" className="ds-lrow" style={{ gridTemplateColumns: cols, animationDelay: `${Math.min(i, 20) * 35}ms` }}
+              onClick={(e) => setOpen({ id: p.id, origin: originFrom(e.currentTarget) })}>
+              <span className="truncate" style={{ fontWeight: 600, color: 'var(--strong)' }}>{p.title}</span>
+              <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--muted)' }}><ClientMark name={client} size={18} /><span className="truncate">{client}</span></span>
+              <span className="flex items-center gap-2" style={{ color: 'var(--soft-text)' }}><StatusDot color={statusColor(p.status, dark)} size={7} />{statusLabel(p.status)}</span>
+              <span className="truncate" style={{ color: p.assigned_team_names ? 'var(--soft-text)' : 'var(--faint)' }}>{p.assigned_team_names || 'Unassigned'}</span>
+              <span className="truncate" style={{ textAlign: 'right', fontSize: 12.5, color: 'var(--faint)' }}>{projectTimeLabel(p)}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function PageLoader() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+    <div className="ds min-h-screen flex items-center justify-center">
+      <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
     </div>
   )
 }

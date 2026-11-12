@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
-import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { cn } from '@/lib/utils'
 import { searchProjects, type SearchRow as Row } from '@/lib/projectSearch'
+import { useTheme } from '@/lib/theme'
+import { statusColor, statusLabel } from '@/lib/dsStatus'
+import { ClientMark, StatusDot } from '@/components/ds'
 
-// Admin top bar: find any project by its name, the client, or the editor.
+// Projects page: find any project by its name, the client, or the editor.
 // Uses the project list admin pages already load, so results are instant.
 
 const SearchIcon = ({ className }: { className?: string }) => (
@@ -14,24 +16,30 @@ const SearchIcon = ({ className }: { className?: string }) => (
 )
 
 function Results({ results, active, onPick, onHover }: { results: Row[]; active: number; onPick: (p: Row) => void; onHover: (i: number) => void }) {
-  if (!results.length) return <p className="px-4 py-3 text-sm text-muted-foreground">No projects</p>
+  const { theme } = useTheme()
+  if (!results.length) return <p style={{ padding: '14px 16px', fontSize: 13.5, color: 'var(--faint)' }}>No projects</p>
   return (
-    <ul role="listbox" className="py-1">
+    <ul role="listbox" style={{ padding: 4, margin: 0, listStyle: 'none' }}>
       {results.map((p, i) => (
         <li key={p.id} role="option" aria-selected={i === active}>
           <button
             type="button"
             onMouseDown={(e) => { e.preventDefault(); onPick(p) }}
             onMouseEnter={() => onHover(i)}
-            className={cn('w-full min-h-[48px] px-4 py-2 flex items-center gap-3 text-left', i === active && 'bg-muted')}
+            className={cn('ds-opt', i === active && 'on')}
+            style={{ borderRadius: 10 }}
           >
+            <ClientMark name={p.profiles?.full_name ?? '?'} />
             <span className="flex-1 min-w-0">
-              <span className="block text-sm font-medium truncate">{p.title}</span>
-              <span className="block text-xs text-muted-foreground truncate">
+              <span className="block truncate" style={{ fontWeight: 600, color: 'var(--strong)' }}>{p.title}</span>
+              <span className="block truncate" style={{ fontSize: 12, color: 'var(--muted)' }}>
                 {[p.profiles?.full_name, p.assigned_team_names].filter(Boolean).join(' · ') || '—'}
               </span>
             </span>
-            <ProjectStatusBadge status={p.status} />
+            <span className="flex items-center gap-2 whitespace-nowrap" style={{ fontSize: 12, color: 'var(--soft-text)' }}>
+              <StatusDot color={statusColor(p.status, theme === 'dark')} size={7} />
+              {statusLabel(p.status)}
+            </span>
           </button>
         </li>
       ))}
@@ -77,48 +85,49 @@ export function ProjectSearch() {
     else if (e.key === 'Enter' && results[active]) { e.preventDefault(); pick(results[active]) }
     else if (e.key === 'Escape') { setQ(''); setOpen(false); setMobile(false); (e.target as HTMLInputElement).blur() }
   }
-  const field = 'w-full h-10 pl-9 pr-3 rounded-xl bg-muted border border-transparent text-sm placeholder:text-muted-foreground focus:outline-none focus:border-border focus:bg-background'
 
   return (
     <>
-      {/* Desktop / tablet: a field in the top bar */}
-      <div className="relative hidden md:block w-full max-w-md">
-        <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-        <input
-          ref={input}
-          type="search"
-          aria-label="Search projects"
-          placeholder="Search projects"
-          value={q}
-          onChange={(e) => { setQ(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-          onKeyDown={onKeyDown}
-          className={field}
-        />
+      {/* Desktop / tablet: the search field (230px, 300px while typing) */}
+      <div className="relative hidden md:block">
+        <label className="ds-find">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4" /></svg>
+          <input
+            ref={input}
+            type="search"
+            aria-label="Search projects"
+            placeholder="Search projects"
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setOpen(true) }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            onKeyDown={onKeyDown}
+          />
+        </label>
         {open && q.trim() && (
-          <div className="absolute left-0 right-0 top-full mt-1.5 rounded-xl border border-border bg-card shadow-xl overflow-hidden z-50">
+          <div className="ds-pop absolute right-0 top-full mt-2 z-50" style={{ width: 380, animation: 'ds-fade .3s var(--out) both' }}>
             <Results results={results} active={active} onPick={pick} onHover={setActive} />
           </div>
         )}
       </div>
 
       {/* Phone: an icon that opens a full-width search */}
-      <button onClick={() => setMobile(true)} aria-label="Search projects"
-        className="md:hidden w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted">
-        <SearchIcon className="w-5 h-5" />
-      </button>
+      <span className="md:hidden">
+        <button type="button" onClick={() => setMobile(true)} aria-label="Search projects" className="ds-ibtn" style={{ width: 44, height: 44 }}>
+          <SearchIcon className="w-5 h-5" />
+        </button>
+      </span>
       {/* Rendered at the top of the page: the top bar's blur would otherwise
           confine a full-screen layer to the bar itself. */}
       {mobile && createPortal(
-        <div className="md:hidden fixed inset-0 z-[70] bg-background flex flex-col">
-          <div className="flex items-center gap-2 px-3 h-14 border-b border-border">
-            <div className="relative flex-1">
-              <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <div className="ds md:hidden fixed inset-0 z-[70] flex flex-col">
+          <div className="flex items-center gap-2 px-3 h-14" style={{ borderBottom: '1px solid var(--line)' }}>
+            <label className="ds-find flex-1" style={{ width: 'auto' }}>
+              <SearchIcon className="w-4 h-4" />
               <input ref={mobileInput} type="search" aria-label="Search projects" placeholder="Search projects"
-                value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown} className={field} />
-            </div>
-            <button onClick={() => { setMobile(false); setQ('') }} className="min-h-[44px] px-3 text-sm text-muted-foreground">Cancel</button>
+                value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown} />
+            </label>
+            <button type="button" onClick={() => { setMobile(false); setQ('') }} style={{ minHeight: 44, padding: '0 10px', fontSize: 13.5, color: 'var(--muted)' }}>Cancel</button>
           </div>
           <div className="flex-1 overflow-y-auto">
             {q.trim() && <Results results={results} active={active} onPick={pick} onHover={setActive} />}
