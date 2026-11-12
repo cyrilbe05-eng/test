@@ -109,8 +109,8 @@ export function AdminLayout({ children, bare }: AdminLayoutProps) {
           </div>
         ))}
       </nav>
-      <div className="mt-auto flex items-center gap-2.5 p-2.5 rounded-xl" style={{ background: 'var(--profile)', boxShadow: 'inset 0 0 0 1px var(--ring)' }}>
-        <span className="grid place-items-center rounded-full text-white flex-none" style={{ width: 30, height: 30, background: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>
+      <div className="mt-auto flex items-center gap-2.5 p-2.5 rounded-xl" style={{ background: 'var(--profile)', boxShadow: 'inset 0 0 0 1px var(--ds-ring)' }}>
+        <span className="grid place-items-center rounded-full text-white flex-none" style={{ width: 30, height: 30, background: 'var(--ds-accent)', fontSize: 13, fontWeight: 600 }}>
           {profile?.full_name?.charAt(0)}
         </span>
         <div className="flex-1 min-w-0 flex flex-col">

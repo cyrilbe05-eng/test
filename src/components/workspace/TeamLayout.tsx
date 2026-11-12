@@ -1,233 +1,45 @@
-import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Logo } from '@/components/brand/Logo'
-import { clearToken } from '@/lib/auth'
-import { useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { NotificationBell } from '@/components/notifications/NotificationBell'
-import { ProductionChatPanel } from '@/components/chat/ProductionChatPanel'
-import { ThemeToggle } from '@/lib/theme'
-import { cn } from '@/lib/utils'
+import { AppFrame, type FrameItem } from '@/components/ds/Frame'
 
-// ── Icons ──────────────────────────────────────────────────────────────────────
-function IconHome() {
-  return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-}
-function IconBar() {
-  return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-}
-function IconFolder() {
-  return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
-}
-function IconCalendar() {
-  return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-}
-function IconChat() {
-  return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-}
-function IconLogout() {
-  return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-}
-function IconMenu() {
-  return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-}
-function IconClose() {
-  return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-}
+type Link = { to: string; label: string; icon: string; exact?: boolean }
 
-const NAV_LINKS = [
-  { to: '/team', label: 'Dashboard', icon: <IconHome />, exact: true },
-  { to: '/team/stats', label: 'My Stats', icon: <IconBar /> },
-  { to: '/team/gallery', label: 'Gallery', icon: <IconFolder /> },
-  { to: '/team/calendar', label: 'Calendar', icon: <IconCalendar /> },
-  { to: '/team/messages', label: 'Messages', icon: <IconChat /> },
+const NAV_LINKS: Link[] = [
+  { to: '/team', label: 'Dashboard', icon: 'home', exact: true },
+  { to: '/team/stats', label: 'My Stats', icon: 'bar_chart' },
+  { to: '/team/gallery', label: 'Gallery', icon: 'photo_library' },
+  { to: '/team/calendar', label: 'Calendar', icon: 'calendar_month' },
+  { to: '/team/messages', label: 'Messages', icon: 'chat_bubble' },
 ]
 
 // Copywriters only (production plans of their assigned clients). Appended so
 // editors' menus are unchanged.
-const PLANS_LINK = { to: '/team/plans', label: 'Plans', exact: false, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> }
-
-const SOPS_LINK = { to: '/team/sops', label: 'SOPs', exact: false, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> }
-
-const ALL_PROJECTS_LINK = { to: '/team/all', label: 'All projects', exact: true, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg> }
+const PLANS_LINK: Link = { to: '/team/plans', label: 'Plans', icon: 'receipt_long' }
+const SOPS_LINK: Link = { to: '/team/sops', label: 'SOPs', icon: 'menu_book' }
+const ALL_PROJECTS_LINK: Link = { to: '/team/all', label: 'All projects', icon: 'view_kanban', exact: true }
 
 interface TeamLayoutProps {
   children: React.ReactNode
 }
 
 export function TeamLayout({ children }: TeamLayoutProps) {
-  const { profile, impersonating, stopImpersonating } = useAuth()
-  // Editors: "Home" (their videos + limit) and the full board under "All projects".
-  const links = [...(profile?.team_role === 'copywriter'
-    ? [...NAV_LINKS, PLANS_LINK]
-    : [{ ...NAV_LINKS[0], label: 'Home' }, ALL_PROJECTS_LINK, ...NAV_LINKS.slice(1)]), SOPS_LINK]
+  const { profile } = useAuth()
   const { pathname } = useLocation()
-  const navigate = useNavigate()
-  const qc = useQueryClient()
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  // Editors: "Home" (their videos + limit) and the full board under "All projects".
+  const links = profile?.team_role === 'copywriter'
+    ? [...NAV_LINKS, PLANS_LINK]
+    : [{ ...NAV_LINKS[0], label: 'Home' }, ALL_PROJECTS_LINK, ...NAV_LINKS.slice(1)]
 
-  const handleSignOut = () => {
-    clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
-  }
-
-  const isActive = (to: string, exact = false) =>
-    exact ? pathname === to : pathname.startsWith(to)
-
-  const SidebarContent = ({ onClick }: { onClick?: () => void }) => (
-    <>
-      {/* Profile */}
-      <div className="px-4 pt-5 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-            {profile?.full_name.charAt(0)}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">{profile?.full_name}</p>
-            <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-3 pb-2"><div className="h-px bg-border/60" /></div>
-
-      <nav className="px-2 space-y-0.5 flex-1">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1 mt-1">Team</p>
-        {links.map(({ to, label, icon, exact }) => (
-          <Link
-            key={to}
-            to={to}
-            onClick={onClick}
-            className={cn('sidebar-item w-full', isActive(to, exact) && 'active')}
-          >
-            {icon}
-            <span>{label}</span>
-          </Link>
-        ))}
-      </nav>
-    </>
-  )
-
+  const item = (l: Link): FrameItem => ({ ...l, on: l.exact ? pathname === l.to : pathname.startsWith(l.to) })
+  // Bottom bar is full; SOPs stays in the ☰ menu on phones.
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* ── Impersonation banner ── */}
-      {impersonating && (
-        <div className="bg-amber-500 text-white flex items-center justify-between px-4 py-1.5 text-sm font-medium z-50 flex-shrink-0">
-          <span>Viewing as <strong>{profile?.full_name}</strong> (team)</span>
-          <button
-            onClick={stopImpersonating}
-            className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-xs font-semibold"
-          >
-            ← Back to Admin
-          </button>
-        </div>
-      )}
-
-      {/* ── Top bar ── */}
-      <header className="h-[52px] border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-30 flex items-center px-4 gap-4">
-        {/* Hamburger — mobile only */}
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground md:hidden"
-        >
-          <IconMenu />
-        </button>
-        <div className="flex items-center gap-2 mr-2">
-          <Logo className="w-8 h-8" />
-          <span className="font-heading font-semibold text-sm hidden sm:block">Pingu Studio</span>
-        </div>
-        <div className="flex-1" />
-        {profile && <NotificationBell userId={profile.id} />}
-        <ThemeToggle />
-        <span className="text-sm text-muted-foreground hidden md:block">{profile?.full_name}</span>
-        <button
-          onClick={handleSignOut}
-          className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-          title="Sign out"
-        >
-          <IconLogout />
-        </button>
-      </header>
-
-      {/* ── Mobile drawer overlay ── */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-background border-r border-border flex flex-col shadow-2xl animate-slide-in-left overflow-y-auto">
-            <div className="flex items-center justify-between px-4 h-[52px] border-b border-border flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <Logo className="w-7 h-7" />
-                <span className="font-heading font-semibold text-sm">Pingu Studio</span>
-              </div>
-              <button onClick={() => setDrawerOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
-                <IconClose />
-              </button>
-            </div>
-            <SidebarContent onClick={() => setDrawerOpen(false)} />
-          </aside>
-        </div>
-      )}
-
-      <div className="flex flex-1 overflow-hidden" style={{ minHeight: 'calc(100vh - 52px)' }}>
-        {/* ── Sidebar — tablet icon rail + desktop full ── */}
-        <aside className="hidden md:flex flex-col flex-shrink-0 border-r border-border bg-background animate-slide-in-left w-12 lg:w-56 transition-all duration-200 overflow-hidden">
-          {/* Tablet: icon rail */}
-          <div className="flex flex-col items-center gap-1 py-3 lg:hidden flex-1">
-            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary mb-2">
-              {profile?.full_name.charAt(0)}
-            </div>
-            <div className="w-full h-px bg-border/60 mb-1" />
-            {links.map(({ to, icon, label, exact }) => (
-              <Link
-                key={to}
-                to={to}
-                title={label}
-                className={cn(
-                  'w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors',
-                  isActive(to, exact) && 'bg-primary/10 text-primary',
-                )}
-              >
-                {icon}
-              </Link>
-            ))}
-          </div>
-
-          {/* Desktop: full sidebar */}
-          <div className="hidden lg:flex lg:flex-col lg:flex-1 overflow-hidden">
-            <SidebarContent />
-          </div>
-        </aside>
-
-        {/* ── Page content ── */}
-        <div className="flex-1 min-w-0 overflow-y-auto pb-16 md:pb-0">
-          {children}
-        </div>
-      </div>
-
-      {/* ── Bottom nav — mobile only ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-card/90 backdrop-blur-xl border-t border-border flex items-stretch h-16 safe-area-bottom">
-        {/* Bottom bar is full; SOPs stays in the ☰ menu on phones. */}
-        {links.filter((l) => l !== SOPS_LINK).map(({ to, label, icon, exact }) => {
-          const active = isActive(to, exact)
-          return (
-            <Link
-              key={to}
-              to={to}
-              className={cn(
-                'flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
-                active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <span className={cn('w-6 h-6 flex items-center justify-center rounded-lg transition-colors', active && 'bg-primary/10')}>
-                {icon}
-              </span>
-              {label}
-            </Link>
-          )
-        })}
-      </nav>
-
-      <ProductionChatPanel />
-    </div>
+    <AppFrame
+      groups={[links.map(item), [item(SOPS_LINK)]]}
+      bottom={links.map(item)}
+      subtitle={profile?.email}
+      viewingAs="team"
+    >
+      {children}
+    </AppFrame>
   )
 }

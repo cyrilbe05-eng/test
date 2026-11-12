@@ -98,7 +98,7 @@ export function KanbanBoard({ projects }: Props) {
             <div className="ds-sheet-in" style={{ padding: '22px 22px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div>
                 <p style={{ margin: 0, fontSize: 17, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--strong)' }}>Move back to {columnLabel(back.to)}?</p>
-                <p className="truncate" style={{ margin: '6px 0 0', fontSize: 13.5, color: 'var(--muted)' }}>{back.title}</p>
+                <p className="truncate" style={{ margin: '6px 0 0', fontSize: 13.5, color: 'var(--ds-muted)' }}>{back.title}</p>
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                 <button type="button" className="ds-ghost-btn" onClick={() => setBack(null)}>Cancel</button>
@@ -157,7 +157,7 @@ export function KanbanBoard({ projects }: Props) {
                     <Link to={`/admin/projects/${project.id}`} className="ds-hit" aria-label={`Open ${project.title}`} draggable={false} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <ClientMark name={client} />
-                      <span className="truncate" style={{ flex: 1, fontSize: 12.5, color: 'var(--muted)' }}>{client}</span>
+                      <span className="truncate" style={{ flex: 1, fontSize: 12.5, color: 'var(--ds-muted)' }}>{client}</span>
                       {project.kind === 'carousel' && (
                         <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--car-t)', padding: '3px 8px', borderRadius: 999, background: 'var(--car-b)' }}>Carousel</span>
                       )}

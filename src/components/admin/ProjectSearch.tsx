@@ -30,7 +30,7 @@ function Results({ results, active, onPick, onHover }: { results: Row[]; active:
             <ClientMark name={p.profiles?.full_name ?? '?'} />
             <span className="flex-1 min-w-0">
               <span className="block truncate" style={{ fontWeight: 600, color: 'var(--strong)' }}>{p.title}</span>
-              <span className="block truncate" style={{ fontSize: 12, color: 'var(--muted)' }}>
+              <span className="block truncate" style={{ fontSize: 12, color: 'var(--ds-muted)' }}>
                 {[p.profiles?.full_name, p.assigned_team_names].filter(Boolean).join(' · ') || '—'}
               </span>
             </span>
@@ -125,7 +125,7 @@ export function ProjectSearch() {
               <input ref={mobileInput} type="search" aria-label="Search projects" placeholder="Search projects"
                 value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown} />
             </label>
-            <button type="button" onClick={() => { setMobile(false); setQ('') }} style={{ minHeight: 44, padding: '0 10px', fontSize: 13.5, color: 'var(--muted)' }}>Cancel</button>
+            <button type="button" onClick={() => { setMobile(false); setQ('') }} style={{ minHeight: 44, padding: '0 10px', fontSize: 13.5, color: 'var(--ds-muted)' }}>Cancel</button>
           </div>
           <div className="flex-1 overflow-y-auto">
             {q.trim() && <Results results={results} active={active} onPick={pick} onHover={setActive} />}

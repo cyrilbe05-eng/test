@@ -66,7 +66,7 @@ function Submitted({ editors, submitted }: { editors: Home['editors']; submitted
                 </span>
               </span>
               {r.perDay.map((n, i) => (
-                <span key={i} className={cell} style={n === 0 ? { color: 'var(--dash)' } : i === 6 ? { color: 'var(--accent)', fontWeight: 600 } : undefined}>{n === 0 ? '·' : n}</span>
+                <span key={i} className={cell} style={n === 0 ? { color: 'var(--dash)' } : i === 6 ? { color: 'var(--ds-accent)', fontWeight: 600 } : undefined}>{n === 0 ? '·' : n}</span>
               ))}
               <span className={cn(cell, 'w-8')} style={{ fontWeight: 600, color: 'var(--strong)' }}>{r.total}</span>
             </li>
@@ -124,7 +124,7 @@ export default function AdminHome() {
         </header>
 
         {isLoading ? (
-          <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} /></div>
+          <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--ds-accent)', borderTopColor: 'transparent' }} /></div>
         ) : error || !data ? (
           <div className="ds-panel" style={{ fontSize: 13.5 }}>{(error as Error)?.message}</div>
         ) : (
@@ -188,7 +188,7 @@ export default function AdminHome() {
                           <div className="flex items-center gap-2.5" style={{ fontSize: 13.5 }}>
                             <EditorAvatar name={e.name} size={22} />
                             <span className="truncate flex-1">{e.name}</span>
-                            <span className="tabular-nums" style={{ fontWeight: 600, color: full ? 'var(--car-t)' : 'var(--muted)' }}>{e.active}/{data.max}</span>
+                            <span className="tabular-nums" style={{ fontWeight: 600, color: full ? 'var(--car-t)' : 'var(--ds-muted)' }}>{e.active}/{data.max}</span>
                           </div>
                           <div className="ds-track" style={{ marginTop: 8 }}>
                             <i className={full ? 'full' : undefined} style={{ width: `${Math.min(100, (e.active / data.max) * 100)}%` }} />

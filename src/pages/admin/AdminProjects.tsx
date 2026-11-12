@@ -51,7 +51,7 @@ function DropZone({ label, files, onFiles, onRemove, accept, dragging, onDragCha
     <div>
       <div
         className="ds-slot"
-        style={{ height: 72, cursor: 'pointer', ...(dragging ? { borderColor: 'rgba(94,114,228,.5)', color: 'var(--accent)' } : {}) }}
+        style={{ height: 72, cursor: 'pointer', ...(dragging ? { borderColor: 'rgba(94,114,228,.5)', color: 'var(--ds-accent)' } : {}) }}
         onDragOver={(e) => { e.preventDefault(); onDragChange(true) }}
         onDragLeave={() => onDragChange(false)}
         onDrop={(e) => { e.preventDefault(); onDragChange(false); onFiles(e.dataTransfer.files) }}
@@ -63,7 +63,7 @@ function DropZone({ label, files, onFiles, onRemove, accept, dragging, onDragCha
         }}
       >
         <p style={{ margin: 0, fontSize: 12.5 }}>
-          {dragging ? 'Release to upload here' : <>{label} or <span style={{ color: 'var(--accent)', fontWeight: 500 }}>browse</span></>}
+          {dragging ? 'Release to upload here' : <>{label} or <span style={{ color: 'var(--ds-accent)', fontWeight: 500 }}>browse</span></>}
         </p>
       </div>
       {files.length > 0 && (
@@ -271,7 +271,7 @@ function ProjectList({ projects }: { projects: BoardProject[] }) {
           return (
             <Link key={p.id} to={`/admin/projects/${p.id}`} className="ds-lrow" style={{ gridTemplateColumns: cols, animationDelay: `${Math.min(i, 20) * 35}ms` }}>
               <span className="truncate" style={{ fontWeight: 600, color: 'var(--strong)' }}>{p.title}</span>
-              <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--muted)' }}><ClientMark name={client} size={18} /><span className="truncate">{client}</span></span>
+              <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--ds-muted)' }}><ClientMark name={client} size={18} /><span className="truncate">{client}</span></span>
               <span className="flex items-center gap-2" style={{ color: 'var(--soft-text)' }}><StatusDot status={p.status} size={7} />{statusLabel(p.status)}</span>
               <span className="truncate" style={{ color: p.assigned_team_names ? 'var(--soft-text)' : 'var(--faint)' }}>{p.assigned_team_names || 'Unassigned'}</span>
               <span className="truncate" style={{ textAlign: 'right', fontSize: 12.5, color: 'var(--faint)' }}>{projectTimeLabel(p)}</span>
@@ -286,7 +286,7 @@ function ProjectList({ projects }: { projects: BoardProject[] }) {
 function PageLoader() {
   return (
     <div className="ds min-h-screen flex items-center justify-center">
-      <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+      <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--ds-accent)', borderTopColor: 'transparent' }} />
     </div>
   )
 }
