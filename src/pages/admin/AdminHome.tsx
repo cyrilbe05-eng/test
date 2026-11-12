@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow, format, startOfDay, subDays, isSameDay } from 'date-fns'
 import { toast } from 'sonner'
-import { AdminLayout } from '@/components/admin/AdminLayout'
+import { AdminLayout, HeaderTools } from '@/components/admin/AdminLayout'
+import { ClientMark, EditorAvatar } from '@/components/ds'
 import { useApiFetch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useUrgentRequests } from '@/hooks/useUrgentRequests'
@@ -23,18 +24,16 @@ type Home = {
 }
 
 const ago = (d: string) => formatDistanceToNow(new Date(d), { addSuffix: true })
-const empty = <p className="text-sm text-muted-foreground py-1">—</p>
+const empty = <p className="ds-empty">—</p>
 
-function Card({ title, count, tone, children }: { title: string; count?: number; tone?: string; children: React.ReactNode }) {
+function Panel({ title, count, tone, delay = 0, children }: { title: string; count?: number; tone?: 'warn' | 'accent' | 'bad'; delay?: number; children: React.ReactNode }) {
   return (
-    <section className="clay-card p-4 md:p-5 min-w-0">
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <h2 className="font-heading font-semibold">{title}</h2>
-        {count !== undefined && (
-          <span className={cn('text-sm font-semibold tabular-nums px-2.5 py-0.5 rounded-full', count > 0 && tone ? tone : 'bg-muted text-muted-foreground')}>{count}</span>
-        )}
+    <section className="ds-panel" style={{ animationDelay: `${delay}ms`, paddingBottom: count === 0 ? 16 : undefined }}>
+      <div className="ds-panel-head" style={count === 0 ? { marginBottom: 0 } : undefined}>
+        <h2>{title}</h2>
+        {count !== undefined && <span className={cn('ds-count', count > 0 && tone)}>{count}</span>}
       </div>
-      {children}
+      {count !== 0 && children}
     </section>
   )
 }
@@ -51,22 +50,25 @@ function Submitted({ editors, submitted }: { editors: Home['editors']; submitted
   return (
     <div className="-mx-1 overflow-x-auto">
       <div className="min-w-[19rem] px-1">
-        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground pb-1.5">
+        <div className="flex items-center gap-1 pb-1" style={{ fontSize: 11.5, color: 'var(--faint)' }}>
           <span className="flex-1" />
-          {days.map((d, i) => <span key={i} className={cn(cell, i === 6 && 'text-foreground font-semibold')}>{i === 6 ? 'Today' : format(d, 'EEEEE')}</span>)}
+          {days.map((d, i) => <span key={i} className={cell} style={i === 6 ? { color: 'var(--strong)', fontWeight: 600 } : undefined}>{i === 6 ? 'Today' : format(d, 'EEEEE')}</span>)}
           <span className={cn(cell, 'w-8')}>7d</span>
         </div>
-        <ul className="divide-y divide-border/60">
+        <ul>
           {rows.map((r) => (
-            <li key={r.id} className="flex items-center gap-1 min-h-[40px] text-sm">
-              <span className="flex-1 min-w-0 truncate">
-                <span className="sm:hidden">{r.name.split(' ')[0]}</span>
-                <span className="hidden sm:inline">{r.name}</span>
+            <li key={r.id} className="flex items-center gap-1" style={{ minHeight: 40, fontSize: 13.5 }}>
+              <span className="flex-1 min-w-0 flex items-center gap-2.5">
+                <EditorAvatar name={r.name} size={22} />
+                <span className="truncate">
+                  <span className="sm:hidden">{r.name.split(' ')[0]}</span>
+                  <span className="hidden sm:inline">{r.name}</span>
+                </span>
               </span>
               {r.perDay.map((n, i) => (
-                <span key={i} className={cn(cell, n === 0 ? 'text-muted-foreground/40' : i === 6 ? 'font-semibold text-primary' : '')}>{n === 0 ? '·' : n}</span>
+                <span key={i} className={cell} style={n === 0 ? { color: 'var(--dash)' } : i === 6 ? { color: 'var(--accent)', fontWeight: 600 } : undefined}>{n === 0 ? '·' : n}</span>
               ))}
-              <span className={cn(cell, 'w-8 font-semibold')}>{r.total}</span>
+              <span className={cn(cell, 'w-8')} style={{ fontWeight: 600, color: 'var(--strong)' }}>{r.total}</span>
             </li>
           ))}
         </ul>
@@ -75,19 +77,24 @@ function Submitted({ editors, submitted }: { editors: Home['editors']; submitted
   )
 }
 
-function Row({ to, title, sub, right }: { to: string; title: string; sub: string; right?: React.ReactNode }) {
+function Row({ to, title, sub, client, lead, right }: { to: string; title: string; sub: string; client?: string | null; lead?: React.ReactNode; right?: React.ReactNode }) {
   return (
     <li>
-      <Link to={to} className="flex items-center gap-3 min-h-[52px] px-2 py-1.5 rounded-lg hover:bg-muted/60">
+      <Link to={to} className="ds-hrow">
+        {lead ?? <ClientMark name={client ?? '?'} size={26} />}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{title}</p>
-          <p className="text-xs text-muted-foreground truncate">{sub}</p>
+          <p className="ds-t">{title}</p>
+          <p className="ds-s">{sub}</p>
         </div>
         {right}
       </Link>
     </li>
   )
 }
+
+const when = (text: string, bad?: boolean) => (
+  <span style={{ fontSize: 12.5, whiteSpace: 'nowrap', color: bad ? 'var(--bad)' : 'var(--faint)', fontWeight: bad ? 600 : 400 }}>{text}</span>
+)
 
 export default function AdminHome() {
   const apiFetch = useApiFetch()
@@ -107,91 +114,95 @@ export default function AdminHome() {
   })
 
   return (
-    <AdminLayout>
-      <main className="px-4 md:px-6 py-5 md:py-6 space-y-4 max-w-5xl">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-heading font-semibold tracking-tight truncate">{profile?.full_name?.split(' ')[0] ?? ''}</h1>
-          <Link to="/admin" className="min-h-[44px] px-4 inline-flex items-center rounded-lg border border-border text-sm font-medium hover:bg-muted flex-shrink-0">Projects</Link>
-        </div>
+    <AdminLayout bare>
+      <main className="px-4 md:px-7 pb-10" style={{ maxWidth: 1180 }}>
+        <header className="flex items-center gap-3" style={{ padding: '22px 0 18px' }}>
+          <h1 className="truncate" style={{ margin: 0, fontSize: 24, fontWeight: 650, letterSpacing: '-.025em', color: 'var(--strong)' }}>{profile?.full_name?.split(' ')[0] ?? ''}</h1>
+          <span className="flex-1" />
+          <div className="hidden md:block"><HeaderTools /></div>
+          <Link to="/admin" className="ds-ghost-btn ds-tap inline-flex items-center flex-shrink-0" style={{ textDecoration: 'none' }}>Projects</Link>
+        </header>
 
         {isLoading ? (
-          <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+          <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} /></div>
         ) : error || !data ? (
-          <div className="clay-card p-5 text-sm">{(error as Error)?.message}</div>
+          <div className="ds-panel" style={{ fontSize: 13.5 }}>{(error as Error)?.message}</div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
             <div className="space-y-4 min-w-0">
-              <Card title="Requests" count={pending.length} tone="bg-amber-500/15 text-amber-700 dark:text-amber-300">
+              <Panel title="Requests" count={pending.length} tone="warn">
                 {pending.length ? (
-                  <ul className="divide-y divide-border/60 -mx-2">
+                  <ul>
                     {pending.map((r) => (
-                      <li key={r.id} className="flex flex-wrap items-center gap-2 px-2 py-2">
-                        <Link to={`/admin/projects/${r.project_id}`} className="flex-1 min-w-[10rem] min-h-[44px] flex flex-col justify-center hover:underline">
-                          <span className="text-sm font-medium truncate">{r.editor_name}</span>
-                          <span className="text-xs text-muted-foreground truncate">{r.project_title} · {ago(r.created_at)}</span>
+                      <li key={r.id} className="flex flex-wrap items-center gap-2 py-1.5">
+                        <Link to={`/admin/projects/${r.project_id}`} className="ds-hrow flex-1" style={{ minWidth: '10rem', margin: '0 0 0 -10px' }}>
+                          <EditorAvatar name={r.editor_name} size={26} />
+                          <div className="flex-1 min-w-0">
+                            <p className="ds-t">{r.editor_name}</p>
+                            <p className="ds-s">{r.project_title} · {ago(r.created_at)}</p>
+                          </div>
                         </Link>
                         <div className="flex gap-2 ml-auto">
-                          <button disabled={urgent.decide.isPending} onClick={() => decide(r.id, 'approve')}
-                            className="min-h-[44px] px-4 rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 disabled:opacity-50">Approve</button>
-                          <button disabled={urgent.decide.isPending} onClick={() => decide(r.id, 'decline')}
-                            className="min-h-[44px] px-4 rounded-lg border border-border text-sm hover:bg-muted disabled:opacity-50">Decline</button>
+                          <button disabled={urgent.decide.isPending} onClick={() => decide(r.id, 'approve')} className="ds-primary ds-tap disabled:opacity-50" style={{ padding: '0 16px' }}>Approve</button>
+                          <button disabled={urgent.decide.isPending} onClick={() => decide(r.id, 'decline')} className="ds-ghost-btn ds-tap disabled:opacity-50">Decline</button>
                         </div>
                       </li>
                     ))}
                   </ul>
                 ) : empty}
-              </Card>
+              </Panel>
 
-              <Card title="To review" count={data.to_review.length} tone="bg-primary/10 text-primary">
+              <Panel title="To review" count={data.to_review.length} tone="accent" delay={60}>
                 {data.to_review.length ? (
-                  <ul className="divide-y divide-border/60 -mx-2">
-                    {data.to_review.map((p) => <Row key={p.id} to={`/admin/projects/${p.id}`} title={p.title} sub={`${p.client ?? '—'} · ${p.editors ?? '—'}`} right={<span className="text-xs text-muted-foreground whitespace-nowrap">{ago(p.updated_at)}</span>} />)}
+                  <ul>
+                    {data.to_review.map((p) => <Row key={p.id} to={`/admin/projects/${p.id}`} client={p.client} title={p.title} sub={`${p.client ?? '—'} · ${p.editors ?? '—'}`} right={when(ago(p.updated_at))} />)}
                   </ul>
                 ) : empty}
-              </Card>
+              </Panel>
 
-              <Card title="Late" count={data.late.length} tone="bg-red-500/10 text-red-700 dark:text-red-300">
+              <Panel title="Late" count={data.late.length} tone="bad" delay={120}>
                 {data.late.length ? (
-                  <ul className="divide-y divide-border/60 -mx-2">
-                    {data.late.map((p) => <Row key={p.id + p.editor} to={`/admin/projects/${p.id}`} title={p.title} sub={p.editor} right={<span className="text-xs font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">{ago(p.due_at)}</span>} />)}
+                  <ul>
+                    {data.late.map((p) => <Row key={p.id + p.editor} to={`/admin/projects/${p.id}`} lead={<EditorAvatar name={p.editor} size={26} />} title={p.title} sub={p.editor} right={when(ago(p.due_at), true)} />)}
                   </ul>
                 ) : empty}
-              </Card>
+              </Panel>
 
-              <Card title="Unassigned" count={data.unassigned.length} tone="bg-amber-500/15 text-amber-700 dark:text-amber-300">
+              <Panel title="Unassigned" count={data.unassigned.length} tone="warn" delay={180}>
                 {data.unassigned.length ? (
-                  <ul className="divide-y divide-border/60 -mx-2">
-                    {data.unassigned.map((p) => <Row key={p.id} to={`/admin/projects/${p.id}`} title={p.title} sub={p.client ?? '—'} right={<span className="text-xs text-muted-foreground whitespace-nowrap">{ago(p.created_at)}</span>} />)}
+                  <ul>
+                    {data.unassigned.map((p) => <Row key={p.id} to={`/admin/projects/${p.id}`} client={p.client} title={p.title} sub={p.client ?? '—'} right={when(ago(p.created_at))} />)}
                   </ul>
                 ) : empty}
-              </Card>
+              </Panel>
             </div>
 
             <div className="space-y-4 min-w-0">
-            <Card title="Editors">
-              {data.editors.length ? (
-                <ul className="space-y-3 pt-1">
-                  {data.editors.map((e) => {
-                    const full = e.active >= data.max
-                    return (
-                      <li key={e.id}>
-                        <div className="flex items-center justify-between gap-3 text-sm">
-                          <span className="truncate">{e.name}</span>
-                          <span className={cn('tabular-nums font-semibold', full ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>{e.active}/{data.max}</span>
-                        </div>
-                        <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div className={cn('h-full rounded-full', full ? 'bg-amber-500' : 'bg-primary')} style={{ width: `${Math.min(100, (e.active / data.max) * 100)}%` }} />
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              ) : empty}
-            </Card>
+              <Panel title="Editors" delay={90}>
+                {data.editors.length ? (
+                  <ul className="space-y-3.5 pt-1 pb-1.5">
+                    {data.editors.map((e) => {
+                      const full = e.active >= data.max
+                      return (
+                        <li key={e.id}>
+                          <div className="flex items-center gap-2.5" style={{ fontSize: 13.5 }}>
+                            <EditorAvatar name={e.name} size={22} />
+                            <span className="truncate flex-1">{e.name}</span>
+                            <span className="tabular-nums" style={{ fontWeight: 600, color: full ? 'var(--car-t)' : 'var(--muted)' }}>{e.active}/{data.max}</span>
+                          </div>
+                          <div className="ds-track" style={{ marginTop: 8 }}>
+                            <i className={full ? 'full' : undefined} style={{ width: `${Math.min(100, (e.active / data.max) * 100)}%` }} />
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : empty}
+              </Panel>
 
-            <Card title="Submitted">
-              {data.editors.length ? <Submitted editors={data.editors} submitted={data.submitted ?? []} /> : empty}
-            </Card>
+              <Panel title="Submitted" delay={150}>
+                {data.editors.length ? <Submitted editors={data.editors} submitted={data.submitted ?? []} /> : empty}
+              </Panel>
             </div>
           </div>
         )}
