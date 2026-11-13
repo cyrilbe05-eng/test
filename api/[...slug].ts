@@ -32,6 +32,7 @@ import { handleFileOrder } from './_helpers/care/carousel.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
+import { isValidAvatar } from './_helpers/avatar.js'
 import { attemptKeys, isLocked, recordFailure, clearFailures, endSessions } from './_helpers/login-guard.js'
 import { isFullPackage, isOpenScriptFor } from './_helpers/care/full-package.js'
 import { handleQuestionsRoute } from './_helpers/care/onboarding.js'
@@ -3688,6 +3689,7 @@ async function handleProfile(req: VercelRequest, res: VercelResponse) {
         params.push(body.password_changed ? 1 : 0)
       }
       if (body.avatar_url !== undefined) {
+        if (!isValidAvatar(body.avatar_url)) { res.status(400).json({ error: 'Picture must be a small image' }); return }
         updates.push('avatar_url = ?')
         params.push(body.avatar_url)
       }

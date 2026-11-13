@@ -9,6 +9,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { ProductionChatPanel } from '@/components/chat/ProductionChatPanel'
 import { Ms, ThemeFadeButton } from '@/components/ds'
 import { cn } from '@/lib/utils'
+import { ProfileMenu } from '@/components/ds/ProfileMenu'
 import { useCardTilt } from '@/hooks/useCardTilt'
 
 // The app frame of the design system (same as the admin frame): 236px
@@ -87,18 +88,7 @@ export function AppFrame({ groups, bottom, subtitle, viewingAs, footer, children
       </nav>
       <div className="mt-auto flex flex-col gap-2.5">
         {footer?.(onPick ?? (() => {}))}
-        <div className="flex items-center gap-2.5 p-2.5 rounded-xl" style={{ background: 'var(--profile)', boxShadow: 'inset 0 0 0 1px var(--ds-ring)' }}>
-          <span className="grid place-items-center rounded-full text-white flex-none" style={{ width: 30, height: 30, background: 'var(--ds-accent)', fontSize: 13, fontWeight: 600 }}>
-            {profile?.full_name?.charAt(0)}
-          </span>
-          <div className="flex-1 min-w-0 flex flex-col">
-            <span className="truncate" style={{ fontSize: 13.5, fontWeight: 500 }}>{profile?.full_name}</span>
-            {subtitle && <span className="truncate" style={{ fontSize: 12, color: 'var(--faint)' }}>{subtitle}</span>}
-          </div>
-          <button type="button" className="ds-ibtn" aria-label="Sign out" onClick={handleSignOut} style={{ width: 30, height: 30 }}>
-            <Ms name="logout" style={{ fontSize: 18, width: 18 }} />
-          </button>
-        </div>
+        <ProfileMenu subtitle={subtitle} onSignOut={handleSignOut} />
       </div>
     </>
   )

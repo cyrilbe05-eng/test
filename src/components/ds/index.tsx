@@ -1,4 +1,5 @@
 import { useTheme } from '@/lib/theme'
+import { themeSwap } from '@/lib/themeSwap'
 import { cn } from '@/lib/utils'
 import { clientTintBoth, editorColor, hexA, initials } from '@/lib/dsColors'
 import { STATUS_META } from '@/lib/dsStatus'
@@ -25,20 +26,7 @@ export function Icon({ name, size = 14, className, style }: { name: string; size
 export function ThemeFadeButton() {
   const { theme, toggle } = useTheme()
   const dark = theme === 'dark'
-  const swap = () => {
-    const root = document.documentElement
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { toggle(); return }
-    if (root.classList.contains('theme-out') || root.classList.contains('theme-in')) return
-    root.classList.add('theme-out')
-    window.setTimeout(() => {
-      toggle()
-      // Two frames: let the new theme paint while the content is hidden.
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        root.classList.replace('theme-out', 'theme-in')
-        window.setTimeout(() => root.classList.remove('theme-in'), 500)
-      }))
-    }, 170)
-  }
+  const swap = () => themeSwap(toggle)
   return (
     <button type="button" className="ds-ibtn ds-theme-btn" onClick={swap} aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}>
       <Ms name={dark ? 'light_mode' : 'dark_mode'} />

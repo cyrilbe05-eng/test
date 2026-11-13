@@ -224,6 +224,21 @@ html.dark .ds-entry:hover{background:rgba(255,255,255,.06)}
 .ds-erow-more{margin:0 12px 14px 54px;padding:14px 16px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--panel-ring);animation:ds-fade .45s var(--out) both}
 @media (max-width:767px){.ds-erow-more{margin-left:12px}}
 
+/* ── Profile card + menu (bottom of the sidebar) ── */
+.ds-pcard{background:var(--profile);box-shadow:inset 0 0 0 1px var(--ds-ring);transition:background .2s}
+.ds-pcard:hover{background:var(--hover)}
+.ds-pcard:focus-visible{outline:2px solid var(--ds-accent);outline-offset:2px}
+.ds-pmenu{position:fixed;z-index:70;width:min(276px,calc(100vw - 24px));border-radius:16px;background:linear-gradient(180deg,var(--sheet-a),var(--sheet-b));box-shadow:var(--sheet-sh);transform-origin:bottom left;animation:ds-pm-in .32s var(--out) both}
+@keyframes ds-pm-in{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+.ds-pm-sep{height:1px;background:var(--line)}
+.ds-pm-photo{position:relative;flex:none;border:0;padding:0;border-radius:999px;cursor:pointer;background:none}
+.ds-pm-cam{position:absolute;inset:0;display:grid;place-items:center;border-radius:999px;background:rgba(0,0,0,.45);opacity:0;transition:opacity .2s}
+.ds-pm-photo:hover .ds-pm-cam,.ds-pm-photo:focus-visible .ds-pm-cam,.ds-pm-photo:disabled .ds-pm-cam{opacity:1}
+.ds-mitem{display:flex;align-items:center;gap:10px;width:100%;height:38px;padding:0 10px;border:0;border-radius:9px;background:transparent;color:var(--text);font-size:13.5px;text-align:left;text-decoration:none;cursor:pointer;transition:background .2s}
+.ds-mitem:hover{background:var(--hover)}
+.ds-mitem .ds-ms{font-size:19px;width:19px}
+@media (max-width:767px){.ds-mitem{height:44px}}
+
 /* ── Theme-picked colours (no React re-render on theme switch) ── */
 .ds-cm{color:var(--cm-l);background:var(--cm-lb)}
 html.dark .ds-cm{color:var(--cm-d);background:var(--cm-db)}
