@@ -23,7 +23,7 @@ import {
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
 import { ProjectEntryModal } from '@/components/calendar/ProjectEntryModal'
 import { MonthView } from '@/components/calendar/MonthView'
-import { Icon, Segmented } from '@/components/ds'
+import { Icon } from '@/components/ds'
 import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus, Profile } from '@/types'
@@ -44,7 +44,7 @@ const CONTENT_STATUSES: ContentStatus[] = ['Idea', 'Drafting', 'Scheduled']
 
 const CONTENT_TYPE_STYLES: Record<ContentType, string> = {
   Reel:     'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  Story:    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  Story:    'bg-zinc-100 text-zinc-700 dark:bg-zinc-900/30 dark:text-zinc-300',
   Carousel: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
   Post:     'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
 }
@@ -107,8 +107,8 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 overflow-y-auto" style={{ maxHeight: '90vh' }}>
+    <div className="ds-cal-veil">
+      <div className="ds-cal-sheet max-w-md p-6 space-y-4 overflow-y-auto" style={{ maxHeight: '90vh' }}>
         <h2 className="font-heading font-semibold text-lg">New Event</h2>
         <div className="space-y-3">
           <div>
@@ -281,8 +281,8 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
   if (!isManual) return <ProjectEntryModal event={event} onClose={onClose} projectBase="/team/projects" />
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '90vh' }}>
+    <div className="ds-cal-veil">
+      <div className="ds-cal-sheet max-w-lg flex flex-col" style={{ maxHeight: '90vh' }}>
         {/* Header */}
         <div className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <div className="flex items-center gap-2">
@@ -467,26 +467,15 @@ export default function TeamCalendar() {
       <main className="px-4 md:px-7 pb-10">
         <MonthView viewDate={viewDate} onMonth={setViewDate} days={days} eventsForDay={eventsForDay}
           onCreate={setCreateDay} onSelect={setSelectedEvent} onMore={setDayDetail}
-          filters={<>
-      {isCopywriter && assignableClients.length > 0 && (
-      <select
-      value={filterClient}
-      onChange={(e) => setFilterClient(e.target.value)}
-      aria-label="Client"
-      className={cn('h-11 sm:h-8 pl-3 pr-8 rounded-lg text-sm sm:text-xs font-medium border-0 outline-none focus:ring-2 focus:ring-primary/40 max-w-full', filterClient ? 'bg-primary text-white' : 'bg-muted text-foreground')}
-      >
-      <option value="">All clients</option>
-      {[...assignableClients].sort((a, b) => a.full_name.localeCompare(b.full_name)).map((c) => (
-      <option key={c.id} value={c.id}>{c.full_name}</option>
-      ))}
-      </select>
-      )}
-      <Segmented label="Type" width={84} value={filterType} onChange={(v) => setFilterType(filterType === v ? 'all' : v)}
-      options={[{ value: 'all', label: 'All types' }, ...CONTENT_TYPES.map((t) => ({ value: t, label: t }))]} />
-      <div className="w-px h-5 bg-border flex-none" />
-      <Segmented label="Status" width={88} value={filterStatus} onChange={(v) => setFilterStatus(filterStatus === v ? 'all' : v)}
-      options={[{ value: 'all', label: 'All statuses' }, ...CONTENT_STATUSES.map((t) => ({ value: t, label: t }))]} />
-          </>} />
+          type={filterType} onType={setFilterType} status={filterStatus} onStatus={setFilterStatus}
+          extra={isCopywriter && assignableClients.length > 0 ? (
+            <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} aria-label="Client" className="ds-tool pr-8">
+              <option value="">All clients</option>
+              {[...assignableClients].sort((a, b) => a.full_name.localeCompare(b.full_name)).map((c) => (
+                <option key={c.id} value={c.id}>{c.full_name}</option>
+              ))}
+            </select>
+          ) : undefined} />
       </main>
 
       {createDay && <CreateEventModal defaultDate={createDay} onClose={() => setCreateDay(null)} clients={assignableClients} defaultClientId={filterClient || undefined} />}
@@ -494,7 +483,7 @@ export default function TeamCalendar() {
         <DayEventsModal
           day={dayDetail}
           events={eventsForDay(dayDetail)}
-          onSelect={(event) => { setDayDetail(null); setSelectedEvent(event) }}
+          onSelect={(event) => setSelectedEvent(event)}
           onClose={() => setDayDetail(null)}
         />
       )}

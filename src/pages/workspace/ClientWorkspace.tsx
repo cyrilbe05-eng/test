@@ -84,7 +84,7 @@ export default function ClientWorkspace() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
           <StatCard label="Active videos" value={active.length} icon={<IconVideo />} color="bg-primary/10 text-primary" delay="stagger-1" />
           <StatCard label="Completed" value={completed.length} icon={<IconCheck />} color="bg-green-50 text-green-700" delay="stagger-2" />
-          <StatCard label="All videos" value={allProjects.length} icon={<IconVideo />} color="bg-blue-50 text-blue-700" delay="stagger-3" />
+          <StatCard label="All videos" value={allProjects.length} icon={<IconVideo />} color="bg-zinc-50 text-zinc-700" delay="stagger-3" />
           <StatCard label="Time Saved" value={timeSaved === null ? '—' : `${timeSaved}h`} icon={<IconClock />} color="bg-amber-50 text-amber-700" delay="stagger-4" />
         </div>
 

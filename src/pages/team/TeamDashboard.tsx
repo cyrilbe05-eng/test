@@ -10,7 +10,7 @@ import type { Project, ProjectStatus } from '@/types'
 // ── Kanban columns ────────────────────────────────────────────────────────────
 const COLUMNS: { statuses: ProjectStatus[]; label: string; color: string }[] = [
   { statuses: ['pending_assignment'],          label: 'Pending',       color: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' },
-  { statuses: ['in_progress'],                 label: 'In Progress',   color: 'text-blue-700 bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' },
+  { statuses: ['in_progress'],                 label: 'In Progress',   color: 'text-zinc-700 bg-zinc-50 border-zinc-200 dark:bg-zinc-950/40 dark:text-zinc-300 dark:border-zinc-800' },
   { statuses: ['in_review', 'admin_approved'], label: 'Admin Approved',color: 'text-cyan-700 bg-cyan-50 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800' },
   { statuses: ['client_reviewing'],            label: 'Client Review', color: 'text-orange-700 bg-orange-50 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800' },
   { statuses: ['revision_requested'],          label: 'Revision',      color: 'text-red-700 bg-red-50 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800' },

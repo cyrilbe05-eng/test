@@ -38,19 +38,20 @@ async function exportStatusHistory() {
 }
 
 const STATUS: { key: ProjectStatus; label: string; hex: string }[] = [
-  { key: 'pending_assignment', label: 'Pending', hex: '#f59e0b' },
-  { key: 'in_progress', label: 'In progress', hex: '#3b82f6' },
-  { key: 'revision_requested', label: 'Revision', hex: '#dc2626' },
-  { key: 'in_review', label: 'In review', hex: '#7c3aed' },
-  { key: 'admin_approved', label: 'Admin OK', hex: '#4f46e5' },
-  { key: 'client_reviewing', label: 'With client', hex: '#0891b2' },
-  { key: 'client_approved', label: 'Approved', hex: '#16a34a' },
+  // Same status colours as the board (DESIGN.md §3), no blue.
+  { key: 'pending_assignment', label: 'Pending', hex: '#8E8E96' },
+  { key: 'in_progress', label: 'In progress', hex: '#E09A2D' },
+  { key: 'revision_requested', label: 'Revision', hex: '#E5584B' },
+  { key: 'in_review', label: 'In review', hex: '#8A62D0' },
+  { key: 'admin_approved', label: 'Admin OK', hex: '#2E9E5B' },
+  { key: 'client_reviewing', label: 'With client', hex: '#C2578A' },
+  { key: 'client_approved', label: 'Approved', hex: '#1F9C7C' },
 ]
 
 /** Theme colours as real values for the SVG chart (re-read on theme switch). */
 function useChartColors() {
   const { theme } = useTheme()
-  const [c, setC] = useState({ bar: '#2F4E9E', grid: '#e5e5e3', axis: '#6B7079', card: '#fff', border: '#e5e5e3', text: '#16181C' })
+  const [c, setC] = useState({ bar: '#16161A', grid: '#e5e5e3', axis: '#6B7079', card: '#fff', border: '#e5e5e3', text: '#16181C' })
   useEffect(() => {
     const cs = getComputedStyle(document.documentElement)
     const v = (n: string) => `hsl(${cs.getPropertyValue(n).trim()})`

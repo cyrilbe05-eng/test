@@ -387,7 +387,7 @@ export default function AdminProjectDetail() {
               return (
                 <div key={a.id} className="mb-3">
                   <div className="flex items-center gap-2 mb-1">
-                    <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-zinc-50 text-zinc-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                       {a.profiles.full_name.charAt(0)}
                     </div>
                     <span className="text-xs font-medium flex-1">{a.profiles.full_name}</span>

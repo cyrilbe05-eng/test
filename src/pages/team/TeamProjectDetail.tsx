@@ -570,7 +570,7 @@ export default function TeamProjectDetail() {
               <button
                 onClick={handleMarkInProgress}
                 disabled={claiming || updateStatus.isPending}
-                className="w-full min-h-[44px] py-2.5 bg-blue-600 rounded-xl text-white font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
+                className="w-full min-h-[44px] py-2.5 bg-zinc-600 rounded-xl text-white font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 {claiming || updateStatus.isPending ? 'Starting…' : 'Start Processing'}
               </button>

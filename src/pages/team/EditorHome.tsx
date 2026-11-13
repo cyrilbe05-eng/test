@@ -18,7 +18,7 @@ type Home = { active: number; max: number; working: Mine[]; with_client: Mine[];
 // What the editor has to do next, per status — most urgent first.
 const NEXT: Record<string, { label: string; tone: string; order: number }> = {
   revision_requested: { label: 'Revisions', tone: 'bg-red-500/10 text-red-700 dark:text-red-300', order: 0 },
-  in_progress: { label: 'Edit', tone: 'bg-blue-500/10 text-blue-700 dark:text-blue-300', order: 1 },
+  in_progress: { label: 'Edit', tone: 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300', order: 1 },
   pending_assignment: { label: 'Start', tone: 'bg-amber-500/10 text-amber-700 dark:text-amber-300', order: 2 },
   in_review: { label: 'With admin', tone: 'bg-muted text-muted-foreground', order: 3 },
   admin_approved: { label: 'With admin', tone: 'bg-muted text-muted-foreground', order: 3 },

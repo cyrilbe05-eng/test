@@ -1,8 +1,7 @@
 import { Icon } from '@/components/ds'
 import { format } from 'date-fns'
-import { cn } from '@/lib/utils'
 import type { CalendarEvent } from '@/types'
-import { calendarLabel } from '@/lib/calendarLabel'
+import { calName, calStatus } from '@/lib/calStatus'
 
 /** Every entry on one day.
  *
@@ -21,9 +20,9 @@ export function DayEventsModal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="ds-cal-veil" onClick={onClose}>
       <div
-        className="bg-card rounded-2xl shadow-2xl w-full max-w-sm flex flex-col"
+        className="ds-cal-sheet max-w-sm flex flex-col"
         style={{ maxHeight: '80vh' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -45,10 +44,10 @@ export function DayEventsModal({
               onClick={() => onSelect(event)}
               className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-muted transition-colors text-left"
             >
-              <span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', event.color ?? 'bg-slate-500')} />
-              {event.posted && <span className="text-[10px] leading-none flex-shrink-0 text-muted-foreground" title="Posted">✓</span>}
+              <span aria-hidden className="ds-dot" style={{ '--sd-d': calStatus(event).colors[0], '--sh-d': calStatus(event).colors[0] + '26', '--sd-l': calStatus(event).colors[1], '--sh-l': calStatus(event).colors[1] + '26', width: 7, height: 7, borderRadius: 999, flex: 'none' } as React.CSSProperties} />
               {event.double_down && <span className="leading-none flex-shrink-0"><Icon name="local_fire_department" className="text-orange-500" size={12} /></span>}
-              <span className="text-sm font-medium truncate flex-1">{calendarLabel(event)}</span>
+              <span className="text-sm font-medium truncate flex-1">{calName(event)}</span>
+              <span className="text-xs text-muted-foreground flex-shrink-0">{calStatus(event).label}</span>
               {event.content_type && (
                 <span className="text-[10px] font-semibold text-muted-foreground flex-shrink-0">{event.content_type}</span>
               )}

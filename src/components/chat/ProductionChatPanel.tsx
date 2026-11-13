@@ -44,7 +44,7 @@ function IconSend() {
 function Avatar({ name, role }: { name?: string; role?: string }) {
   const color =
     role === 'admin' ? 'bg-purple-500/20 text-purple-400' :
-    role === 'team'  ? 'bg-blue-500/20 text-blue-400' :
+    role === 'team'  ? 'bg-zinc-500/20 text-zinc-400' :
                        'bg-green-500/20 text-green-400'
   return (
     <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0', color)}>
@@ -193,7 +193,7 @@ export function ProductionChatPanel() {
                             onClick={() => openThread(c.id, otherName ?? 'Support')}
                             className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors text-left"
                           >
-                            <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
                               DM
                             </div>
                             <div className="flex-1 min-w-0">
@@ -237,7 +237,7 @@ export function ProductionChatPanel() {
       {/* FAB */}
       <button
         onClick={() => setPanel((p) => p === 'closed' ? 'list' : 'closed')}
-        className="pointer-events-auto w-12 h-12 rounded-full bg-primary text-white shadow-lg hover:brightness-110 transition-all active:scale-95 flex items-center justify-center"
+        className="pointer-events-auto ds-fab flex items-center justify-center"
       >
         {panel !== 'closed' ? <IconX /> : <IconChat />}
       </button>

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
 // The Projects board's card feel, for every card in the app (DESIGN.md):
-// small cards (.clay-card up to ~460×360) tilt toward the cursor, max ±3.5°,
+// small cards (.clay-card up to ~460×360, and calendar days) tilt toward the cursor, max ±3.5°,
 // with a pre-rendered hover shadow and, in dark mode, a soft shine. One
 // document listener, throttled with requestAnimationFrame, CSS variables only.
 // Bigger panels (tables, calendars, forms) never tilt. Mouse only; off with
@@ -28,8 +28,9 @@ export function useCardTilt() {
       const r = el.getBoundingClientRect()
       const px = Math.min(1, Math.max(0, (x - r.left) / r.width))
       const py = Math.min(1, Math.max(0, (y - r.top) / r.height))
-      el.style.setProperty('--ry', `${((px - 0.5) * 7).toFixed(2)}deg`)
-      el.style.setProperty('--rx', `${((0.5 - py) * 7).toFixed(2)}deg`)
+      const k = el.classList.contains('ds-dcard') ? 6 : 7 // calendar days: ±3°, cards: ±3.5°
+      el.style.setProperty('--ry', `${((px - 0.5) * k).toFixed(2)}deg`)
+      el.style.setProperty('--rx', `${((0.5 - py) * k).toFixed(2)}deg`)
       el.style.setProperty('--mx', `${(px * 100).toFixed(1)}%`)
       el.style.setProperty('--my', `${(py * 100).toFixed(1)}%`)
     }
@@ -42,7 +43,7 @@ export function useCardTilt() {
     }
     const move = (e: PointerEvent) => {
       const t = e.target as Element | null
-      const c = (t && 'closest' in t ? t.closest('.clay-card') : null) as HTMLElement | null
+      const c = (t && 'closest' in t ? t.closest('.clay-card, .ds-dcard') : null) as HTMLElement | null
       if (c !== el) {
         if (el) release(el)
         el = c && eligible(c) ? c : null

@@ -23,7 +23,7 @@ type ConversationId = string | null
 function roleColor(role?: string) {
   if (role === 'admin') return 'bg-violet-500'
   if (role === 'team') return 'bg-teal-500'
-  return 'bg-indigo-500'
+  return 'bg-violet-500'
 }
 
 function getInitial(name?: string) {

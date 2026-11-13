@@ -47,7 +47,7 @@ function IconThumbUp() {
 function StatusBanner({ color, children }: { color: string; children: React.ReactNode }) {
   const c: Record<string, string> = {
     amber:  'bg-amber-50 border-amber-200 text-amber-700',
-    blue:   'bg-blue-50 border-blue-200 text-blue-700',
+    blue:   'bg-zinc-50 border-zinc-200 text-zinc-700',
     purple: 'bg-violet-50 border-violet-200 text-violet-700',
     red:    'bg-red-50 border-red-200 text-red-700',
   }

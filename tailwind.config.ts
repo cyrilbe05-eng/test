@@ -106,8 +106,8 @@ const config: Config = {
           '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
         },
         'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 0 0 hsl(231 71% 63% / 0)' },
-          '50%': { boxShadow: '0 0 0 4px hsl(231 71% 63% / 0.18)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 hsl(240 5% 50% / 0)' },
+          '50%': { boxShadow: '0 0 0 4px hsl(240 5% 50% / 0.18)' },
         },
         'status-dot-live': {
           '0%, 100%': { opacity: '1', transform: 'scale(1)' },

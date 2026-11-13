@@ -1,18 +1,23 @@
 import { useRef } from 'react'
 import { addMonths, format, isSameDay, isSameMonth, subMonths } from 'date-fns'
 import { EventChip } from '@/components/calendar/EventChip'
-import { Icon, Ms } from '@/components/ds'
-import { calendarLabel } from '@/lib/calendarLabel'
+import { Ms } from '@/components/ds'
+import { ToolMenu } from '@/components/ds/ToolMenu'
+import { CAL_STATUSES, PROJECT_STAGES } from '@/lib/calStatus'
+import { markSheetOrigin } from '@/lib/sheetOrigin'
 import { cn } from '@/lib/utils'
-import type { CalendarEvent } from '@/types'
+import type { CalendarEvent, ContentStatus, ContentType } from '@/types'
 
-// The month calendar shared by the admin, team and client calendars: header
-// (month, ‹ ›, Today, the page's filters) and the grid. Each page keeps its own
-// data, filters and modals; this only draws them.
+// The month calendar shared by the admin, team and client calendars
+// (DESIGN.md §6 Calendar): header (month, ‹ ›, Today, type + status menus,
+// "New post") and the grid of raised day cards. Each page keeps its own data,
+// filters and sheets; this only draws them.
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const TYPES = ['Reel', 'Story', 'Carousel', 'Post']
-const STATUSES = ['Idea', 'Drafting', 'Scheduled']
+const TYPES: ContentType[] = ['Reel', 'Story', 'Carousel', 'Post']
+const STATUSES: { value: ContentStatus; key: keyof typeof CAL_STATUSES }[] = [
+  { value: 'Idea', key: 'idea' }, { value: 'Drafting', key: 'drafting' }, { value: 'Scheduled', key: 'scheduled' },
+]
 
 interface Props {
   viewDate: Date
@@ -22,68 +27,74 @@ interface Props {
   onCreate: (d: Date) => void
   onSelect: (e: CalendarEvent) => void
   onMore: (d: Date) => void
-  filters?: React.ReactNode
+  type: ContentType | 'all'
+  onType: (v: ContentType | 'all') => void
+  status: ContentStatus | 'all'
+  onStatus: (v: ContentStatus | 'all') => void
+  /** Extra filter (the copywriter's client picker). */
+  extra?: React.ReactNode
 }
 
-export function MonthView({ viewDate, onMonth, days, eventsForDay, onCreate, onSelect, onMore, filters }: Props) {
-  // Slide direction of the month change (+1 next, -1 previous).
+export function MonthView({ viewDate, onMonth, days, eventsForDay, onCreate, onSelect, onMore, type, onType, status, onStatus, extra }: Props) {
   const dir = useRef(0)
   const go = (d: Date, n: number) => { dir.current = n; onMonth(d) }
   const today = new Date()
+  const monthKey = format(viewDate, 'yyyy-MM')
 
   return (
-    <>
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-3 pt-5 pb-5">
-        <h1 className="tabular-nums" style={{ minWidth: 0 }}>{format(viewDate, 'MMMM yyyy')}</h1>
+    <div className="ds-cal">
+      <header className="flex flex-wrap items-center gap-x-2.5 gap-y-3 pt-5 pb-5">
+        <h1 className="tabular-nums mr-1" style={{ minWidth: 0 }}>{format(viewDate, 'MMMM yyyy')}</h1>
         <div className="flex items-center">
           <button type="button" className="ds-ibtn" aria-label="Previous month" onClick={() => go(subMonths(viewDate, 1), -1)}><Ms name="chevron_left" /></button>
           <button type="button" className="ds-ibtn" aria-label="Next month" onClick={() => go(addMonths(viewDate, 1), 1)}><Ms name="chevron_right" /></button>
         </div>
-        <button type="button" className="ds-ghost-btn ds-tap" style={{ height: 34 }} onClick={() => go(new Date(), Math.sign(+new Date() - +viewDate))}>Today</button>
+        <button type="button" className="ds-ghost-btn ds-tap" onClick={() => go(new Date(), Math.sign(+new Date() - +viewDate))}>Today</button>
         <div className="flex-1" />
-        {filters && <div className="flex items-center gap-2 overflow-x-auto max-w-full -mx-4 px-4 md:mx-0 md:px-0 pb-1 md:pb-0">{filters}</div>}
+        <div className="flex items-center gap-2 flex-wrap">
+          {extra}
+          <ToolMenu label="Type" value={type} onChange={onType}
+            options={[{ value: 'all', label: 'All types' }, ...TYPES.map((t) => ({ value: t, label: t }))]} />
+          <ToolMenu label="Status" value={status} onChange={onStatus}
+            options={[{ value: 'all', label: 'All statuses' }, ...STATUSES.map((s) => ({ value: s.value, label: s.value, dot: CAL_STATUSES[s.key].colors }))]}
+            notes={PROJECT_STAGES.map((s) => ({ label: s.stage, dot: s.status.colors }))} />
+          <button type="button" className="ds-primary ds-tap" onClick={(e) => { markSheetOrigin(e.currentTarget); onCreate(new Date()) }}>
+            <Ms name="add" style={{ fontSize: 18, width: 18, color: 'inherit' }} />New post
+          </button>
+        </div>
       </header>
 
-      <div className="ds-month">
-        <div className="ds-month-head">
-          {DAY_NAMES.map((d) => <div key={d}>{d}</div>)}
-        </div>
-        <div key={format(viewDate, 'yyyy-MM')} className="ds-month-grid" style={{ '--dir': dir.current } as React.CSSProperties}>
-          {days.map((day, idx) => {
-            const dayEvents = eventsForDay(day)
-            const inMonth = isSameMonth(day, viewDate)
-            const isToday = isSameDay(day, today)
-            const visible = dayEvents.slice(0, 3)
-            const overflow = dayEvents.length - visible.length
-            const weekend = idx % 7 === 0 || idx % 7 === 6
-            return (
-              <div key={idx} onClick={() => onCreate(day)} className={cn('ds-day', !inMonth && 'out', weekend && 'weekend')}>
-                <div className="ds-day-top">
-                  <span className={cn('ds-day-n', isToday && 'today')}>{format(day, 'd')}</span>
-                  <Icon name="add" size={16} className="ds-day-add" />
-                </div>
-                <div className="flex flex-wrap gap-1 sm:block sm:space-y-0.5">
-                  {visible.map((event) => (
-                    <EventChip key={event.id} event={event} label={calendarLabel(event)} onClick={(e) => { e.stopPropagation(); onSelect(event) }} />
-                  ))}
-                  {overflow > 0 && (
-                    <button type="button" onClick={(e) => { e.stopPropagation(); onMore(day) }} className="ds-day-more">
-                      +{overflow}<span className="hidden sm:inline"> more</span>
-                    </button>
-                  )}
-                </div>
+      <div className="ds-cal-head" aria-hidden>
+        {DAY_NAMES.map((d) => <div key={d}>{d}</div>)}
+      </div>
+      <div key={monthKey} className={cn('ds-cal-grid', dir.current < 0 ? 'from-left' : dir.current > 0 ? 'from-right' : '')}>
+        {days.map((day, idx) => {
+          const dayEvents = eventsForDay(day)
+          const inMonth = isSameMonth(day, viewDate)
+          const isToday = isSameDay(day, today)
+          const visible = dayEvents.slice(0, 3)
+          const overflow = dayEvents.length - visible.length
+          return (
+            <div key={idx} onClick={(e) => { markSheetOrigin(e.currentTarget); onCreate(day) }}
+              className={cn(inMonth ? 'ds-dcard' : 'ds-dout')} style={{ animationDelay: `${Math.min(idx, 34) * 9}ms` }}>
+              <div className="ds-day-top">
+                <span className={cn('ds-day-n', isToday && 'today')}>{format(day, 'd')}</span>
+                <Ms name="add" className="ds-day-add" style={{ fontSize: 16, width: 16 }} />
               </div>
-            )
-          })}
-        </div>
+              <div className="ds-day-posts">
+                {visible.map((event) => (
+                  <EventChip key={event.id} event={event} onClick={(e) => { e.stopPropagation(); onSelect(event) }} />
+                ))}
+                {overflow > 0 && (
+                  <button type="button" onClick={(e) => { e.stopPropagation(); markSheetOrigin(e.currentTarget.closest('.ds-dcard, .ds-dout')); onMore(day) }} className="ds-day-more">
+                    {overflow}<span className="hidden sm:inline"> more</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
-
-      <div className="flex items-center gap-x-4 gap-y-1 mt-4 flex-wrap" style={{ fontSize: 12, color: 'var(--faint)' }}>
-        {TYPES.map((t) => <span key={t}><b className="font-semibold mr-1" style={{ color: 'var(--soft-text)' }}>{t.slice(0, 1)}</b>{t}</span>)}
-        <span className="w-px h-3" style={{ background: 'var(--line)' }} />
-        {STATUSES.map((s) => <span key={s}>{s}</span>)}
-        <span className="ml-auto inline-flex items-center gap-1"><Icon name="local_fire_department" className="text-orange-500" /> Double Down</span>
-      </div>
-    </>
+    </div>
   )
 }

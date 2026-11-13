@@ -17,7 +17,7 @@ type ConversationId = string | null
 function roleColor(role?: string) {
   if (role === 'admin') return 'bg-violet-500'
   if (role === 'team') return 'bg-teal-500'
-  return 'bg-indigo-500'
+  return 'bg-violet-500'
 }
 
 function getInitial(name?: string) {
@@ -169,7 +169,7 @@ export default function ClientMessages() {
                         isActive ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
                       )}
                     >
-                      <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-violet-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
                         DM
                       </div>
                       <div className="flex-1 min-w-0">

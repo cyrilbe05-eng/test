@@ -58,7 +58,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       viewingAs="client"
       footer={canCreate ? (close) => (
         <Link to="/workspace/new" onClick={close} className="ds-primary justify-center" style={{ width: '100%' }}>
-          <Ms name="add" style={{ color: '#fff' }} />New video
+          <Ms name="add" style={{ color: 'inherit' }} />New video
         </Link>
       ) : undefined}
     >

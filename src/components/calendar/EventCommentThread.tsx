@@ -7,7 +7,7 @@ import type { CalendarEventComment, UserRole } from '@/types'
 
 const ROLE_STYLES: Record<UserRole, string> = {
   admin:  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-  team:   'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  team:   'bg-zinc-100 text-zinc-700 dark:bg-zinc-900/30 dark:text-zinc-300',
   client: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
 }
 

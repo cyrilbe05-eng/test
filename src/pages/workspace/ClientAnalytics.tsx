@@ -121,9 +121,9 @@ export default function ClientAnalytics() {
   }
   const STATUS_COLORS: Record<string, string> = {
     pending_assignment: 'bg-yellow-400',
-    in_progress: 'bg-blue-500',
+    in_progress: 'bg-zinc-500',
     in_review: 'bg-purple-500',
-    admin_approved: 'bg-indigo-500',
+    admin_approved: 'bg-violet-500',
     client_reviewing: 'bg-orange-500',
     client_approved: 'bg-green-500',
     revision_requested: 'bg-red-500',

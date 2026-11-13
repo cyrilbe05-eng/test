@@ -1,21 +1,24 @@
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { PostedToggle } from './PostedToggle'
-import { calendarLabel } from '@/lib/calendarLabel'
-import { cn } from '@/lib/utils'
+import { calName, calStatus } from '@/lib/calStatus'
 import type { CalendarEvent } from '@/types'
 
 /** A project's calendar entry: its date, where it stands, and a way into the
  *  project. (Script entries keep their own editable window.) */
 export function ProjectEntryModal({ event, onClose, projectBase }: { event: CalendarEvent; onClose: () => void; projectBase: string }) {
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+    <div className="ds-cal-veil" onClick={onClose}>
+      <div className="ds-cal-sheet max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 pt-6 pb-4 flex items-start gap-3">
-          <span className={cn('w-3 h-3 rounded-full mt-2 flex-shrink-0', event.color ?? 'bg-slate-500')} aria-hidden />
-          <h2 className="text-lg font-heading font-semibold min-w-0 break-words">{calendarLabel(event)}</h2>
+          <span aria-hidden className="ds-dot mt-2.5" style={{ '--sd-d': calStatus(event).colors[0], '--sh-d': calStatus(event).colors[0] + '26', '--sd-l': calStatus(event).colors[1], '--sh-l': calStatus(event).colors[1] + '26', width: 8, height: 8, borderRadius: 999, flex: 'none' } as React.CSSProperties} />
+          <h2 className="text-lg font-heading font-semibold min-w-0 break-words">{calName(event)}</h2>
         </div>
         <div className="px-6 pb-4 space-y-3 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Status</span>
+            <span>{calStatus(event).label}</span>
+          </div>
           <div className="flex items-center justify-between gap-3">
             <span className="text-muted-foreground">Date</span>
             <span>{format(parseISO(event.date), 'd MMMM yyyy')}</span>

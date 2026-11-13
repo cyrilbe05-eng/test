@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 export function UserAvatar({ name, src, size = 30 }: { name?: string | null; src?: string | null; size?: number }) {
   if (src) return <img src={src} alt="" width={size} height={size} className="rounded-full object-cover flex-none" style={{ width: size, height: size }} />
   return (
-    <span className="grid place-items-center rounded-full text-white flex-none" style={{ width: size, height: size, background: 'var(--ds-accent)', fontSize: Math.round(size * 0.43), fontWeight: 600 }}>
+    <span className="grid place-items-center rounded-full flex-none" style={{ width: size, height: size, background: 'var(--avatar-bg)', color: 'var(--avatar-fg)', fontSize: Math.round(size * 0.43), fontWeight: 600 }}>
       {name?.charAt(0)}
     </span>
   )

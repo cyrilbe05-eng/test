@@ -51,7 +51,7 @@ function ClientView({ client, brief, back }: { client?: Profile; brief: Brief; b
             <ol>
               {brief.sops.map((s, i) => (
                 <li key={s} className="flex gap-4 py-3" style={{ borderTop: i ? '1px solid var(--line)' : 0 }}>
-                  <span className="tabular-nums flex-none" style={{ width: 20, fontSize: 12, fontWeight: 600, color: 'var(--ds-accent)', paddingTop: 2 }}>{String(i + 1).padStart(2, '0')}</span>
+                  <span className="tabular-nums flex-none" style={{ width: 20, fontSize: 12, fontWeight: 600, color: 'var(--faint)', paddingTop: 2 }}>{String(i + 1).padStart(2, '0')}</span>
                   <span className="break-words min-w-0" style={{ fontSize: 14, lineHeight: 1.5 }}>{s}</span>
                 </li>
               ))}

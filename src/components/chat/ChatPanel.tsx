@@ -56,7 +56,7 @@ function Avatar({
   const roleColor: Record<string, string> = {
     client: 'bg-green-500/25 text-green-400',
     admin:  'bg-purple-500/25 text-purple-400',
-    team:   'bg-blue-500/25 text-blue-400',
+    team:   'bg-zinc-500/25 text-zinc-400',
   }
   const base = roleColor[role ?? ''] ?? 'bg-muted text-muted-foreground'
   const sz = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'

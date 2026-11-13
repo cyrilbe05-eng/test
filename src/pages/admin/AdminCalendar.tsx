@@ -23,7 +23,7 @@ import { useApiFetch } from '@/lib/api'
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
 import { ProjectEntryModal } from '@/components/calendar/ProjectEntryModal'
 import { MonthView } from '@/components/calendar/MonthView'
-import { Icon, Segmented } from '@/components/ds'
+import { Icon } from '@/components/ds'
 import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus, Profile } from '@/types'
@@ -107,8 +107,8 @@ function CreateEventModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 overflow-y-auto" style={{ maxHeight: '90vh' }}>
+    <div className="ds-cal-veil">
+      <div className="ds-cal-sheet max-w-lg p-6 space-y-4 overflow-y-auto" style={{ maxHeight: '90vh' }}>
         <h2 className="font-heading font-semibold text-lg">New Event</h2>
         <div className="space-y-3">
           <div>
@@ -182,7 +182,7 @@ function CreateEventModal({
               <label className="text-xs text-muted-foreground mb-1.5 block">Assign Team</label>
               <div className="flex flex-wrap gap-1.5">
                 {teamMembers.map((m) => (
-                  <button key={m.id} onClick={() => setAssignedTeamIds(toggleId(assignedTeamIds, m.id))} className={cn('flex items-center gap-1 px-2.5 py-1 rounded-full ds-chip text-xs font-medium border transition-all', assignedTeamIds.includes(m.id) ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-muted text-muted-foreground border-border hover:border-indigo-400 hover:text-indigo-600')}>
+                  <button key={m.id} onClick={() => setAssignedTeamIds(toggleId(assignedTeamIds, m.id))} className={cn('flex items-center gap-1 px-2.5 py-1 rounded-full ds-chip text-xs font-medium border transition-all', assignedTeamIds.includes(m.id) ? 'bg-violet-500 text-white border-violet-500' : 'bg-muted text-muted-foreground border-border hover:border-violet-400 hover:text-violet-600')}>
                     {assignedTeamIds.includes(m.id) && <span className="text-[9px]">✓</span>}
                     {m.full_name}
                   </button>
@@ -299,8 +299,8 @@ function EventModal({
   if (!isManual) return <ProjectEntryModal event={event} onClose={onClose} projectBase="/admin/projects" />
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '90vh' }}>
+    <div className="ds-cal-veil">
+      <div className="ds-cal-sheet max-w-lg flex flex-col" style={{ maxHeight: '90vh' }}>
         {/* Header */}
         <div className="px-6 pt-6 pb-3 flex-shrink-0 border-b border-border">
           <div className="flex items-center gap-2 mb-1">
@@ -407,7 +407,7 @@ function EventModal({
                       <button
                         key={m.id}
                         onClick={() => setAssignedTeamIds(toggleId(assignedTeamIds, m.id))}
-                        className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full ds-chip text-[11px] font-medium border transition-all', assignedTeamIds.includes(m.id) ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-muted text-muted-foreground border-border hover:border-indigo-400 hover:text-indigo-600')}
+                        className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full ds-chip text-[11px] font-medium border transition-all', assignedTeamIds.includes(m.id) ? 'bg-violet-500 text-white border-violet-500' : 'bg-muted text-muted-foreground border-border hover:border-violet-400 hover:text-violet-600')}
                       >
                         {assignedTeamIds.includes(m.id) && <span className="text-[9px]">✓</span>}
                         {m.full_name}
@@ -420,7 +420,7 @@ function EventModal({
                     {assignedTeamIds.length > 0
                       ? assignedTeamIds.map((id) => {
                           const m = teamMembers.find((x) => x.id === id)
-                          return m ? <span key={id} className="px-2 py-0.5 rounded-full ds-tag text-[11px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40">{m.full_name}</span> : null
+                          return m ? <span key={id} className="px-2 py-0.5 rounded-full ds-tag text-[11px] font-medium bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-300/40">{m.full_name}</span> : null
                         })
                       : <span className="text-xs text-muted-foreground">—</span>
                     }
@@ -538,13 +538,7 @@ export default function AdminCalendar() {
       <main className="px-4 md:px-7 pb-10">
         <MonthView viewDate={viewDate} onMonth={setViewDate} days={days} eventsForDay={eventsForDay}
           onCreate={setCreateDay} onSelect={setSelectedEvent} onMore={setDayDetail}
-          filters={<>
-      <Segmented label="Type" width={84} value={filterType} onChange={(v) => setFilterType(filterType === v ? 'all' : v)}
-      options={[{ value: 'all', label: 'All types' }, ...CONTENT_TYPES.map((t) => ({ value: t, label: t }))]} />
-      <div className="w-px h-5 bg-border flex-none" />
-      <Segmented label="Status" width={88} value={filterStatus} onChange={(v) => setFilterStatus(filterStatus === v ? 'all' : v)}
-      options={[{ value: 'all', label: 'All statuses' }, ...CONTENT_STATUSES.map((t) => ({ value: t, label: t }))]} />
-          </>} />
+          type={filterType} onType={setFilterType} status={filterStatus} onStatus={setFilterStatus} />
       </main>
 
       {createDay && (
@@ -559,7 +553,7 @@ export default function AdminCalendar() {
         <DayEventsModal
           day={dayDetail}
           events={eventsForDay(dayDetail)}
-          onSelect={(event) => { setDayDetail(null); setSelectedEvent(event) }}
+          onSelect={(event) => setSelectedEvent(event)}
           onClose={() => setDayDetail(null)}
         />
       )}

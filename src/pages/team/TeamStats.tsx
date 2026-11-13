@@ -18,9 +18,9 @@ const STATUS_LABELS: Record<ProjectStatus, string> = {
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   pending_assignment: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  in_progress: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  in_progress: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-400',
   in_review: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  admin_approved: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+  admin_approved: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400',
   client_reviewing: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
   client_approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   revision_requested: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',

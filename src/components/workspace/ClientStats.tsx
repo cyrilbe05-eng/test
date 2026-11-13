@@ -35,7 +35,7 @@ export function ClientStats({ projects }: { projects: Project[] }) {
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <Stat label="Active videos" value={projects.length - done} icon={VIDEO} color="bg-primary/10 text-primary" />
       <Stat label="Completed" value={done} icon={CHECK} color="bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400" />
-      <Stat label="All videos" value={projects.length} icon={VIDEO} color="bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400" />
+      <Stat label="All videos" value={projects.length} icon={VIDEO} color="bg-zinc-50 text-zinc-700 dark:bg-zinc-500/10 dark:text-zinc-400" />
       <Stat label="Time Saved" value={data ? `${data.total}h` : '—'} icon={CLOCK} color="bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" />
     </div>
   )

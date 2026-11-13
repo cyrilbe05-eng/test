@@ -6,8 +6,18 @@
 .ds {
   --spring: cubic-bezier(.34,1.4,.64,1);
   --out: cubic-bezier(.16,1,.3,1);
-  --ds-accent: #5E72E4;
-  --ds-accent-h: #6578E6;
+  /* Neutral accent (DESIGN.md §3): near-black in light, near-white in dark. */
+  --ds-accent: #16161A;
+  --ds-accent-h: #000000;
+  --accent-fg: #FFFFFF;
+  --focus: rgba(0,0,0,.45);
+  --drop: rgba(0,0,0,.03);
+  --drop-ring: rgba(0,0,0,.12);
+  --avatar-bg: #E4E4E8;
+  --avatar-fg: #1A1A1E;
+  --fab: #FFFFFF;
+  --today-bg: #16161A;
+  --today-fg: #FFFFFF;
   /* light */
   --bg:#F5F5F7;--line:rgba(0,0,0,.06);--text:#1A1A1E;--strong:#0B0B0D;--ds-muted:#5F5F67;--faint:#6E6E76;--soft-text:#3A3A40;--nav:#5F5F67;--hover:rgba(0,0,0,.04);--active:rgba(0,0,0,.055);--field:#FFFFFF;--ds-ring:rgba(0,0,0,.07);--seg-on:#FFFFFF;--seg-shadow:0 1px 3px rgba(0,0,0,.1),0 0 0 1px rgba(0,0,0,.04);--card-a:#FFFFFF;--card-b:#FFFFFF;--card-sh:inset 0 0 0 1px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04),0 6px 16px -12px rgba(0,0,0,.18);--card-sh-h:inset 0 0 0 1px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04),0 22px 40px -20px rgba(0,0,0,.28);--sheen:rgba(255,255,255,0);--sheet-a:#FFFFFF;--sheet-b:#FBFBFC;--sheet-sh:inset 0 0 0 1px rgba(0,0,0,.06),0 40px 80px -24px rgba(0,0,0,.3);--veil:rgba(20,20,26,.22);--panel:#F5F5F7;--panel-ring:rgba(0,0,0,.05);--track:rgba(0,0,0,.07);--pill:rgba(0,0,0,.05);--pill-h:rgba(0,0,0,.09);--slot:rgba(0,0,0,.1);--dash:#B4B4BB;--ms:#6E6E76;--ms-h:#2A2A30;--ms-on:#0B0B0D;--profile:#FFFFFF;--car-t:#9A5E0C;--car-b:rgba(224,154,45,.13);--ghost:rgba(0,0,0,.05);--ghost-h:rgba(0,0,0,.09);--scroll:rgba(0,0,0,.12);
   color-scheme: light;
@@ -19,6 +29,7 @@
 }
 html.dark .ds {
   --bg:#0E0E10;--line:rgba(255,255,255,.05);--text:#ECECEF;--strong:#FFFFFF;--ds-muted:#9A9AA2;--faint:#7F7F87;--soft-text:#C4C4CA;--nav:#8F8F97;--hover:rgba(255,255,255,.05);--active:rgba(255,255,255,.055);--field:#18181B;--ds-ring:rgba(255,255,255,.05);--seg-on:#2A2A2F;--seg-shadow:0 1px 3px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08);--card-a:#1B1B1F;--card-b:#161619;--card-sh:inset 0 1px 0 rgba(255,255,255,.06),inset 0 0 0 1px rgba(255,255,255,.04),0 1px 2px rgba(0,0,0,.4),0 8px 20px -14px rgba(0,0,0,.8);--card-sh-h:inset 0 1px 0 rgba(255,255,255,.08),inset 0 0 0 1px rgba(255,255,255,.07),0 2px 4px rgba(0,0,0,.4),0 22px 40px -18px rgba(0,0,0,.9);--sheen:rgba(255,255,255,.07);--sheet-a:#1E1E23;--sheet-b:#17171A;--sheet-sh:inset 0 1px 0 rgba(255,255,255,.08),inset 0 0 0 1px rgba(255,255,255,.06),0 40px 80px -20px rgba(0,0,0,.85);--veil:rgba(6,6,8,.55);--panel:rgba(255,255,255,.03);--panel-ring:rgba(255,255,255,.05);--track:rgba(255,255,255,.07);--pill:rgba(255,255,255,.05);--pill-h:rgba(255,255,255,.1);--slot:rgba(255,255,255,.07);--dash:#4E4E55;--ms:#7F7F87;--ms-h:#C4C4CA;--ms-on:#FFFFFF;--profile:#151518;--car-t:#F2C27A;--car-b:rgba(242,194,122,.1);--ghost:rgba(255,255,255,.06);--ghost-h:rgba(255,255,255,.1);--scroll:rgba(255,255,255,.07);
+  --ds-accent: #F2F2F3;--ds-accent-h: #FFFFFF;--accent-fg: #0E0E10;--focus: rgba(255,255,255,.5);--drop: rgba(255,255,255,.035);--drop-ring: rgba(255,255,255,.14);--avatar-bg: #2C2C31;--avatar-fg: #ECECEF;--fab: #1C1C20;--today-bg: #FFFFFF;--today-fg: #0E0E10;
   color-scheme: dark;
 }
 :where(.ds) button { font: inherit; }
@@ -36,7 +47,7 @@ html.dark .ds {
 .ds-nav.on{color:var(--strong)}
 .ds-nav:hover .ds-ms{color:var(--ms-h);transform:translateX(1px)}
 .ds-nav.on .ds-ms{color:var(--ms-on);font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 20}
-.ds-nav:focus-visible{outline:2px solid var(--ds-accent);outline-offset:1px}
+.ds-nav:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .ds-sep{height:17px}
 
 /* ── Segmented control ── */
@@ -44,13 +55,13 @@ html.dark .ds {
 .ds-seg-ind{position:absolute;top:3px;left:3px;width:var(--sw,76px);height:30px;border-radius:8px;background:var(--seg-on);box-shadow:var(--seg-shadow);transition:transform .5s var(--spring)}
 .ds-seg button{position:relative;z-index:1;flex:none;white-space:nowrap;width:var(--sw,76px);height:30px;border:0;background:transparent;color:var(--nav);font-size:13px;cursor:pointer;transition:color .25s}
 .ds-seg button.on{color:var(--strong)}
-.ds-seg button:focus-visible{outline:2px solid var(--ds-accent);border-radius:8px}
+.ds-seg button:focus-visible{outline:2px solid var(--focus);border-radius:8px}
 
 /* ── Buttons ── */
-.ds-primary{height:38px;padding:0 16px 0 13px;border:0;border-radius:10px;background:var(--ds-accent);color:#fff !important;font-size:13.5px;font-weight:500;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;text-decoration:none;box-shadow:0 1px 0 rgba(255,255,255,.1) inset,0 2px 6px -2px rgba(0,0,0,.25);transition:transform .35s var(--spring),box-shadow .35s,background .25s}
-.ds-primary:hover{transform:translateY(-1px);background:var(--ds-accent-h);box-shadow:0 1px 0 rgba(255,255,255,.12) inset,0 6px 14px -8px rgba(94,114,228,.45)}
+.ds-primary{height:38px;padding:0 16px 0 13px;border:0;border-radius:10px;background:var(--ds-accent);color:var(--accent-fg) !important;font-size:13.5px;font-weight:500;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .35s var(--spring),box-shadow .35s,background .25s}
+.ds-primary:hover{transform:translateY(-1px);background:var(--ds-accent-h);box-shadow:0 6px 14px -8px rgba(0,0,0,.5)}
 .ds-primary:active{transform:scale(.96)}
-.ds-primary:focus-visible,.ds-ghost-btn:focus-visible,.ds-ibtn:focus-visible{outline:2px solid var(--ds-accent);outline-offset:2px}
+.ds-primary:focus-visible,.ds-ghost-btn:focus-visible,.ds-ibtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .ds-ghost-btn{height:38px;padding:0 14px;border:0;border-radius:10px;background:var(--ghost);color:var(--text);font-size:13.5px;font-weight:500;cursor:pointer;transition:background .2s,transform .35s var(--spring)}
 .ds-ghost-btn:hover{background:var(--ghost-h)}
 .ds-ghost-btn:active{transform:scale(.96)}
@@ -62,7 +73,7 @@ html.dark .ds {
 
 /* ── Search ── */
 .ds-find{display:flex;align-items:center;gap:9px;height:38px;width:230px;padding:0 12px;border-radius:10px;background:var(--field);box-shadow:inset 0 0 0 1px var(--ds-ring);color:var(--faint);transition:width .5s var(--out),box-shadow .25s}
-.ds-find:focus-within{width:300px;box-shadow:inset 0 0 0 1px rgba(94,114,228,.6),0 0 0 4px rgba(94,114,228,.12)}
+.ds-find:focus-within{width:300px;box-shadow:inset 0 0 0 1px var(--focus),0 0 0 4px var(--drop)}
 .ds-find input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);font:inherit;font-size:13.5px}
 .ds-find input::placeholder{color:var(--faint)}
 .ds-find input::-webkit-search-cancel-button{display:none}
@@ -75,7 +86,7 @@ html.dark .ds {
 .ds-lanes::-webkit-scrollbar{height:8px}
 .ds-lanes::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:8px}
 .ds-lane{flex:0 0 292px;display:flex;flex-direction:column;gap:10px;padding:8px;border-radius:18px;transition:background .35s var(--out),box-shadow .35s}
-.ds-lane.over{background:rgba(94,114,228,.07);box-shadow:inset 0 0 0 1px rgba(94,114,228,.28)}
+.ds-lane.over{background:var(--drop);box-shadow:inset 0 0 0 1px var(--drop-ring)}
 .ds-lane-head{display:flex;align-items:center;gap:9px;height:34px;padding:0 8px;animation:ds-fade .6s var(--out) backwards}
 .ds-card{--rx:0deg;--ry:0deg;--mx:50%;--my:50%;position:relative;display:flex;flex-direction:column;gap:14px;padding:15px 16px 14px;border-radius:14px;background:linear-gradient(180deg,var(--card-a),var(--card-b));box-shadow:var(--card-sh);transform:perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));transition:transform .7s var(--out),opacity .25s;cursor:grab;animation:ds-rise .7s var(--out) backwards}
 .ds-card::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:var(--card-sh-h);opacity:0;transition:opacity .45s var(--out)}
@@ -87,16 +98,16 @@ html.dark .ds {
 .ds-card.ghost{opacity:.3;transform:scale(.97)}
 .ds-card.landed{animation:ds-rise .7s var(--out) both}
 .ds-hit{position:absolute;inset:0;border:0;padding:0;background:transparent;border-radius:14px;cursor:inherit;z-index:2}
-.ds-hit:focus-visible{outline:2px solid var(--ds-accent);outline-offset:2px}
+.ds-hit:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .ds-slot{height:84px;border-radius:14px;border:1.5px dashed var(--slot);display:grid;place-items:center;color:var(--faint);font-size:12.5px;transition:all .35s var(--out)}
-.ds-lane.over .ds-slot{border-color:rgba(94,114,228,.5);color:var(--ds-accent)}
+.ds-lane.over .ds-slot{border-color:var(--focus);color:var(--strong)}
 @keyframes ds-rise{from{opacity:0;transform:perspective(900px) translateY(14px) scale(.96)}to{opacity:1}}
 @keyframes ds-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ── List view ── */
 .ds-lrow{all:unset;box-sizing:border-box;display:grid;grid-template-columns:minmax(220px,2.4fr) minmax(150px,1.4fr) minmax(150px,1.3fr) minmax(150px,1.3fr) 90px;gap:16px;align-items:center;height:52px;padding:0 20px;border-radius:12px;cursor:pointer;font-size:13.5px;transition:background .2s;animation:ds-fade .5s var(--out) backwards}
 .ds-lrow:hover{background:var(--hover)}
-.ds-lrow:focus-visible{outline:2px solid var(--ds-accent)}
+.ds-lrow:focus-visible{outline:2px solid var(--focus)}
 
 /* ── Sheet (modal) ── */
 .ds-veil{position:fixed;inset:0;z-index:60;background:var(--veil);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:ds-veil-in .4s var(--out) both}
@@ -115,7 +126,7 @@ html.dark .ds {
 .ds-track{position:relative;height:4px;border-radius:4px;background:var(--track);overflow:hidden}
 .ds-track i{position:absolute;inset:0 auto 0 0;border-radius:4px;transition:width .8s var(--spring),background .4s}
 .ds-field{width:100%;height:40px;padding:0 12px;border:0;border-radius:10px;background:var(--field);box-shadow:inset 0 0 0 1px var(--ds-ring);color:var(--text);font:inherit;font-size:13.5px;outline:0;transition:box-shadow .25s}
-.ds-field:focus{box-shadow:inset 0 0 0 1px rgba(94,114,228,.6),0 0 0 4px rgba(94,114,228,.12)}
+.ds-field:focus{box-shadow:inset 0 0 0 1px var(--focus),0 0 0 4px var(--drop)}
 textarea.ds-field{height:auto;padding:10px 12px;resize:none}
 
 /* ── Home panels ── */
@@ -130,7 +141,7 @@ html.dark .ds{--bad:#F2766B;--bad-b:rgba(242,118,107,.12);--warn:#F2B35B}
 .ds-count.bad{color:var(--bad)}
 .ds-hrow{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;min-height:52px;margin:0 -10px;padding:6px 10px;border-radius:10px;cursor:pointer;transition:background .2s}
 .ds-hrow:hover{background:var(--hover)}
-.ds-hrow:focus-visible{outline:2px solid var(--ds-accent)}
+.ds-hrow:focus-visible{outline:2px solid var(--focus)}
 .ds-t{font-size:13.5px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ds-s{font-size:12.5px;color:var(--ds-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ds-empty{padding:4px 0 8px;font-size:13px;color:var(--faint)}
@@ -147,7 +158,7 @@ html.dark .ds{--bad:#F2766B;--bad-b:rgba(242,118,107,.12);--warn:#F2B35B}
 .ds-num{padding:0 !important;border:0 !important;background:none !important;box-shadow:none !important;font-variant-numeric:tabular-nums}
 .ds-chip{display:inline-flex !important;align-items:center;gap:6px;height:30px;padding:0 11px !important;border:0 !important;border-radius:8px !important;background:var(--ghost,rgba(0,0,0,.05)) !important;color:var(--soft-text,inherit) !important;font-weight:500 !important;transition:background .2s,color .2s !important}
 .ds-chip:hover{background:var(--ghost-h,rgba(0,0,0,.09)) !important}
-.ds-chip.text-white{background:rgba(94,114,228,.14) !important;color:var(--ds-accent,#5E72E4) !important}
+.ds-chip.text-white{background:var(--ds-accent) !important;color:var(--accent-fg) !important}
 @media (max-width:767px){.ds-chip{height:44px}}
 /* Dark mode: deep text tones would be too dark on the near-black page. */
 html.dark .ds-tag[class*="text-green-"],html.dark .ds-tag[class*="text-emerald-"]{color:#6FD3A2 !important}
@@ -155,7 +166,7 @@ html.dark .ds-tag[class*="text-red-"],html.dark .ds-tag[class*="text-rose-"]{col
 html.dark .ds-tag[class*="text-amber-"],html.dark .ds-tag[class*="text-yellow-"]{color:#F2B35B !important}
 html.dark .ds-tag[class*="text-orange-"]{color:#FF9F80 !important}
 html.dark .ds-tag[class*="text-blue-"],html.dark .ds-tag[class*="text-sky-"]{color:#7FA8FF !important}
-html.dark .ds-tag[class*="text-indigo-"]{color:#9FAEFF !important}
+html.dark .ds-tag[class*="text-indigo-"]{color:#C9B6F2 !important}
 html.dark .ds-tag[class*="text-violet-"],html.dark .ds-tag[class*="text-purple-"]{color:#C9A2FF !important}
 html.dark .ds-tag[class*="text-teal-"],html.dark .ds-tag[class*="text-cyan-"]{color:#4CC9A6 !important}
 /* Phones: segmented controls are 44px tall to tap. */
@@ -180,54 +191,84 @@ html.dark .clay-card[data-tilt]:hover::after{opacity:1}
 /* ── One title style everywhere (the Projects page's) ── */
 .ds h1{font-size:24px !important;line-height:1.2;font-weight:650 !important;letter-spacing:-.025em !important;color:var(--strong)}
 
-/* ── Month calendar (MonthView) ── */
-.ds-month{border-radius:16px;background:linear-gradient(180deg,var(--card-a),var(--card-b));box-shadow:var(--card-sh);overflow:hidden;animation:ds-fade .6s var(--out) backwards}
-.ds-month-head{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
-.ds-month-head>div{padding:11px 12px 9px;font-size:11.5px;font-weight:500;color:var(--faint)}
-.ds-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));animation:ds-month-in .45s var(--out) both}
-@keyframes ds-month-in{from{opacity:0;transform:translateX(calc(var(--dir,0) * 14px))}to{opacity:1;transform:none}}
-.ds-day{position:relative;min-height:136px;padding:8px 8px 6px;border-top:1px solid var(--line);border-left:1px solid var(--line);cursor:pointer;transition:background .2s}
-.ds-day:nth-child(7n+1){border-left:0}
-.ds-day.weekend{background:var(--panel)}
-html.dark .ds-day.weekend{background:rgba(255,255,255,.015)}
-.ds-day:hover{background:var(--hover)}
-.ds-day.out .ds-day-n{color:var(--dash)}
-.ds-day.out .ds-entry{opacity:.55}
-.ds-day-top{display:flex;align-items:center;justify-content:space-between;height:24px;margin-bottom:4px;padding-left:2px}
-.ds-day-n{display:grid;place-items:center;min-width:24px;height:24px;padding:0 4px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--soft-text);font-variant-numeric:tabular-nums}
-.ds-day-n.today{background:var(--ds-accent);color:#fff}
+/* ── Calendar (DESIGN.md §6 Calendar) ── */
+.ds-cal-head,.ds-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.ds-cal-head{margin-bottom:8px}
+.ds-cal-head>div{padding:0 4px;font-size:12.5px;color:var(--faint)}
+.ds-cal-grid.from-right{animation:ds-cal-r .55s var(--out) both}
+.ds-cal-grid.from-left{animation:ds-cal-l .55s var(--out) both}
+@keyframes ds-cal-r{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes ds-cal-l{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+/* Each day is a raised card: same gradient, shadow, hover shadow, sheen and tilt as project cards. */
+.ds-dcard,.ds-dout{position:relative;min-height:128px;padding:9px 9px 8px;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;min-width:0}
+.ds-dcard{--rx:0deg;--ry:0deg;--mx:50%;--my:50%;background:linear-gradient(180deg,var(--card-a),var(--card-b));box-shadow:var(--card-sh);transform:perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry));transition:transform .7s var(--out);animation:ds-rise .6s var(--out) backwards}
+.ds-dcard::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:var(--card-sh-h);opacity:0;transition:opacity .45s var(--out)}
+.ds-dcard::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(200px circle at var(--mx) var(--my),var(--sheen),transparent 65%);opacity:0;transition:opacity .4s}
+.ds-dcard:hover{transition:transform .18s ease-out;will-change:transform}
+.ds-dcard:hover::before,.ds-dcard:hover::after{opacity:1}
+.ds-dout{background:transparent;box-shadow:inset 0 0 0 1px var(--ds-ring)}
+.ds-dout .ds-day-n{opacity:.6}
+.ds-day-top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;height:24px;margin-bottom:6px}
+.ds-day-n{display:grid;place-items:center;min-width:24px;height:24px;padding:0 5px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--soft-text);font-variant-numeric:tabular-nums}
+.ds-day-n.today{background:var(--today-bg);color:var(--today-fg)}
 .ds-day-add{opacity:0;color:var(--faint);transition:opacity .2s,transform .35s var(--spring)}
-.ds-day:hover .ds-day-add{opacity:1;transform:rotate(90deg)}
-.ds-entry{display:flex;align-items:flex-start;gap:7px;width:100%;padding:4px 6px;border-radius:7px;text-align:left;transition:background .2s}
-.ds-entry:hover{background:var(--hover)}
-html.dark .ds-entry:hover{background:rgba(255,255,255,.06)}
-.ds-entry-dot{flex:none;width:7px;height:7px;margin-top:5px;border-radius:50%}
-.ds-entry-t{min-width:0;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;font-weight:500;line-height:17px;color:var(--text)}
-.ds-entry-s{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;line-height:14px;color:var(--faint)}
-.ds-day-more{padding:2px 6px;font-size:11.5px;font-weight:500;color:var(--faint);border-radius:6px}
-.ds-day-more:hover{color:var(--text);background:var(--hover)}
+.ds-dcard:hover .ds-day-add,.ds-dout:hover .ds-day-add{opacity:1;transform:rotate(90deg)}
+.ds-day-posts{position:relative;z-index:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+/* Posts: mini raised chips. */
+.ds-post{display:flex;align-items:center;gap:7px;width:100%;height:24px;padding:0 8px;border:0;border-radius:8px;text-align:left;cursor:pointer;
+  background:linear-gradient(180deg,var(--chip-a),var(--chip-b));box-shadow:inset 0 1px 0 var(--chip-hi),0 1px 1px rgba(0,0,0,.08),0 0 0 1px var(--ds-ring);
+  transition:transform .3s var(--spring)}
+.ds-post:hover{transform:translateY(-1px)}
+.ds-post:active{transform:scale(.97)}
+.ds-post:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.ds-post-t{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;font-weight:500;color:var(--text)}
+.ds-day-more{align-self:flex-start;padding:1px 4px;border:0;background:none;font-size:12px;font-weight:500;color:var(--faint);border-radius:6px;cursor:pointer}
+.ds-day-more:hover{color:var(--text)}
+.ds{--chip-a:#FFFFFF;--chip-b:#F7F7F9;--chip-hi:rgba(255,255,255,.9)}
+html.dark .ds{--chip-a:#26262B;--chip-b:#202024;--chip-hi:rgba(255,255,255,.06)}
 @media (max-width:639px){
-  .ds-month-head>div{padding:9px 0;text-align:center}
-  .ds-day{min-height:84px;padding:5px 3px}
-  .ds-day-top{justify-content:center;padding:0}
+  .ds-cal-head,.ds-cal-grid{gap:4px}
+  .ds-cal-head>div{text-align:center;padding:0}
+  .ds-dcard,.ds-dout{min-height:76px;padding:5px 3px;border-radius:10px;align-items:center}
+  .ds-day-top{justify-content:center;margin-bottom:4px}
   .ds-day-add{display:none}
-  .ds-entry{width:22px;height:22px}
-  .ds-entry-dot{margin:0}
+  .ds-day-posts{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:3px}
+  .ds-post{width:18px;height:18px;padding:0;justify-content:center;border-radius:6px}
+  .ds-post-t,.ds-post-x{display:none !important}
 }
+
+/* ── Filter dropdowns (DESIGN.md §6 Filters) ── */
+.ds-tool{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 10px 0 12px;border:0;border-radius:10px;background:var(--field);box-shadow:inset 0 0 0 1px var(--ds-ring);color:var(--text);font-size:13.5px;cursor:pointer;white-space:nowrap;transition:box-shadow .25s}
+.ds-tool:hover,.ds-tool.on{box-shadow:inset 0 0 0 1px var(--focus)}
+.ds-tool:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.ds-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:200px;padding:6px;border-radius:14px;background:linear-gradient(180deg,var(--sheet-a),var(--sheet-b));box-shadow:var(--sheet-sh);transform-origin:top right;animation:ds-menu-in .28s var(--out) both}
+@keyframes ds-menu-in{from{opacity:0;transform:scale(.97) translateY(-4px)}to{opacity:1;transform:none}}
+.ds-menu-item{display:flex;align-items:center;gap:10px;width:100%;height:36px;padding:0 10px;border:0;border-radius:9px;background:none;color:var(--text);font-size:13.5px;text-align:left;cursor:pointer}
+.ds-menu-item:hover{background:var(--hover)}
+.ds-menu-sep{height:1px;margin:6px 4px;background:var(--line)}
+.ds-menu-note{display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;font-size:12.5px;color:var(--faint)}
+@media (max-width:767px){.ds-tool{height:44px}.ds-menu-item{height:44px}.ds-menu{right:auto;left:0;transform-origin:top left}}
+
+/* ── Calendar sheets: grow out of what was clicked (DESIGN.md §7) ── */
+.ds-cal-veil{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--veil);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:ds-veil-in .4s var(--out) both}
+.ds-cal-sheet{position:relative;width:100%;border-radius:22px;background:linear-gradient(180deg,var(--sheet-a),var(--sheet-b));box-shadow:var(--sheet-sh);color:var(--text);animation:ds-sheet-grow .6s var(--out) both}
+@keyframes ds-sheet-grow{from{opacity:.2;transform:translate(var(--sheet-dx,0px),var(--sheet-dy,0px)) scale(var(--sheet-s,.96))}to{opacity:1;transform:none}}
+.ds-cal-sheet>*{animation:ds-fade .55s var(--out) backwards}
+.ds-cal-sheet>*:nth-child(2){animation-delay:.06s}.ds-cal-sheet>*:nth-child(3){animation-delay:.12s}.ds-cal-sheet>*:nth-child(4){animation-delay:.18s}
 
 /* ── Editors table (Analytics → Editors) ── */
 .ds-erow{border-top:1px solid var(--line);animation:ds-fade .5s var(--out) backwards}
 .ds-erow:first-child{border-top:0}
 .ds-erow>button{padding:14px 12px;border-radius:12px;transition:background .2s}
 .ds-erow>button:hover{background:var(--hover)}
-.ds-erow>button:focus-visible{outline:2px solid var(--ds-accent)}
+.ds-erow>button:focus-visible{outline:2px solid var(--focus)}
 .ds-erow-more{margin:0 12px 14px 54px;padding:14px 16px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--panel-ring);animation:ds-fade .45s var(--out) both}
 @media (max-width:767px){.ds-erow-more{margin-left:12px}}
 
 /* ── Profile card + menu (bottom of the sidebar) ── */
 .ds-pcard{background:var(--profile);box-shadow:inset 0 0 0 1px var(--ds-ring);transition:background .2s}
 .ds-pcard:hover{background:var(--hover)}
-.ds-pcard:focus-visible{outline:2px solid var(--ds-accent);outline-offset:2px}
+.ds-pcard:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .ds-pmenu{position:fixed;z-index:70;width:min(276px,calc(100vw - 24px));border-radius:16px;background:linear-gradient(180deg,var(--sheet-a),var(--sheet-b));box-shadow:var(--sheet-sh);transform-origin:bottom left;animation:ds-pm-in .32s var(--out) both}
 @keyframes ds-pm-in{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
 .ds-pm-sep{height:1px;background:var(--line)}
@@ -256,3 +297,13 @@ html.theme-in .ds > * { transition: opacity .42s cubic-bezier(.16,1,.3,1) }
   .ds *,.ds *::before,.ds *::after{animation-duration:.01ms !important;animation-delay:0s !important;transition-duration:.01ms !important}
   .ds-card,.clay-card{transform:none !important}
 }
+
+/* ── Neutral accent across the app (DESIGN.md §3) ──
+   Old pages put white text on bg-primary; with the near-white dark-mode
+   primary that text must turn dark. The floating chat button is neutral. */
+html.dark .bg-primary.text-white, html.dark .bg-primary .text-white, html.dark .bg-primary.text-primary-foreground{color:#0E0E10 !important}
+html.dark .bg-primary svg.text-white{color:#0E0E10 !important}
+.ds-fab{width:46px;height:46px;border-radius:999px;background:var(--fab);color:var(--text);box-shadow:inset 0 0 0 1px var(--ds-ring),0 8px 24px -10px rgba(0,0,0,.35);transition:transform .35s var(--spring)}
+.ds-fab:hover{transform:translateY(-2px)}
+.ds-fab:active{transform:scale(.96)}
+.ds-fab:focus-visible{outline:2px solid var(--focus);outline-offset:2px}

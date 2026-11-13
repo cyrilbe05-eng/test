@@ -173,7 +173,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
             <div className={cn(
               'w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold flex-shrink-0',
               user.role === 'client' ? 'bg-green-50 text-green-700' :
-              user.role === 'team' ? 'bg-blue-50 text-blue-700' : 'bg-violet-50 text-violet-700',
+              user.role === 'team' ? 'bg-zinc-50 text-zinc-700' : 'bg-violet-50 text-violet-700',
             )}>
               {user.full_name.charAt(0)}
             </div>
@@ -198,7 +198,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
           <div className="flex items-center gap-2 flex-wrap">
             <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full ds-tag capitalize border', {
               'bg-green-50 text-green-700 border-green-200': user.role === 'client',
-              'bg-blue-50 text-blue-700 border-blue-200': user.role === 'team',
+              'bg-zinc-50 text-zinc-700 border-zinc-200': user.role === 'team',
               'bg-violet-50 text-violet-700 border-violet-200': user.role === 'admin',
             })}>
               {user.role}
@@ -624,7 +624,7 @@ export default function AdminUserManagement() {
                     return (
                       <div key={conn.id} className="flex items-center gap-4 clay-card px-4 py-3">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0', profA?.role === 'client' ? 'bg-green-50 text-green-700' : profA?.role === 'team' ? 'bg-blue-50 text-blue-700' : 'bg-muted text-muted-foreground')}>
+                          <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0', profA?.role === 'client' ? 'bg-green-50 text-green-700' : profA?.role === 'team' ? 'bg-zinc-50 text-zinc-700' : 'bg-muted text-muted-foreground')}>
                             {profA?.full_name.charAt(0)}
                           </div>
                           <div className="min-w-0">
@@ -642,7 +642,7 @@ export default function AdminUserManagement() {
                           <div className="h-px w-4 bg-border" />
                         </div>
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0', profB?.role === 'client' ? 'bg-green-50 text-green-700' : profB?.role === 'team' ? 'bg-blue-50 text-blue-700' : 'bg-muted text-muted-foreground')}>
+                          <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0', profB?.role === 'client' ? 'bg-green-50 text-green-700' : profB?.role === 'team' ? 'bg-zinc-50 text-zinc-700' : 'bg-muted text-muted-foreground')}>
                             {profB?.full_name.charAt(0)}
                           </div>
                           <div className="min-w-0">
@@ -679,9 +679,9 @@ export default function AdminUserManagement() {
                           'flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all duration-150 text-left',
                           selected ? 'border-primary bg-primary/10 text-primary' :
                           u.role === 'client' ? 'border-green-300 bg-green-50 text-green-700 hover:border-primary/40' :
-                          'border-blue-300 bg-blue-50 text-blue-700 hover:border-primary/40',
+                          'border-zinc-300 bg-zinc-50 text-zinc-700 hover:border-primary/40',
                         )}>
-                          <div className={cn('w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0', selected ? 'bg-primary text-white' : u.role === 'client' ? 'bg-green-100' : 'bg-blue-100')}>
+                          <div className={cn('w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0', selected ? 'bg-primary text-white' : u.role === 'client' ? 'bg-green-100' : 'bg-zinc-100')}>
                             {u.full_name.charAt(0)}
                           </div>
                           <span className="truncate text-xs font-medium">{u.full_name}</span>
@@ -708,7 +708,7 @@ export default function AdminUserManagement() {
                       <div key={g.id} className="flex items-center gap-4 clay-card px-4 py-3">
                         <div className="flex -space-x-2 flex-shrink-0">
                           {members.slice(0, 4).map((m) => (
-                            <div key={m.id} className={cn('w-8 h-8 rounded-full border-2 border-card flex items-center justify-center text-xs font-bold', m.role === 'client' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700')} title={m.full_name}>
+                            <div key={m.id} className={cn('w-8 h-8 rounded-full border-2 border-card flex items-center justify-center text-xs font-bold', m.role === 'client' ? 'bg-green-50 text-green-700' : 'bg-zinc-50 text-zinc-700')} title={m.full_name}>
                               {m.full_name.charAt(0)}
                             </div>
                           ))}
@@ -842,7 +842,7 @@ export default function AdminUserManagement() {
               <section className="animate-slide-up stagger-2">
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Team</h2>
-                  <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full ds-num font-medium">{team.length}</span>
+                  <span className="text-xs bg-zinc-50 text-zinc-700 border border-zinc-200 px-2 py-0.5 rounded-full ds-num font-medium">{team.length}</span>
                 </div>
                 <div className="clay-card overflow-hidden">
                   <table className="w-full text-sm">
@@ -858,7 +858,7 @@ export default function AdminUserManagement() {
                         <tr key={u.id} className={cn('hover:bg-muted/20 transition-colors group', u.disabled && 'opacity-50')}>
                           <td className="px-4 py-3">
                             <button onClick={() => setProfileUser(u)} className="flex items-center gap-2.5 hover:text-primary transition-colors text-left">
-                              <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">{u.full_name.charAt(0)}</div>
+                              <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-700 flex items-center justify-center text-xs font-bold flex-shrink-0">{u.full_name.charAt(0)}</div>
                               <span className="font-medium">{u.full_name}</span>
                             </button>
                           </td>

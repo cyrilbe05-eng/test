@@ -51,7 +51,7 @@ function DropZone({ label, files, onFiles, onRemove, accept, dragging, onDragCha
     <div>
       <div
         className="ds-slot"
-        style={{ height: 72, cursor: 'pointer', ...(dragging ? { borderColor: 'rgba(94,114,228,.5)', color: 'var(--ds-accent)' } : {}) }}
+        style={{ height: 72, cursor: 'pointer', ...(dragging ? { borderColor: 'var(--focus)', color: 'var(--ds-accent)' } : {}) }}
         onDragOver={(e) => { e.preventDefault(); onDragChange(true) }}
         onDragLeave={() => onDragChange(false)}
         onDrop={(e) => { e.preventDefault(); onDragChange(false); onFiles(e.dataTransfer.files) }}

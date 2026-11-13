@@ -42,7 +42,7 @@ function formatBytes(bytes: number): string {
 
 function mimeBadgeClass(mime: string): string {
   if (mime.startsWith('image/')) return 'bg-violet-100 text-violet-700 border-violet-200'
-  if (mime.startsWith('video/')) return 'bg-blue-100 text-blue-700 border-blue-200'
+  if (mime.startsWith('video/')) return 'bg-zinc-100 text-zinc-700 border-zinc-200'
   if (mime === 'application/pdf') return 'bg-red-100 text-red-700 border-red-200'
   if (mime.includes('zip') || mime.includes('compressed')) return 'bg-amber-100 text-amber-700 border-amber-200'
   return 'bg-muted text-muted-foreground border-border'
@@ -419,7 +419,7 @@ function FileCard({
             </button>
             {/* Video badge */}
             {!playing && (
-              <span className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white">
+              <span className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-600 text-white">
                 VIDEO
               </span>
             )}

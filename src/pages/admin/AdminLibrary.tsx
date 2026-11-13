@@ -47,7 +47,7 @@ const FILE_TYPE_LABELS: Record<string, string> = {
 }
 
 const FILE_TYPE_COLORS: Record<string, string> = {
-  source_video: 'bg-blue-50 text-blue-700 border-blue-200',
+  source_video: 'bg-zinc-50 text-zinc-700 border-zinc-200',
   deliverable: 'bg-green-50 text-green-700 border-green-200',
   attachment: 'bg-orange-50 text-orange-700 border-orange-200',
 }

@@ -15,24 +15,24 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 7% 11%;
 
-    --primary: 231 71% 63%;             /* #5E72E4 */
+    --primary: 240 10% 9%;              /* #16161A: neutral accent */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 231 80% 72%;
+    --secondary: 240 4% 46%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 240 9% 94%;                /* #EDEDF0 */
     --muted-foreground: 240 4% 39%;     /* #5F5F67 */
 
     --accent: 240 9% 94%;
-    --accent-foreground: 231 60% 52%;
+    --accent-foreground: 240 7% 11%;
 
     --destructive: 5 75% 60%;           /* #E5584B */
     --destructive-foreground: 0 0% 100%;
 
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    --ring: 231 71% 63%;
+    --ring: 240 4% 46%;
 
     --radius: 0.75rem;
 
@@ -58,24 +58,24 @@
     --popover: 240 8% 13%;              /* #1E1E23 */
     --popover-foreground: 240 7% 93%;
 
-    --primary: 231 71% 63%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 240 5% 95%;              /* #F2F2F3: neutral accent */
+    --primary-foreground: 240 7% 6%;
 
-    --secondary: 231 80% 72%;
+    --secondary: 240 4% 62%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 240 5% 15%;
     --muted-foreground: 240 4% 62%;     /* #9A9AA2 */
 
     --accent: 240 5% 15%;
-    --accent-foreground: 231 80% 76%;
+    --accent-foreground: 240 7% 93%;
 
     --destructive: 5 84% 68%;           /* #F2766B */
     --destructive-foreground: 0 0% 100%;
 
     --border: 240 5% 17%;
     --input: 240 5% 17%;
-    --ring: 231 71% 63%;
+    --ring: 0 0% 100%;
 
     --shadow-sm: none;
     --shadow-md: none;
@@ -103,7 +103,7 @@
   }
 
   ::selection {
-    background: hsl(231 71% 63% / 0.2);
+    background: hsl(240 5% 50% / 0.25);
   }
 
   :focus-visible {
@@ -170,8 +170,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 hsl(231 71% 63% / 0); }
-  50%       { box-shadow: 0 0 0 4px hsl(231 71% 63% / 0.18); }
+  0%, 100% { box-shadow: 0 0 0 0 hsl(240 5% 50% / 0); }
+  50%       { box-shadow: 0 0 0 4px hsl(240 5% 50% / 0.18); }
 }
 
 @keyframes shimmer {
