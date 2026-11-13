@@ -13,28 +13,39 @@ import {
 } from 'date-fns'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
-import { cn } from '@/lib/utils'
 import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
-import type { Project, TimelineComment, Plan } from '@/types'
+import { BarChart, ChartCard, HBars, StatTile } from '@/components/charts/Charts'
+import { Segmented, StatusDot } from '@/components/ds'
+import type { Project, ProjectStatus, TimelineComment, Plan } from '@/types'
+
+// Client analytics: the period's numbers, all-time numbers, videos started
+// per month, videos by status, plan usage and recent activity.
 
 type Timeframe = 'week' | 'month' | 'custom'
 
-function MiniBarChart({ data, color = 'bg-primary' }: { data: { label: string; value: number }[]; color?: string }) {
-  const max = Math.max(...data.map((d) => d.value), 1)
+const STATUS_LABELS: Record<ProjectStatus, string> = {
+  pending_assignment: 'Pending',
+  in_progress: 'In Progress',
+  in_review: 'In Review',
+  admin_approved: 'Admin Approved',
+  client_reviewing: 'Reviewing',
+  client_approved: 'Completed',
+  revision_requested: 'Revision',
+}
+const FLOW: ProjectStatus[] = ['pending_assignment', 'in_progress', 'revision_requested', 'in_review', 'admin_approved', 'client_reviewing', 'client_approved']
+
+/** A thin usage meter: neutral until it's nearly full, then red. */
+function Meter({ label, used, max }: { label: string; used: number; max: number }) {
+  const pct = Math.min(used / max, 1)
   return (
-    <div className="flex items-end gap-1.5 h-20">
-      {data.map((d) => (
-        <div key={d.label} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-          <span className="text-[9px] text-muted-foreground font-medium">{d.value > 0 ? d.value : ''}</span>
-          <div
-            className={cn('w-full rounded-t transition-all duration-500', color, d.value === 0 && 'opacity-20')}
-            style={{ height: `${Math.max((d.value / max) * 56, d.value > 0 ? 6 : 2)}px` }}
-          />
-          <span className="text-[9px] text-muted-foreground truncate w-full text-center">{d.label}</span>
-        </div>
-      ))}
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-1.5" style={{ fontSize: 13 }}>
+        <span className="truncate">{label}</span>
+        <span className="tabular-nums flex-none" style={{ fontWeight: 600, color: 'var(--strong)' }}>{used} / {max}</span>
+      </div>
+      <span className="ds-track block"><i style={{ width: `${pct * 100}%`, background: pct >= 1 ? 'var(--bad-bar)' : 'var(--ink-bar)' }} /></span>
     </div>
   )
 }
@@ -97,220 +108,103 @@ export default function ClientAnalytics() {
   const months = eachMonthOfInterval({ start: subMonths(new Date(), 5), end: new Date() })
   const projectsPerMonth = months.map((m) => ({
     label: format(m, 'MMM'),
-    value: allProjects.filter((p) => {
+    title: format(m, 'MMMM yyyy'),
+    values: [allProjects.filter((p) => {
       const d = parseISO(p.created_at)
       return d.getFullYear() === m.getFullYear() && d.getMonth() === m.getMonth()
-    }).length,
+    }).length],
   }))
 
-  // Status breakdown
-  const statusCounts = allProjects.reduce<Record<string, number>>((acc, p) => {
-    acc[p.status] = (acc[p.status] || 0) + 1
-    return acc
-  }, {})
-  const statusMax = Math.max(...Object.values(statusCounts), 1)
-
-  const STATUS_LABELS: Record<string, string> = {
-    pending_assignment: 'Pending',
-    in_progress: 'In Progress',
-    in_review: 'In Review',
-    admin_approved: 'Admin Approved',
-    client_reviewing: 'Reviewing',
-    client_approved: 'Completed',
-    revision_requested: 'Revision',
-  }
-  const STATUS_COLORS: Record<string, string> = {
-    pending_assignment: 'bg-yellow-400',
-    in_progress: 'bg-zinc-500',
-    in_review: 'bg-purple-500',
-    admin_approved: 'bg-violet-500',
-    client_reviewing: 'bg-orange-500',
-    client_approved: 'bg-green-500',
-    revision_requested: 'bg-red-500',
-  }
+  const byStatus = FLOW.map((s) => ({ key: s, label: STATUS_LABELS[s], value: allProjects.filter((p) => p.status === s).length, dot: <StatusDot status={s} size={7} /> }))
+    .filter((r) => r.value > 0)
+  const revisionVideos = allProjects.filter((p) => p.max_client_revisions !== -1 && p.max_client_revisions > 0)
+  const periodLabel = timeframe === 'week' ? 'This week' : timeframe === 'month' ? 'This month' : `${customFrom} – ${customTo}`
+  const activity = rangeComments.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10)
 
   return (
     <ClientLayout>
-
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-heading font-semibold tracking-tight">Analytics</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Your videos and content performance</p>
+      <main className="px-4 md:px-7 pb-10" style={{ maxWidth: 1240 }}>
+        <header className="flex flex-wrap items-center gap-3 pt-5 pb-5">
+          <h1>Analytics</h1>
+          <span className="flex-1" />
+          <div className="overflow-x-auto max-w-full">
+            <Segmented label="Period" width={96} value={timeframe} onChange={setTimeframe}
+              options={[{ value: 'week', label: 'This week' }, { value: 'month', label: 'This month' }, { value: 'custom', label: 'Custom' }]} />
           </div>
-
-          {/* Timeframe picker */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex bg-muted rounded-xl p-0.5 gap-0.5">
-              {(['week', 'month', 'custom'] as Timeframe[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTimeframe(t)}
-                  className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize', timeframe === t ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground')}
-                >
-                  {t === 'week' ? 'This week' : t === 'month' ? 'This month' : 'Custom'}
-                </button>
-              ))}
+          {timeframe === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="ds-field" style={{ width: 150 }} aria-label="From" />
+              <span style={{ color: 'var(--faint)' }}>–</span>
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="ds-field" style={{ width: 150 }} aria-label="To" />
             </div>
-            {timeframe === 'custom' && (
-              <div className="flex items-center gap-2">
-                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="bg-muted rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40" />
-                <span className="text-xs text-muted-foreground">–</span>
-                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="bg-muted rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40" />
-              </div>
-            )}
-          </div>
-        </div>
+          )}
+        </header>
 
         {isLoading ? (
-          <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+          <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--ds-accent)', borderTopColor: 'transparent' }} /></div>
         ) : (
-          <>
-            {/* Period KPIs */}
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-3">
-                {timeframe === 'week' ? 'This week' : timeframe === 'month' ? 'This month' : `${customFrom} – ${customTo}`}
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Videos started', value: rangeProjects.length, color: 'text-primary' },
-                  { label: 'Team Comments', value: rangeComments.filter((c) => c.author_role === 'team').length, color: 'text-foreground' },
-                ].map((kpi, i) => (
-                  <div key={kpi.label} className={`clay-card p-4 text-center animate-slide-up stagger-${i + 1}`}>
-                    <p className={`text-3xl font-heading font-semibold ${kpi.color}`}>{kpi.value}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
-                  </div>
-                ))}
-              </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+              <StatTile i={0} label="Videos started" value={rangeProjects.length} sub={periodLabel} />
+              <StatTile i={1} label="Team Comments" value={rangeComments.filter((c) => c.author_role === 'team').length} sub={periodLabel} />
+              <StatTile i={2} label="All videos" value={allProjects.length} sub="All time" />
+              <StatTile i={3} label="Active" value={active.length} sub="All time" />
+              <StatTile i={4} label="Completed" value={completed.length} sub="All time" />
+              <StatTile i={5} label="Revisions Used" value={totalRevisions} sub="All time" />
             </div>
 
-            {/* All-time KPIs */}
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-3">All time</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: 'All videos', value: allProjects.length, color: 'text-foreground' },
-                  { label: 'Active', value: active.length, color: 'text-primary' },
-                  { label: 'Completed', value: completed.length, color: 'text-green-600' },
-                  { label: 'Revisions Used', value: totalRevisions, color: totalRevisions > 0 ? 'text-red-500' : 'text-green-600' },
-                ].map((kpi, i) => (
-                  <div key={kpi.label} className={`clay-card p-4 text-center animate-slide-up stagger-${i + 1}`}>
-                    <p className={`text-3xl font-heading font-semibold ${kpi.color}`}>{kpi.value}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-start">
+              <ChartCard title="Videos started" right={<span style={{ fontSize: 12.5, color: 'var(--faint)' }}>Last 6 months</span>} delay={80}>
+                <BarChart data={projectsPerMonth} ariaLabel="Videos started per month, last 6 months" series={[{ name: 'Videos started', color: 'var(--ink-bar)' }]} />
+              </ChartCard>
+              <ChartCard title="Videos by status" delay={120}>
+                {byStatus.length ? <HBars rows={byStatus} /> : <p className="ds-empty">—</p>}
+              </ChartCard>
             </div>
 
-            {/* Charts row */}
-            <div className="clay-card p-5">
-              <h3 className="font-heading font-semibold text-sm mb-4">Videos started (last 6 months)</h3>
-              <MiniBarChart data={projectsPerMonth} color="bg-primary" />
-            </div>
-
-            {/* Status breakdown */}
-            {allProjects.length > 0 && (
-              <div className="clay-card p-5">
-                <h3 className="font-heading font-semibold text-sm mb-4">Videos by status</h3>
-                <div className="space-y-2.5">
-                  {Object.entries(statusCounts).map(([status, count]) => (
-                    <div key={status} className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground w-32 flex-shrink-0">{STATUS_LABELS[status] ?? status}</span>
-                      <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                        <div
-                          className={cn('h-2 rounded-full transition-all duration-500', STATUS_COLORS[status] ?? 'bg-primary')}
-                          style={{ width: `${(count / statusMax) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold text-foreground w-5 text-right">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Plan usage */}
-            {plan && (
-              <div className="clay-card p-5">
-                <h3 className="font-heading font-semibold text-sm mb-4">Plan usage</h3>
-                <div className="space-y-4">
-                  {/* Active project limit */}
-                  {plan.max_active_projects !== -1 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-muted-foreground">Active videos</span>
-                        <span className="text-xs font-semibold">{active.length} / {plan.max_active_projects}</span>
-                      </div>
-                      <div className="bg-muted rounded-full h-2 overflow-hidden">
-                        <div
-                          className={cn('h-2 rounded-full transition-all', active.length / plan.max_active_projects > 0.8 ? 'bg-red-500' : active.length / plan.max_active_projects > 0.5 ? 'bg-amber-500' : 'bg-green-500')}
-                          style={{ width: `${Math.min((active.length / plan.max_active_projects) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Revision usage per project */}
-                  {allProjects.filter((p) => p.max_client_revisions !== -1).length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-2">Revision usage per video</p>
-                      <div className="space-y-2">
-                        {allProjects.filter((p) => p.max_client_revisions !== -1 && p.max_client_revisions > 0).map((p) => {
-                          const pct = p.client_revision_count / p.max_client_revisions
-                          return (
-                            <div key={p.id}>
-                              <div className="flex items-center justify-between mb-0.5">
-                                <span className="text-xs text-muted-foreground truncate max-w-[200px]">{p.title}</span>
-                                <span className="text-xs font-semibold ml-2 flex-shrink-0">{p.client_revision_count} / {p.max_client_revisions}</span>
-                              </div>
-                              <div className="bg-muted rounded-full h-1.5 overflow-hidden">
-                                <div
-                                  className={cn('h-1.5 rounded-full transition-all', pct >= 1 ? 'bg-red-500' : pct > 0.6 ? 'bg-amber-500' : 'bg-green-500')}
-                                  style={{ width: `${Math.min(pct * 100, 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Recent activity */}
-            {allComments.length > 0 && (
-              <div className="clay-card p-5">
-                <h3 className="font-heading font-semibold text-sm mb-4">Recent activity{timeframe !== 'custom' ? ` (${timeframe === 'week' ? 'this week' : 'this month'})` : ''}</h3>
-                <div className="space-y-2">
-                  {allComments
-                    .filter((c) => inRange(c.created_at))
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                    .slice(0, 10)
-                    .map((c) => {
-                      const proj = allProjects.find((p) => p.id === c.project_id)
-                      return (
-                        <div key={c.id} className="flex items-start gap-3 py-1.5">
-                          <div className={cn('w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0', c.author_role === 'team' ? 'bg-primary' : 'bg-red-400')} />
-                          <div className="min-w-0">
-                            <p className="text-xs text-foreground line-clamp-1">{c.comment_text}</p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              {c.profiles.full_name}
-                              {proj && <> · <Link to={`/workspace/projects/${proj.id}`} className="hover:text-primary transition-colors">{proj.title}</Link></>}
-                              · {new Date(c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                            </p>
-                          </div>
+            <div className="grid gap-4 lg:grid-cols-2 items-start">
+              {plan && (
+                <ChartCard title="Plan usage" right={<span style={{ fontSize: 12.5, color: 'var(--faint)' }}>{plan.name}</span>} delay={160}>
+                  <div className="space-y-4">
+                    {plan.max_active_projects !== -1 && <Meter label="Active videos" used={active.length} max={plan.max_active_projects} />}
+                    {revisionVideos.length > 0 && (
+                      <div>
+                        <p className="mb-2.5" style={{ fontSize: 12.5, color: 'var(--faint)' }}>Revision usage per video</p>
+                        <div className="space-y-3">
+                          {revisionVideos.map((p) => <Meter key={p.id} label={p.title} used={p.client_revision_count} max={p.max_client_revisions} />)}
                         </div>
-                      )
-                    })}
-                  {allComments.filter((c) => inRange(c.created_at)).length === 0 && (
-                    <p className="text-xs text-muted-foreground">No activity in this period.</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </>
+                      </div>
+                    )}
+                  </div>
+                </ChartCard>
+              )}
+
+              {allComments.length > 0 && (
+                <ChartCard title="Recent activity" right={<span style={{ fontSize: 12.5, color: 'var(--faint)' }}>{periodLabel}</span>} delay={200}>
+                  {activity.length ? (
+                    <ul className="space-y-3">
+                      {activity.map((c) => {
+                        const proj = allProjects.find((p) => p.id === c.project_id)
+                        return (
+                          <li key={c.id} className="flex items-start gap-3">
+                            <span className="w-1.5 h-1.5 rounded-full mt-2 flex-none" style={{ background: c.author_role === 'team' ? 'var(--strong)' : 'var(--bad-bar)' }} />
+                            <div className="min-w-0">
+                              <p className="line-clamp-1" style={{ fontSize: 13 }}>{c.comment_text}</p>
+                              <p style={{ fontSize: 11.5, color: 'var(--faint)' }}>
+                                {c.profiles.full_name}
+                                {proj && <> · <Link to={`/workspace/projects/${proj.id}`} className="hover:underline">{proj.title}</Link></>}
+                                {' '}· {new Date(c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                              </p>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  ) : <p className="ds-empty">No activity in this period.</p>}
+                </ChartCard>
+              )}
+            </div>
+          </div>
         )}
       </main>
     </ClientLayout>
