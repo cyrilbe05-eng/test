@@ -20,9 +20,11 @@ const ALL_PROJECTS_LINK: Link = { to: '/team/all', label: 'All projects', icon: 
 
 interface TeamLayoutProps {
   children: React.ReactNode
+  /** The page draws its own header. */
+  bare?: boolean
 }
 
-export function TeamLayout({ children }: TeamLayoutProps) {
+export function TeamLayout({ children, bare }: TeamLayoutProps) {
   const { profile } = useAuth()
   const { pathname } = useLocation()
   // Editors: "Home" (their videos + limit) and the full board under "All projects".
@@ -38,6 +40,7 @@ export function TeamLayout({ children }: TeamLayoutProps) {
       bottom={links.map(item)}
       subtitle={profile?.email}
       viewingAs="team"
+      bare={bare}
     >
       {children}
     </AppFrame>

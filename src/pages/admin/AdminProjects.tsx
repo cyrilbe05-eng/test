@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -7,14 +7,13 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { useProjects } from '@/hooks/useProjects'
 import { KanbanBoard } from '@/components/admin/KanbanBoard'
+import { ProjectList } from '@/components/admin/ProjectList'
 import { useUploadManager } from '@/lib/uploadManager'
 import { AdminLayout, HeaderTools } from '@/components/admin/AdminLayout'
 import { useApiFetch } from '@/lib/api'
 import { useStorageAdapter } from '@/lib/storage'
-import { cn, projectTimeLabel, sortByRecentActivity } from '@/lib/utils'
-import { statusLabel } from '@/lib/dsStatus'
+import { cn, sortByRecentActivity } from '@/lib/utils'
 import { type BoardProject } from '@/lib/board'
-import { ClientMark, StatusDot } from '@/components/ds'
 import type { Profile } from '@/types'
 import { ProjectSearch } from '@/components/admin/ProjectSearch'
 
@@ -250,36 +249,10 @@ export default function AdminProjects() {
         {view === 'kanban' ? (
           <KanbanBoard projects={(projects ?? []) as BoardProject[]} />
         ) : (
-          <ProjectList projects={sortByRecentActivity(projects ?? []) as BoardProject[]} />
+          <ProjectList projects={sortByRecentActivity(projects ?? []) as BoardProject[]} base="/admin/projects" />
         )}
       </main>
     </AdminLayout>
-  )
-}
-
-/** List view: 52px rows; a row opens the project. */
-function ProjectList({ projects }: { projects: BoardProject[] }) {
-  const cols = 'minmax(220px,2.4fr) minmax(150px,1.4fr) minmax(150px,1.3fr) minmax(150px,1.3fr) 150px'
-  return (
-    <div style={{ padding: '4px 16px 40px', overflowX: 'auto' }}>
-      <div style={{ minWidth: 760, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 16, padding: '0 20px 10px', fontSize: 12.5, color: 'var(--faint)' }}>
-          <span>Project</span><span>Client</span><span>Status</span><span>Editor</span><span style={{ textAlign: 'right' }}>Updated</span>
-        </div>
-        {projects.map((p, i) => {
-          const client = p.profiles?.full_name ?? '—'
-          return (
-            <Link key={p.id} to={`/admin/projects/${p.id}`} className="ds-lrow" style={{ gridTemplateColumns: cols, animationDelay: `${Math.min(i, 20) * 35}ms` }}>
-              <span className="truncate" style={{ fontWeight: 600, color: 'var(--strong)' }}>{p.title}</span>
-              <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--ds-muted)' }}><ClientMark name={client} size={18} /><span className="truncate">{client}</span></span>
-              <span className="flex items-center gap-2" style={{ color: 'var(--soft-text)' }}><StatusDot status={p.status} size={7} />{statusLabel(p.status)}</span>
-              <span className="truncate" style={{ color: p.assigned_team_names ? 'var(--soft-text)' : 'var(--faint)' }}>{p.assigned_team_names || 'Unassigned'}</span>
-              <span className="truncate" style={{ textAlign: 'right', fontSize: 12.5, color: 'var(--faint)' }}>{projectTimeLabel(p)}</span>
-            </Link>
-          )
-        })}
-      </div>
-    </div>
   )
 }
 

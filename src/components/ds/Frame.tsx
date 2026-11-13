@@ -29,10 +29,13 @@ interface FrameProps {
   viewingAs: string
   /** Extra action above the profile card (e.g. "New video"). */
   footer?: (close: () => void) => React.ReactNode
+  /** The page draws its own header (with <FrameTools />). */
+  bare?: boolean
   children: React.ReactNode
 }
 
-function Tools() {
+/** Theme toggle + notifications, for pages that draw their own header. */
+export function FrameTools() {
   const { profile } = useAuth()
   return (
     <div className="flex items-center gap-1">
@@ -42,7 +45,7 @@ function Tools() {
   )
 }
 
-export function AppFrame({ groups, bottom, subtitle, viewingAs, footer, children }: FrameProps) {
+export function AppFrame({ groups, bottom, subtitle, viewingAs, footer, bare, children }: FrameProps) {
   const { profile, impersonating, stopImpersonating } = useAuth()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -109,7 +112,7 @@ export function AppFrame({ groups, bottom, subtitle, viewingAs, footer, children
         <button type="button" className="ds-ibtn" aria-label="Menu" onClick={() => setDrawerOpen(true)} style={{ width: 44, height: 44 }}><Ms name="menu" /></button>
         <img src={logoLine} alt="Pingu Studio" className="w-7 h-[23px] object-contain dark:invert" />
         <div className="flex-1" />
-        <Tools />
+        <FrameTools />
       </header>
 
       {drawerOpen && (
@@ -126,7 +129,7 @@ export function AppFrame({ groups, bottom, subtitle, viewingAs, footer, children
           <Sidebar />
         </aside>
         <div className="flex-1 min-w-0 pb-16 md:pb-0">
-          <div className="hidden md:flex justify-end px-6 pt-4"><Tools /></div>
+          {!bare && <div className="hidden md:flex justify-end px-6 pt-4"><FrameTools /></div>}
           {children}
         </div>
       </div>

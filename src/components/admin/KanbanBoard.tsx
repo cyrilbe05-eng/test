@@ -13,6 +13,12 @@ import { ClientMark, EditorAvatar, StatusDot } from '@/components/ds'
 
 interface Props {
   projects: BoardProject[]
+  /** Where a card opens (admin: /admin/projects, editors: /team/projects). */
+  base?: string
+  /** Editors see the same board but can't move cards. */
+  readOnly?: boolean
+  /** Marks the viewer's own projects ("Mine"). */
+  mine?: (p: BoardProject) => boolean
 }
 
 /** Card tilt toward the cursor (max ±3.5°) + the sheen position, written to
@@ -38,7 +44,7 @@ function untilt(e: React.MouseEvent<HTMLElement>) {
   el.style.setProperty('--ry', '0deg')
 }
 
-export function KanbanBoard({ projects }: Props) {
+export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine }: Props) {
   const [dragging, setDragging] = useState<{ id: string; fromStatus: ProjectStatus } | null>(null)
   const [back, setBack] = useState<{ id: string; to: ProjectStatus; title: string } | null>(null)
   const [over, setOver] = useState<ProjectStatus | null>(null)
@@ -125,9 +131,9 @@ export function KanbanBoard({ projects }: Props) {
               key={col.dropTarget}
               aria-label={col.label}
               className={cn('ds-lane', isOver && 'over')}
-              onDragOver={(e) => { e.preventDefault(); if (over !== col.dropTarget) setOver(col.dropTarget) }}
-              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver((o) => (o === col.dropTarget ? null : o)) }}
-              onDrop={() => handleDrop(col.dropTarget)}
+              onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); if (over !== col.dropTarget) setOver(col.dropTarget) }}
+              onDragLeave={readOnly ? undefined : (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver((o) => (o === col.dropTarget ? null : o)) }}
+              onDrop={readOnly ? undefined : () => handleDrop(col.dropTarget)}
             >
               <div className="ds-lane-head" style={{ animationDelay: `${li * 60}ms` }}>
                 <StatusDot status={col.dropTarget} />
@@ -143,21 +149,24 @@ export function KanbanBoard({ projects }: Props) {
                   <article
                     key={project.id}
                     className={cn('ds-card', dragging?.id === project.id && 'ghost', landed === project.id && 'landed')}
-                    style={{ animationDelay: landed === project.id ? '0ms' : `${li * 60 + Math.min(i, 10) * 55 + 80}ms` }}
-                    draggable
-                    onDragStart={(e) => {
+                    draggable={!readOnly}
+                    onDragStart={readOnly ? undefined : (e) => {
                       e.dataTransfer.effectAllowed = 'move'
                       try { e.dataTransfer.setData('text/plain', project.id) } catch { /* old browsers */ }
                       setDragging({ id: project.id, fromStatus: project.status })
                     }}
-                    onDragEnd={() => { setDragging(null); setOver(null) }}
+                    onDragEnd={readOnly ? undefined : () => { setDragging(null); setOver(null) }}
+                    style={{ ...(readOnly ? { cursor: 'pointer' } : {}), animationDelay: landed === project.id ? '0ms' : `${li * 60 + Math.min(i, 10) * 55 + 80}ms` }}
                     onMouseMove={tilt}
                     onMouseLeave={untilt}
                   >
-                    <Link to={`/admin/projects/${project.id}`} className="ds-hit" aria-label={`Open ${project.title}`} draggable={false} />
+                    <Link to={`${base}/${project.id}`} className="ds-hit" aria-label={`Open ${project.title}`} draggable={false} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <ClientMark name={client} />
                       <span className="truncate" style={{ flex: 1, fontSize: 12.5, color: 'var(--ds-muted)' }}>{client}</span>
+                      {mine?.(project) && (
+                        <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--soft-text)', padding: '3px 8px', borderRadius: 999, background: 'var(--pill)' }}>Mine</span>
+                      )}
                       {project.kind === 'carousel' && (
                         <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--car-t)', padding: '3px 8px', borderRadius: 999, background: 'var(--car-b)' }}>Carousel</span>
                       )}
@@ -172,7 +181,7 @@ export function KanbanBoard({ projects }: Props) {
                 )
               })}
 
-              {cards.length === 0 && <div className="ds-slot">Drop a project here</div>}
+              {cards.length === 0 && <div className="ds-slot">{readOnly ? 'Empty' : 'Drop a project here'}</div>}
             </section>
           )
         })}

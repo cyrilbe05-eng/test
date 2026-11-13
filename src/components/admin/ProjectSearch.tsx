@@ -45,7 +45,7 @@ function Results({ results, active, onPick, onHover }: { results: Row[]; active:
   )
 }
 
-export function ProjectSearch() {
+export function ProjectSearch({ base = '/admin/projects' }: { base?: string } = {}) {
   const { data } = useProjects()
   const navigate = useNavigate()
   const [q, setQ] = useState('')
@@ -75,7 +75,7 @@ export function ProjectSearch() {
   const pick = (p: Row) => {
     setQ(''); setOpen(false); setMobile(false)
     input.current?.blur()
-    navigate(`/admin/projects/${p.id}`)
+    navigate(`${base}/${p.id}`)
   }
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)) }
