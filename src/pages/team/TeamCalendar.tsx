@@ -28,6 +28,7 @@ import { EventCommentThread } from '@/components/calendar/EventCommentThread'
 import { ProjectEntryModal } from '@/components/calendar/ProjectEntryModal'
 import { calendarLabel } from '@/lib/calendarLabel'
 import { EventChip } from '@/components/calendar/EventChip'
+import { Segmented } from '@/components/ds'
 import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus, Profile } from '@/types'
@@ -484,8 +485,8 @@ export default function TeamCalendar() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-xs text-muted-foreground font-semibold">Filter:</span>
+        <div className="flex items-center gap-3 mb-4 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1">
+          <span className="text-xs text-muted-foreground flex-none">Filter:</span>
           {isCopywriter && assignableClients.length > 0 && (
             <select
               value={filterClient}
@@ -499,19 +500,11 @@ export default function TeamCalendar() {
               ))}
             </select>
           )}
-          <div className="flex gap-1 flex-wrap">
-            <button onClick={() => setFilterType('all')} className={cn('h-8 px-3 rounded-full text-[13px] font-medium transition-colors', filterType === 'all' ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>All types</button>
-            {CONTENT_TYPES.map((t) => (
-              <button key={t} onClick={() => setFilterType(filterType === t ? 'all' : t)} className={cn('h-8 px-3 rounded-full text-[13px] font-medium transition-colors', filterType === t ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>{t}</button>
-            ))}
-          </div>
-          <div className="w-px h-4 bg-border mx-1" />
-          <div className="flex gap-1 flex-wrap">
-            <button onClick={() => setFilterStatus('all')} className={cn('h-8 px-3 rounded-full text-[13px] font-medium transition-colors', filterStatus === 'all' ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>All statuses</button>
-            {CONTENT_STATUSES.map((s) => (
-              <button key={s} onClick={() => setFilterStatus(filterStatus === s ? 'all' : s)} className={cn('h-8 px-3 rounded-full text-[13px] font-medium transition-colors', filterStatus === s ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>{s}</button>
-            ))}
-          </div>
+          <Segmented label="Type" width={84} value={filterType} onChange={(v) => setFilterType(filterType === v ? 'all' : v)}
+            options={[{ value: 'all', label: 'All types' }, ...CONTENT_TYPES.map((t) => ({ value: t, label: t }))]} />
+          <div className="w-px h-5 bg-border flex-none" />
+          <Segmented label="Status" width={88} value={filterStatus} onChange={(v) => setFilterStatus(filterStatus === v ? 'all' : v)}
+            options={[{ value: 'all', label: 'All statuses' }, ...CONTENT_STATUSES.map((t) => ({ value: t, label: t }))]} />
         </div>
 
         <div className="clay-card overflow-hidden">
@@ -550,10 +543,10 @@ export default function TeamCalendar() {
         </div>
 
         <div className="flex items-center gap-3 mt-3 flex-wrap">
-          {CONTENT_TYPES.map((t) => <span key={t} className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', CONTENT_TYPE_STYLES[t])}>{t}</span>)}
+          {CONTENT_TYPES.map((t) => <span key={t} className="text-[11.5px] text-muted-foreground"><b className="font-semibold text-foreground mr-1">{t.slice(0, 1)}</b>{t}</span>)}
           <div className="w-px h-3 bg-border mx-1" />
-          {CONTENT_STATUSES.map((s) => <span key={s} className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', CONTENT_STATUS_STYLES[s])}>{s}</span>)}
-          <span className="ml-auto text-[10px] text-muted-foreground">🔥 = Double Down</span>
+          {CONTENT_STATUSES.map((s) => <span key={s} className="text-[11.5px] text-muted-foreground">{s}</span>)}
+          <span className="ml-auto text-[11.5px] text-muted-foreground">🔥 Double Down</span>
         </div>
       </main>
 

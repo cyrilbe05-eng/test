@@ -39,8 +39,8 @@ html.dark .ds {
 
 /* ── Segmented control ── */
 .ds-seg{position:relative;display:flex;padding:3px;border-radius:10px;background:var(--field);box-shadow:inset 0 0 0 1px var(--ds-ring)}
-.ds-seg-ind{position:absolute;top:3px;left:3px;width:76px;height:30px;border-radius:8px;background:var(--seg-on);box-shadow:var(--seg-shadow);transition:transform .5s var(--spring)}
-.ds-seg button{position:relative;z-index:1;width:76px;height:30px;border:0;background:transparent;color:var(--nav);font-size:13px;cursor:pointer;transition:color .25s}
+.ds-seg-ind{position:absolute;top:3px;left:3px;width:var(--sw,76px);height:30px;border-radius:8px;background:var(--seg-on);box-shadow:var(--seg-shadow);transition:transform .5s var(--spring)}
+.ds-seg button{position:relative;z-index:1;width:var(--sw,76px);height:30px;border:0;background:transparent;color:var(--nav);font-size:13px;cursor:pointer;transition:color .25s}
 .ds-seg button.on{color:var(--strong)}
 .ds-seg button:focus-visible{outline:2px solid var(--ds-accent);border-radius:8px}
 

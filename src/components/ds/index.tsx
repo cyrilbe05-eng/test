@@ -66,3 +66,23 @@ export function StatusDot({ status, size = 8 }: { status: ProjectStatus; size?: 
   const [d, l] = (STATUS_META[status] ?? STATUS_META.pending_assignment).colors
   return <span aria-hidden="true" className="ds-dot" style={{ '--sd-d': d, '--sh-d': hexA(d, 0.15), '--sd-l': l, '--sh-l': hexA(l, 0.15), width: size, height: size, borderRadius: 999, flex: 'none' } as React.CSSProperties} />
 }
+
+/** Segmented control with one sliding indicator (DESIGN.md). Every segment
+ *  has the same width so the indicator only moves (transform). */
+export function Segmented<T extends string>({ options, value, onChange, width = 76, label }: {
+  options: { value: T; label: string }[]
+  value: T
+  onChange: (v: T) => void
+  width?: number
+  label?: string
+}) {
+  const i = Math.max(0, options.findIndex((o) => o.value === value))
+  return (
+    <div className="ds-seg flex-none" role="group" aria-label={label} style={{ '--sw': `${width}px` } as React.CSSProperties}>
+      <div className="ds-seg-ind" style={{ transform: `translateX(${i * width}px)` }} />
+      {options.map((o) => (
+        <button key={o.value} type="button" className={cn(o.value === value && 'on')} aria-pressed={o.value === value} onClick={() => onChange(o.value)}>{o.label}</button>
+      ))}
+    </div>
+  )
+}
