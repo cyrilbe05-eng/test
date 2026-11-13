@@ -5,6 +5,7 @@ import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { useClientDashboard, useTickClientStep, type ClientDashboard as Dashboard, type DashboardOwner } from '@/hooks/useClientDashboard'
 import { cn } from '@/lib/utils'
 import { ClientBrief } from '@/components/onboarding/ClientBrief'
+import { Ms } from '@/components/ds'
 import { ClientStats } from '@/components/workspace/ClientStats'
 import { MarkPosted } from '@/components/project/MarkPosted'
 import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
@@ -170,9 +171,16 @@ export default function ClientDashboard() {
       <main className="px-4 md:px-6 py-5 md:py-6 space-y-4 max-w-5xl">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-heading font-semibold tracking-tight truncate">{data?.name ?? ''}</h1>
-          {canCreate && <Link to="/workspace/new" className="min-h-[44px] px-4 inline-flex items-center rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 flex-shrink-0">
-            + New video
-          </Link>}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {data?.miro_url && (
+              <a href={data.miro_url} target="_blank" rel="noreferrer" aria-label="Miro board" className="ds-ghost-btn ds-tap inline-flex items-center gap-2" style={{ textDecoration: 'none' }}>
+                <Ms name="dashboard" style={{ fontSize: 18, width: 18, color: 'inherit' }} /><span className="hidden sm:inline">Miro board</span><Ms name="north_east" className="hidden sm:inline-block" style={{ fontSize: 15, width: 15, color: 'var(--faint)' }} />
+              </a>
+            )}
+            {canCreate && <Link to="/workspace/new" className="min-h-[44px] px-4 inline-flex items-center rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 flex-shrink-0">
+              + New video
+            </Link>}
+          </div>
         </div>
         {isLoading ? (
           <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
@@ -182,12 +190,12 @@ export default function ClientDashboard() {
           <>
             <ClientStats projects={(projects ?? []) as Project[]} />
             {data.contract && <Timeline c={data.contract} />}
+            {data.plan.length > 0 && <Plan steps={data.plan} />}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
               <div className="space-y-4 min-w-0">
                 <Videos items={data.needs} scripts={data.scripts ?? []} toPost={toPost} inWorks={inWorks} />
-                {data.plan.length > 0 && <Plan steps={data.plan} />}
               </div>
-              <ClientBrief brief={data} noStyle />
+              <ClientBrief brief={data} noStyle noMiro />
             </div>
           </>
         ) : null}

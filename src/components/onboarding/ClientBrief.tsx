@@ -19,10 +19,10 @@ function Card({ title, children, action }: { title: string; children: React.Reac
 
 const empty = <p className="text-sm text-muted-foreground">—</p>
 
-export function ClientBrief({ brief, wide, noStyle, className }: { brief: Brief; wide?: boolean; noStyle?: boolean; className?: string }) {
+export function ClientBrief({ brief, wide, noStyle, noMiro, className }: { brief: Brief; wide?: boolean; noStyle?: boolean; /** The page shows the Miro board as a button elsewhere. */ noMiro?: boolean; className?: string }) {
   return (
     <div className={cn(wide ? cn('grid gap-4 items-start min-w-0', noStyle ? 'md:grid-cols-2' : 'md:grid-cols-3') : 'space-y-4 min-w-0', className)}>
-      <Card
+      {!noMiro && <Card
         title="Miro board"
         action={brief.miro_url && (
           <a href={brief.miro_url} target="_blank" rel="noreferrer"
@@ -32,7 +32,7 @@ export function ClientBrief({ brief, wide, noStyle, className }: { brief: Brief;
         )}
       >
         {!brief.miro_url && empty}
-      </Card>
+      </Card>}
       <Card title="SOPs">
         {brief.sops.length ? (
           <ul className="space-y-1.5 text-sm">
