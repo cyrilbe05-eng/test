@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ds'
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getSignedUrlById } from '@/lib/storage'
@@ -201,6 +202,7 @@ export default function AdminProjectDetail() {
       qc.invalidateQueries({ queryKey: ['project_assignments', id] })
       qc.invalidateQueries({ queryKey: ['project', id] })
       qc.invalidateQueries({ queryKey: ['project_deadlines', id] })
+      qc.invalidateQueries({ queryKey: ['projects'] }); qc.invalidateQueries({ queryKey: ['admin-home'] })
       toast.success('Team member assigned')
       setSelectedTeamMember('')
     } catch (err) {
@@ -343,13 +345,14 @@ export default function AdminProjectDetail() {
                     try {
                       await apiFetch(`/api/projects/${id}/limits`, { method: 'PATCH', body: JSON.stringify({ max_deliverables: value }) })
                       qc.invalidateQueries({ queryKey: ['project', id] })
+                      qc.invalidateQueries({ queryKey: ['projects'] })
                       toast.success('Deliverable limit updated')
                     } catch (err) { toast.error((err as Error).message) }
                   }}
                   className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
                   title="Change deliverable limit"
                 >
-                  ✎
+                  <Icon name="edit" />
                 </button>}
               </div>
             </div>
@@ -395,12 +398,13 @@ export default function AdminProjectDetail() {
                           await apiFetch(`/api/projects/${id}/unassign`, { method: 'DELETE', body: JSON.stringify({ team_member_id: a.team_member_id }) })
                           qc.invalidateQueries({ queryKey: ['project_assignments', id] })
                           qc.invalidateQueries({ queryKey: ['project_deadlines', id] })
+                          qc.invalidateQueries({ queryKey: ['projects'] }); qc.invalidateQueries({ queryKey: ['admin-home'] })
                           toast.success('Unassigned')
                         } catch (err) { toast.error((err as Error).message) }
                       }}
                       className="text-[10px] text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
                       title="Unassign"
-                    >✕</button>
+                    ><Icon name="close" /></button>
                   </div>
                   {dl && (
                     <div className="ml-8">
@@ -411,7 +415,7 @@ export default function AdminProjectDetail() {
                           dl.status === 'missed' ? 'bg-red-100 text-red-700' :
                           'bg-orange-100 text-orange-700',
                         )}>
-                          {dl.status === 'met' ? '✓ Met' : dl.status === 'missed' ? '✗ Missed' : '⏰ Pending'}
+                          {dl.status === 'met' ? 'Met' : dl.status === 'missed' ? 'Missed' : 'Pending'}
                         </span>
                         {editDeadlineId === dl.id ? (
                           <div className="flex items-center gap-1 mt-1">
@@ -422,14 +426,14 @@ export default function AdminProjectDetail() {
                               className="text-[10px] px-1.5 py-0.5 border border-border rounded bg-input"
                             />
                             <button onClick={() => saveDeadlineEdit(dl.id)} className="text-[10px] text-primary hover:underline">Save</button>
-                            <button onClick={() => setEditDeadlineId(null)} className="text-[10px] text-muted-foreground hover:underline">✕</button>
+                            <button onClick={() => setEditDeadlineId(null)} className="text-[10px] text-muted-foreground hover:underline" aria-label="Cancel"><Icon name="close" /></button>
                           </div>
                         ) : (
                           <button
                             onClick={() => { setEditDeadlineId(dl.id); setEditDeadlineValue(dl.due_at.slice(0, 16)) }}
                             className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
                           >
-                            Due {new Date(dl.due_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} ✎
+                            Due {new Date(dl.due_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} <Icon name="edit" size={12} />
                           </button>
                         )}
                       </div>
@@ -526,7 +530,7 @@ export default function AdminProjectDetail() {
                       : 'border-transparent text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  {tab === 'review' ? '🎬 Review' : '📁 Storage'}
+                  <Icon name={tab === 'review' ? 'movie' : 'folder'} size={16} className="mr-1.5" />{tab === 'review' ? 'Review' : 'Storage'}
                 </button>
               ))}
             </div>

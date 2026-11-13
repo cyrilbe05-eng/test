@@ -224,7 +224,7 @@ export default function TeamProjectDetail() {
   const versionIds = versions.map((v) => v.id)
   const versionComments = shown ? commentsForVersion(comments ?? [], shown.id, versionIds) : comments ?? []
   const commentedVersions = new Set((comments ?? []).filter((c) => c.file_id && versionIds.includes(c.file_id)).map((c) => c.file_id!))
-  const filesChanged = () => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }); qc.invalidateQueries({ queryKey: ['project', id] }) }
+  const filesChanged = () => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }); qc.invalidateQueries({ queryKey: ['project', id] }); qc.invalidateQueries({ queryKey: ['projects'] }) }
 
   // Editors upload only on projects assigned to them (server enforces it too).
   const canUpload = (project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment')
