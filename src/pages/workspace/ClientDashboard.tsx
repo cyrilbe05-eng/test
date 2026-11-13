@@ -1,11 +1,15 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
 import { useClientDashboard, useTickClientStep, type ClientDashboard as Dashboard, type DashboardOwner } from '@/hooks/useClientDashboard'
 import { cn } from '@/lib/utils'
 import { ClientBrief } from '@/components/onboarding/ClientBrief'
-import { ClientStats } from '@/components/workspace/ClientStats'
+import { StatTile } from '@/components/charts/Charts'
+import { Ms } from '@/components/ds'
+import { useApiFetch } from '@/lib/api'
 import { MarkPosted } from '@/components/project/MarkPosted'
 import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
@@ -13,8 +17,9 @@ import { useProjects } from '@/hooks/useProjects'
 import { projectTimeLabel } from '@/lib/utils'
 import type { Project } from '@/types'
 
-// Client home: contract timeline → one video list (to-dos first) →
-// plan; Miro board and SOPs on the side. Home is also the video list: a
+// Client home: the plan's steps on top (when the client has a plan) → one
+// video list (to-dos first); Miro board and SOPs on the side. Their numbers
+// and contract progress open from "My report" (top right) in a side panel. Home is also the video list: a
 // tap on a video opens it.
 // Compact; labels and numbers only. Everything comes from /api/client/dashboard.
 
@@ -30,20 +35,53 @@ function Card({ title, children, className }: { title?: string; children: React.
   )
 }
 
-function Timeline({ c }: { c: NonNullable<Dashboard['contract']> }) {
+function Contract({ c }: { c: NonNullable<Dashboard['contract']> }) {
   return (
-    <Card>
+    <div className="clay-card p-4">
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">Contract {c.number}</p>
-          <p className="text-lg font-heading font-semibold tabular-nums">Day {c.day} of {c.total_days}</p>
+          <p style={{ fontSize: 12.5, color: 'var(--faint)' }}>Contract {c.number}</p>
+          <p className="tabular-nums" style={{ fontSize: 17, fontWeight: 650, color: 'var(--strong)' }}>Day {c.day} of {c.total_days}</p>
         </div>
-        <p className="text-sm tabular-nums text-muted-foreground whitespace-nowrap">{c.days_left} days left</p>
+        <p className="tabular-nums whitespace-nowrap" style={{ fontSize: 12.5, color: 'var(--faint)' }}>{c.days_left} days left</p>
       </div>
-      <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={c.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Contract">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${c.progress}%` }} />
-      </div>
-    </Card>
+      <span className="ds-track block mt-3" role="progressbar" aria-valuenow={c.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Contract">
+        <i style={{ width: `${c.progress}%`, background: 'var(--ink-bar)' }} />
+      </span>
+    </div>
+  )
+}
+
+/** "My report": the client's numbers + contract, in a panel from the right. */
+function Report({ projects, contract, onClose }: { projects: Project[]; contract: Dashboard['contract']; onClose: () => void }) {
+  const apiFetch = useApiFetch()
+  const { data } = useQuery<{ total: number }>({ queryKey: ['time-saved'], queryFn: () => apiFetch<{ total: number }>('/api/time-saved') })
+  const done = projects.filter((p) => p.status === 'client_approved').length
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+  }, [onClose])
+  return (
+    <>
+      <div className="ds-side-veil" onClick={onClose} />
+      <aside className="ds-side-panel" role="dialog" aria-modal="true" aria-label="My report">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 style={{ fontSize: 20, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--strong)' }}>My report</h2>
+          <button type="button" className="ds-ibtn" aria-label="Close" onClick={onClose}><Ms name="close" /></button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <StatTile i={0} label="Active videos" value={projects.length - done} />
+          <StatTile i={1} label="Completed" value={done} />
+          <StatTile i={2} label="All videos" value={projects.length} />
+          <StatTile i={3} label="Time Saved" value={data ? `${data.total}h` : '—'} />
+        </div>
+        {contract && <div className="mt-3"><Contract c={contract} /></div>}
+        <Link to="/workspace/analytics" className="ds-ghost-btn ds-tap mt-4 w-full inline-flex items-center justify-center gap-2" style={{ textDecoration: 'none' }}>
+          <Ms name="monitoring" style={{ fontSize: 18, width: 18, color: 'inherit' }} />Analytics
+        </Link>
+      </aside>
+    </>
   )
 }
 
@@ -117,36 +155,45 @@ function Videos({ items, scripts, toPost, inWorks }: { items: Dashboard['needs']
   )
 }
 
+/** The plan's steps as a horizontal track; scrolls to the next step. */
 function Plan({ steps }: { steps: Dashboard['plan'] }) {
   const tick = useTickClientStep()
+  const track = useRef<HTMLOListElement>(null)
+  const doneCount = steps.filter((s) => s.done).length
+  useEffect(() => {
+    // Show the next step with the one before it, both whole.
+    const next = track.current?.querySelector<HTMLElement>('[data-next="true"]')
+    const el = (next?.previousElementSibling as HTMLElement | null) ?? next
+    if (el && track.current) track.current.scrollTo({ left: Math.max(0, el.offsetLeft - track.current.offsetLeft - 20), behavior: 'smooth' })
+  }, [steps.length])
   return (
-    <Card title="Plan">
-      <ol className="space-y-0.5">
-        {steps.map((s) => (
-          <li key={s.id} className={cn('flex items-center gap-2 rounded-lg pr-2',
-            s.state === 'next' && 'bg-primary/5 ring-1 ring-primary/30', s.state === 'overdue' && 'bg-red-500/5 ring-1 ring-red-500/30')}>
-            {s.can_tick ? (
-              <button role="checkbox" aria-checked={s.done} aria-label={s.title} disabled={tick.isPending}
-                onClick={() => tick.mutate({ id: s.id, done: !s.done }, { onError: (e) => toast.error((e as Error).message) })}
-                className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                <span className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center text-xs font-bold',
-                  s.done ? 'bg-primary border-primary text-white' : 'border-muted-foreground/40')}>{s.done ? '✓' : ''}</span>
-              </button>
-            ) : (
-              <span className="w-11 h-11 flex items-center justify-center flex-shrink-0" aria-label={s.done ? 'Done' : 'To do'}>
-                <span className={cn('w-2.5 h-2.5 rounded-full', s.done ? 'bg-primary' : 'bg-muted-foreground/30')} />
-              </span>
-            )}
-            <span className={cn('w-12 flex-shrink-0 text-xs tabular-nums', s.state === 'overdue' ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-muted-foreground', s.done && 'opacity-50')}>{day(s.date)}</span>
-            <span className={cn('flex-1 min-w-0 text-sm leading-snug break-words py-1', s.state === 'next' && 'font-semibold', s.done && 'opacity-50')}>{s.title}</span>
-            <span className={cn('text-xs px-2 py-0.5 rounded-full ds-tag whitespace-nowrap', s.done && 'opacity-50',
-              s.owner === 'client' ? 'bg-primary/10 text-primary' : s.owner === 'both' ? 'bg-violet-500/10 text-violet-700 dark:text-violet-300' : 'bg-muted text-muted-foreground')}>
-              {OWNER[s.owner]}
-            </span>
+    <section className="ds-panel" style={{ padding: '18px 0 16px' }}>
+      <div className="ds-panel-head px-5" style={{ marginBottom: 12 }}>
+        <h2>Plan</h2>
+        <span className="tabular-nums" style={{ fontSize: 12.5, color: 'var(--faint)' }}>{doneCount} / {steps.length}</span>
+      </div>
+      <ol ref={track} className="ds-steps">
+        {steps.map((s, i) => (
+          <li key={s.id} data-next={s.state === 'next'} className={cn('ds-step', s.done && 'done', s.state === 'next' && 'next', s.state === 'overdue' && 'late')} style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}>
+            <div className="ds-step-rail" aria-hidden>
+              <span className="ds-step-node">{s.done && <Ms name="check" style={{ fontSize: 13, width: 13, color: 'inherit' }} />}</span>
+            </div>
+            <p className="tabular-nums" style={{ fontSize: 12, color: s.state === 'overdue' ? 'var(--bad)' : 'var(--faint)', fontWeight: s.state === 'overdue' ? 600 : 400 }}>{day(s.date)}</p>
+            <p className="ds-step-t">{s.title}</p>
+            <div className="flex items-center justify-between gap-2 mt-auto pt-2">
+              <span style={{ fontSize: 12, color: 'var(--faint)' }}>{OWNER[s.owner]}</span>
+              {s.can_tick && (
+                <button role="checkbox" aria-checked={s.done} aria-label={s.title} disabled={tick.isPending}
+                  onClick={() => tick.mutate({ id: s.id, done: !s.done }, { onError: (e) => toast.error((e as Error).message) })}
+                  className="ds-step-tick">
+                  {s.done ? 'Done' : 'Mark done'}
+                </button>
+              )}
+            </div>
           </li>
         ))}
       </ol>
-    </Card>
+    </section>
   )
 }
 
@@ -163,29 +210,32 @@ export default function ClientDashboard() {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
   const needIds = new Set((data?.needs ?? []).flatMap((n) => (n.type === 'plan_step' ? [] : [n.project_id])))
   const inWorks = active.filter((p) => !needIds.has(p.id))
+  const [report, setReport] = useState(false)
   // Onboarding opens before the dashboard until it's done.
   if (data?.needs_onboarding) return <Navigate to="/workspace/onboarding" replace />
   return (
     <ClientLayout>
-      <main className="px-4 md:px-6 py-5 md:py-6 space-y-4 max-w-5xl">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-heading font-semibold tracking-tight truncate">{data?.name ?? ''}</h1>
-          {canCreate && <Link to="/workspace/new" className="min-h-[44px] px-4 inline-flex items-center rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 flex-shrink-0">
-            + New video
+      {report && data && <Report projects={(projects ?? []) as Project[]} contract={data.contract} onClose={() => setReport(false)} />}
+      <main className="px-4 md:px-7 pb-10 space-y-4" style={{ maxWidth: 1240 }}>
+        <header className="flex items-center gap-3 pt-5 pb-1">
+          <h1 className="truncate flex-1">{data?.name ?? ''}</h1>
+          <button type="button" className="ds-ghost-btn ds-tap inline-flex items-center gap-2 flex-none" onClick={() => setReport(true)} disabled={!data}>
+            <Ms name="insights" style={{ fontSize: 18, width: 18, color: 'inherit' }} /><span className="hidden sm:inline">My report</span>
+          </button>
+          {canCreate && <Link to="/workspace/new" className="ds-primary ds-tap flex-none" style={{ textDecoration: 'none' }}>
+            <Ms name="add" style={{ fontSize: 18, width: 18, color: 'inherit' }} /><span className="hidden sm:inline">New video</span>
           </Link>}
-        </div>
+        </header>
         {isLoading ? (
-          <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+          <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--ds-accent)', borderTopColor: 'transparent' }} /></div>
         ) : error ? (
-          <div className="clay-card p-5 text-sm">{(error as Error).message}</div>
+          <div className="ds-panel" style={{ fontSize: 13.5 }}>{(error as Error).message}</div>
         ) : data ? (
           <>
-            <ClientStats projects={(projects ?? []) as Project[]} />
-            {data.contract && <Timeline c={data.contract} />}
+            {data.plan.length > 0 && <Plan steps={data.plan} />}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
               <div className="space-y-4 min-w-0">
                 <Videos items={data.needs} scripts={data.scripts ?? []} toPost={toPost} inWorks={inWorks} />
-                {data.plan.length > 0 && <Plan steps={data.plan} />}
               </div>
               <ClientBrief brief={data} noStyle />
             </div>
