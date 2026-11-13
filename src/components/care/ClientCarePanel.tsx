@@ -430,7 +430,7 @@ function Videos({ detail }: { detail: ClientCareDetail }) {
             <Link to={`/admin/projects/${v.id}`} className="block min-h-[44px] py-3 px-2 -mx-2 rounded-xl hover:bg-muted/60 transition-colors">
               <span className="flex items-start justify-between gap-3">
                 <span className="font-medium text-sm break-words min-w-0">{v.title}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-muted whitespace-nowrap text-foreground">{STATUS_LABELS[v.status] ?? v.status}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full ds-tag bg-muted whitespace-nowrap text-foreground">{STATUS_LABELS[v.status] ?? v.status}</span>
               </span>
               <span className="block text-xs text-muted-foreground mt-1 tabular-nums">
                 {fmtDate(v.delivered_at ?? v.created_at)}

@@ -181,7 +181,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-heading font-bold">{user.full_name}</h2>
                 {user.client_id_label && (
-                  <span className="font-mono text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-semibold">{user.client_id_label}</span>
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded ds-num font-semibold">{user.client_id_label}</span>
                 )}
               </div>
               <p className="text-sm text-muted-foreground">{user.email}</p>
@@ -196,7 +196,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
         <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Badges */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full capitalize border', {
+            <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full ds-tag capitalize border', {
               'bg-green-50 text-green-700 border-green-200': user.role === 'client',
               'bg-blue-50 text-blue-700 border-blue-200': user.role === 'team',
               'bg-violet-50 text-violet-700 border-violet-200': user.role === 'admin',
@@ -204,7 +204,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
               {user.role}
             </span>
             {user.role === 'admin' && user.admin_role === 'manager' && (
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200"
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full ds-tag border bg-amber-50 text-amber-700 border-amber-200"
                 title="Admin without account creation, password resets or deletion">
                 Manager
               </span>
@@ -228,7 +228,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
                 }}
                 title="Copywriters can also assign clients to calendar entries"
                 className={cn(
-                  'text-xs font-semibold px-2.5 py-1 rounded-full capitalize border transition-colors',
+                  'text-xs font-semibold px-2.5 py-1 rounded-full ds-tag capitalize border transition-colors',
                   user.team_role === 'copywriter'
                     ? 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100'
                     : 'bg-muted text-muted-foreground border-border hover:bg-muted/70',
@@ -238,10 +238,10 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
               </button>
             )}
             {user.disabled
-              ? <span className="text-xs bg-red-50 border border-red-200 text-red-700 px-2.5 py-1 rounded-full font-semibold">Disabled</span>
-              : <span className="text-xs bg-green-50 border border-green-200 text-green-700 px-2.5 py-1 rounded-full font-semibold">Active</span>}
+              ? <span className="text-xs bg-red-50 border border-red-200 text-red-700 px-2.5 py-1 rounded-full ds-tag font-semibold">Disabled</span>
+              : <span className="text-xs bg-green-50 border border-green-200 text-green-700 px-2.5 py-1 rounded-full ds-tag font-semibold">Active</span>}
             {isClient && clientPlan && (
-              <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full font-semibold">{clientPlan.name} plan</span>
+              <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full ds-tag font-semibold">{clientPlan.name} plan</span>
             )}
             <span className="text-xs text-muted-foreground ml-auto">
               Member since {formatDistanceToNow(new Date(user.created_at), { addSuffix: true })}
@@ -575,7 +575,7 @@ export default function AdminUserManagement() {
               )}
             >
               {t.label}
-              <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium', tab === t.id ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground')}>
+              <span className={cn('text-xs px-1.5 py-0.5 rounded-full ds-num font-medium', tab === t.id ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground')}>
                 {t.badge}
               </span>
             </button>
@@ -718,7 +718,7 @@ export default function AdminUserManagement() {
                           <p className="text-sm font-semibold truncate">{g.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{members.map((m) => m.full_name).join(', ')}</p>
                         </div>
-                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full flex-shrink-0">{members.length} members</span>
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full ds-num flex-shrink-0">{members.length} members</span>
                         <button onClick={() => deleteGroup(g.id, g.name)} className="text-xs text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg transition-colors flex-shrink-0">Delete</button>
                       </div>
                     )
@@ -738,7 +738,7 @@ export default function AdminUserManagement() {
             <section className="mb-8 animate-slide-up stagger-1">
               <div className="flex items-center gap-2 mb-3">
                 <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Clients</h2>
-                <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">{clients.length}</span>
+                <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full ds-num font-medium">{clients.length}</span>
               </div>
               <div className="clay-card overflow-x-auto">
                 <table className="w-full text-sm">
@@ -766,7 +766,7 @@ export default function AdminUserManagement() {
                           </td>
                           <td className="px-4 py-3">
                             {u.client_id_label
-                              ? <span className="font-mono text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-semibold">{u.client_id_label}</span>
+                              ? <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded ds-num font-semibold">{u.client_id_label}</span>
                               : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
                           <td className="px-4 py-3 text-muted-foreground text-xs">{u.email}</td>
@@ -786,8 +786,8 @@ export default function AdminUserManagement() {
                           </td>
                           <td className="px-4 py-3">
                             {u.disabled
-                              ? <span className="text-xs bg-red-50 border border-red-200 text-red-700 px-2 py-0.5 rounded-full font-medium">Disabled</span>
-                              : <span className="text-xs bg-green-50 border border-green-200 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>}
+                              ? <span className="text-xs bg-red-50 border border-red-200 text-red-700 px-2 py-0.5 rounded-full ds-tag font-medium">Disabled</span>
+                              : <span className="text-xs bg-green-50 border border-green-200 text-green-700 px-2 py-0.5 rounded-full ds-tag font-medium">Active</span>}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -814,7 +814,7 @@ export default function AdminUserManagement() {
                 <button onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived}
                   className="flex items-center gap-2 mb-3 min-h-[44px]">
                   <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Archived</h2>
-                  <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">{archivedClients.length}</span>
+                  <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full ds-num font-medium">{archivedClients.length}</span>
                   <span className="text-muted-foreground text-xs">{showArchived ? '▾' : '▸'}</span>
                 </button>
                 {showArchived && (
@@ -842,7 +842,7 @@ export default function AdminUserManagement() {
               <section className="animate-slide-up stagger-2">
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Team</h2>
-                  <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-medium">{team.length}</span>
+                  <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full ds-num font-medium">{team.length}</span>
                 </div>
                 <div className="clay-card overflow-hidden">
                   <table className="w-full text-sm">
@@ -865,8 +865,8 @@ export default function AdminUserManagement() {
                           <td className="px-4 py-3 text-muted-foreground text-xs">{u.email}</td>
                           <td className="px-4 py-3">
                             {u.disabled
-                              ? <span className="text-xs bg-red-50 border border-red-200 text-red-700 px-2 py-0.5 rounded-full font-medium">Disabled</span>
-                              : <span className="text-xs bg-green-50 border border-green-200 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>}
+                              ? <span className="text-xs bg-red-50 border border-red-200 text-red-700 px-2 py-0.5 rounded-full ds-tag font-medium">Disabled</span>
+                              : <span className="text-xs bg-green-50 border border-green-200 text-green-700 px-2 py-0.5 rounded-full ds-tag font-medium">Active</span>}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -887,7 +887,7 @@ export default function AdminUserManagement() {
               <section className="animate-slide-up stagger-3">
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Admins</h2>
-                  <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full font-medium">{admins.length}</span>
+                  <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full ds-num font-medium">{admins.length}</span>
                 </div>
                 <div className="clay-card overflow-hidden">
                   <table className="w-full text-sm">

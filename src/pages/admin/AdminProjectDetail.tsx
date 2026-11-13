@@ -406,7 +406,7 @@ export default function AdminProjectDetail() {
                     <div className="ml-8">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={cn(
-                          'text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                          'text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-tag',
                           dl.status === 'met' ? 'bg-green-100 text-green-700' :
                           dl.status === 'missed' ? 'bg-red-100 text-red-700' :
                           'bg-orange-100 text-orange-700',
@@ -550,7 +550,7 @@ export default function AdminProjectDetail() {
                               {(f as any).profiles?.full_name && ` · ${(f as any).profiles.full_name}`}
                             </p>
                           </div>
-                          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full border flex-shrink-0', f.approved ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800')}>
+                          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full ds-tag border flex-shrink-0', f.approved ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800')}>
                             {f.approved ? 'Approved' : 'Pending'}
                           </span>
                           <FileRow name="" size={null} fileId={f.id} iconOnly />
@@ -575,7 +575,7 @@ export default function AdminProjectDetail() {
                               {f.file_size ? formatBytes(f.file_size) : '—'} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
                             </p>
                           </div>
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full ds-num bg-muted text-muted-foreground flex-shrink-0">
                             {f.file_type === 'source_video' ? 'Main video' : f.file_type === 'attachment' ? 'Attachment' : f.file_type}
                           </span>
                           <FileRow name="" size={null} fileId={f.id} iconOnly />
@@ -666,7 +666,7 @@ export default function AdminProjectDetail() {
                               {f.file_size ? formatBytes(f.file_size) : '—'} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
                             </p>
                           </div>
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full ds-num bg-muted text-muted-foreground flex-shrink-0">
                             {f.file_type === 'source_video' ? 'Main video' : 'Attachment'}
                           </span>
                           <FileRow name="" size={null} fileId={f.id} iconOnly />

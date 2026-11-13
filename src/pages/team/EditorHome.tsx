@@ -96,7 +96,7 @@ export default function EditorHome() {
               <Card
                 title="My videos"
                 right={
-                  <span className={cn('text-sm font-semibold tabular-nums px-2.5 py-0.5 rounded-full',
+                  <span className={cn('text-sm font-semibold tabular-nums px-2.5 py-0.5 rounded-full ds-num',
                     full ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-muted text-muted-foreground')}>
                     {data.active}/{data.max}
                   </span>
@@ -118,7 +118,7 @@ export default function EditorHome() {
                             <span className="text-xs tabular-nums text-muted-foreground whitespace-nowrap">{p.open_notes} notes</span>
                           )}
                           <Due p={p} />
-                          <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap', NEXT[p.status]?.tone)}>{NEXT[p.status]?.label ?? p.status}</span>
+                          <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full ds-tag whitespace-nowrap', NEXT[p.status]?.tone)}>{NEXT[p.status]?.label ?? p.status}</span>
                         </Link>
                       </li>
                     ))}

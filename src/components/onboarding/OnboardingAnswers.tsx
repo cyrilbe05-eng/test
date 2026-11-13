@@ -48,7 +48,7 @@ function Row({ q, clientId }: { q: Q; clientId: string }) {
     <li className="py-2 flex items-start gap-2">
       <div className="flex-1 min-w-0 space-y-0.5">
         <p className="text-xs text-muted-foreground break-words">
-          {q.text}{q.admin_only && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-muted text-[10px] font-semibold uppercase">Admin</span>}
+          {q.text}{q.admin_only && <span className="ml-1.5 px-1.5 py-0.5 rounded ds-tag bg-muted text-[10px] font-semibold">Admin</span>}
         </p>
       {editing ? (
         <div className="mt-1.5 space-y-2">
@@ -79,7 +79,7 @@ export function OnboardingAnswers({ clientId, compact }: { clientId: string; com
   return (
     <div className={cn(compact ? '' : 'space-y-3')}>
       <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-2', compact ? 'px-4 md:px-5 py-3 border-b border-border/60' : 'clay-card px-4 py-3')}>
-        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full',
+        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full ds-tag',
           data.status === 'done' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
             : data.status === 'in_progress' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'bg-muted text-muted-foreground')}>
           {STATUS[data.status]}

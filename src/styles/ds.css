@@ -122,10 +122,10 @@ html.dark .ds{--bad:#F2766B;--bad-b:rgba(242,118,107,.12);--warn:#F2B35B}
 .ds-panel{min-width:0;padding:16px 18px 12px;border-radius:16px;background:linear-gradient(180deg,var(--card-a),var(--card-b));box-shadow:var(--card-sh);animation:ds-fade .6s var(--out) backwards}
 .ds-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;height:28px;margin-bottom:6px}
 .ds-panel-head h2{margin:0;font-size:14.5px;font-weight:600;letter-spacing:-.01em;color:var(--strong)}
-.ds-count{min-width:24px;height:22px;padding:0 8px;border-radius:999px;display:inline-grid;place-items:center;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;background:var(--pill);color:var(--ds-muted)}
-.ds-count.warn{background:var(--car-b);color:var(--car-t)}
-.ds-count.accent{background:rgba(94,114,228,.12);color:var(--ds-accent)}
-.ds-count.bad{background:var(--bad-b);color:var(--bad)}
+.ds-count{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--faint)}
+.ds-count.warn{color:var(--car-t)}
+.ds-count.accent{color:var(--ds-accent)}
+.ds-count.bad{color:var(--bad)}
 .ds-hrow{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;min-height:52px;margin:0 -10px;padding:6px 10px;border-radius:10px;cursor:pointer;transition:background .2s}
 .ds-hrow:hover{background:var(--hover)}
 .ds-hrow:focus-visible{outline:2px solid var(--ds-accent)}
@@ -135,6 +135,29 @@ html.dark .ds{--bad:#F2766B;--bad-b:rgba(242,118,107,.12);--warn:#F2B35B}
 .ds-track i{background:var(--ds-accent)}
 .ds-track i.full{background:var(--warn)}
 @media (max-width:767px){.ds-tap{height:44px !important}}
+
+/* ── No pills (DESIGN.md): status labels are a dot + text, counts are plain
+   numbers, toggles are soft rounded buttons. Applied over the old pill
+   classes, so colours chosen per status still apply to the text/dot. ── */
+.ds-tag{display:inline-flex !important;align-items:center;gap:6px;padding:0 !important;border:0 !important;border-radius:0 !important;background:none !important;box-shadow:none !important;font-weight:500 !important;letter-spacing:0 !important;text-transform:none !important}
+.ds-tag::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:currentColor}
+.ds-tag.nodot::before{display:none}
+.ds-num{padding:0 !important;border:0 !important;background:none !important;box-shadow:none !important;font-variant-numeric:tabular-nums}
+.ds-chip{display:inline-flex !important;align-items:center;gap:6px;height:30px;padding:0 11px !important;border:0 !important;border-radius:8px !important;background:var(--ghost,rgba(0,0,0,.05)) !important;color:var(--soft-text,inherit) !important;font-weight:500 !important;transition:background .2s,color .2s !important}
+.ds-chip:hover{background:var(--ghost-h,rgba(0,0,0,.09)) !important}
+.ds-chip.text-white{background:rgba(94,114,228,.14) !important;color:var(--ds-accent,#5E72E4) !important}
+@media (max-width:767px){.ds-chip{height:44px}}
+/* Dark mode: deep text tones would be too dark on the near-black page. */
+html.dark .ds-tag[class*="text-green-"],html.dark .ds-tag[class*="text-emerald-"]{color:#6FD3A2 !important}
+html.dark .ds-tag[class*="text-red-"],html.dark .ds-tag[class*="text-rose-"]{color:#F2766B !important}
+html.dark .ds-tag[class*="text-amber-"],html.dark .ds-tag[class*="text-yellow-"]{color:#F2B35B !important}
+html.dark .ds-tag[class*="text-orange-"]{color:#FF9F80 !important}
+html.dark .ds-tag[class*="text-blue-"],html.dark .ds-tag[class*="text-sky-"]{color:#7FA8FF !important}
+html.dark .ds-tag[class*="text-indigo-"]{color:#9FAEFF !important}
+html.dark .ds-tag[class*="text-violet-"],html.dark .ds-tag[class*="text-purple-"]{color:#C9A2FF !important}
+html.dark .ds-tag[class*="text-teal-"],html.dark .ds-tag[class*="text-cyan-"]{color:#4CC9A6 !important}
+/* Phones: segmented controls are 44px tall to tap. */
+@media (max-width:767px){.ds-seg button,.ds-seg-ind{height:38px}}
 
 /* ── Theme-picked colours (no React re-render on theme switch) ── */
 .ds-cm{color:var(--cm-l);background:var(--cm-lb)}

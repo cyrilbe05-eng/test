@@ -39,7 +39,7 @@ function CommentBubble({
         {/* Header */}
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="text-xs font-semibold text-foreground">{comment.author_name}</span>
-          <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full capitalize', ROLE_STYLES[comment.author_role as UserRole])}>
+          <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-tag capitalize', ROLE_STYLES[comment.author_role as UserRole])}>
             {comment.author_role}
           </span>
           <span className="text-[10px] text-muted-foreground">

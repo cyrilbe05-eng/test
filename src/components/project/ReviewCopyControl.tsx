@@ -38,7 +38,7 @@ export function ReviewCopyControl({ file, canEdit, onChanged }: Props) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap pl-6">
-      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-600 font-medium" title="Clients stream this smaller file; the original stays available for download">
+      <span className="text-[10px] px-1.5 py-0.5 rounded-full ds-tag bg-green-500/15 text-green-600 font-medium" title="Clients stream this smaller file; the original stays available for download">
         Review copy ✓
       </span>
       {canEdit && (

@@ -168,7 +168,7 @@ export default function TeamStats() {
                       <div key={p.id} className="space-y-2">
                         <div className="flex items-center gap-3">
                           <Link to={`/team/projects/${p.id}`} className="text-sm font-medium hover:text-primary transition-colors flex-1 truncate">{p.title}</Link>
-                          <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                          <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full ds-tag text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
                             {p.client_revision_count}× revision
                           </span>
                         </div>
@@ -209,7 +209,7 @@ export default function TeamStats() {
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{p.title}</p>
                             {p.client_revision_count > 0 && (
-                              <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                              <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-tag bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
                                 {p.client_revision_count}×
                               </span>
                             )}
@@ -220,7 +220,7 @@ export default function TeamStats() {
                         </div>
                         {deadline && (
                           <span className={cn(
-                            'text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0',
+                            'text-[10px] font-semibold px-2 py-0.5 rounded-full ds-tag flex-shrink-0',
                             deadline.status === 'met' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                               : deadline.status === 'missed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                               : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
@@ -228,7 +228,7 @@ export default function TeamStats() {
                             {deadline.status === 'met' ? '✓ deadline' : deadline.status === 'missed' ? '✗ deadline' : '⏰ deadline'}
                           </span>
                         )}
-                        <span className={cn('flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', STATUS_COLORS[p.status])}>
+                        <span className={cn('flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full ds-tag text-xs font-medium', STATUS_COLORS[p.status])}>
                           {STATUS_LABELS[p.status]}
                         </span>
                       </Link>

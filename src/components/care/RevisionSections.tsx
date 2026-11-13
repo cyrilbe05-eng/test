@@ -14,7 +14,7 @@ const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
 const day = (d: string) => format(new Date(d), 'd MMM yyyy')
 
 function CategoryPill({ label }: { label: string }) {
-  return <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium whitespace-nowrap">{label}</span>
+  return <span className="inline-block px-2 py-0.5 rounded-full ds-tag bg-primary/10 text-primary text-xs font-medium whitespace-nowrap">{label}</span>
 }
 
 export function SopRules({ detail, miro }: { detail: ClientCareDetail; miro: React.ReactNode }) {

@@ -146,7 +146,7 @@ function Done({ data }: { data: Data }) {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <h2 className="text-xl font-heading font-semibold tracking-tight">Onboarding</h2>
-        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full ds-tag bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
           Done{data.done_at && ` · ${format(new Date(data.done_at), 'd MMM yyyy')}`}
         </span>
       </div>

@@ -74,7 +74,7 @@ function Tags({ reasons, max }: { reasons: string[]; max?: number }) {
   return (
     <span className="mt-1 flex flex-wrap gap-1">
       {shown.map((r) => (
-        <span key={r.full} title={r.full} className="px-1.5 py-0.5 rounded-md bg-muted text-[11px] text-muted-foreground whitespace-nowrap">{r.label}</span>
+        <span key={r.full} title={r.full} className="px-1.5 py-0.5 rounded-md ds-tag bg-muted text-[11px] text-muted-foreground whitespace-nowrap">{r.label}</span>
       ))}
       {max && list.length > max && <span className="px-1 py-0.5 text-[11px] text-muted-foreground">+{list.length - max}</span>}
     </span>

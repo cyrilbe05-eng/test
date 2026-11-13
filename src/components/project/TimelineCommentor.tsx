@@ -495,7 +495,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
                 type="button"
                 onClick={() => seekTo(rangeStartTs)}
                 title="Jump the video to this time"
-                className="font-mono bg-primary/15 text-primary px-2 py-0.5 rounded hover:bg-primary/25 transition-colors"
+                className="bg-primary/15 text-primary px-2 py-0.5 rounded ds-num hover:bg-primary/25 transition-colors"
               >
                 {formatTimestamp(rangeStartTs)}
               </button>
@@ -596,7 +596,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
           <div className="ml-auto flex items-center gap-1.5">
             {currentUserRole !== 'client' && visibleComments.length > 0 && (
               <span className={cn(
-                'text-xs px-2 py-0.5 rounded-full',
+                'text-xs px-2 py-0.5 rounded-full ds-tag',
                 visibleComments.some((c) => !c.resolved)
                   ? 'bg-amber-500/15 text-amber-600'
                   : 'bg-green-500/15 text-green-600',
@@ -604,7 +604,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
                 {visibleComments.filter((c) => !c.resolved).length} open
               </span>
             )}
-            <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{visibleComments.length}</span>
+            <span className="text-xs bg-muted px-2 py-0.5 rounded-full ds-num text-muted-foreground">{visibleComments.length}</span>
           </div>
         </div>
 
@@ -647,7 +647,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
                           <span className="text-xs font-semibold">{comment.profiles.full_name}</span>
                           <span className="text-[10px] text-muted-foreground capitalize">{comment.author_role}</span>
                           {comment.timestamp_sec !== null && (
-                            <button onClick={() => seekTo(comment.timestamp_sec!)} className="text-[10px] font-mono bg-primary/15 text-primary px-1.5 py-0.5 rounded hover:bg-primary/25 transition-colors">
+                            <button onClick={() => seekTo(comment.timestamp_sec!)} className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded ds-num hover:bg-primary/25 transition-colors">
                               {formatTimestamp(comment.timestamp_sec)}
                               {comment.timestamp_end_sec != null && `–${formatTimestamp(comment.timestamp_end_sec)}`}
                             </button>

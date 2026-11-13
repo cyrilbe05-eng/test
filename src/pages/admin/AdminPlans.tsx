@@ -162,16 +162,16 @@ export default function AdminPlans() {
                   <div className="flex-1">
                     <h3 className="font-semibold">{plan.name}</h3>
                     <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
-                      <span className="bg-muted px-2.5 py-1 rounded-full text-xs">
+                      <span className="bg-muted px-2.5 py-1 rounded-full ds-num text-xs">
                         <span className="text-foreground font-medium">{plan.max_deliverables === -1 ? '∞' : plan.max_deliverables}</span> deliverable{plan.max_deliverables !== 1 ? 's' : ''}
                       </span>
-                      <span className="bg-muted px-2.5 py-1 rounded-full text-xs">
+                      <span className="bg-muted px-2.5 py-1 rounded-full ds-num text-xs">
                         <span className="text-foreground font-medium">{revisionsLabel(plan.max_client_revisions)}</span> revision{plan.max_client_revisions !== 1 ? 's' : ''}
                       </span>
-                      <span className="bg-muted px-2.5 py-1 rounded-full text-xs">
+                      <span className="bg-muted px-2.5 py-1 rounded-full ds-num text-xs">
                         <span className="text-foreground font-medium">{storageLabel(plan.storage_limit_mb)}</span> storage
                       </span>
-                      <span className="bg-muted px-2.5 py-1 rounded-full text-xs">
+                      <span className="bg-muted px-2.5 py-1 rounded-full ds-num text-xs">
                         <span className="text-foreground font-medium">{plan.max_active_projects === -1 ? '∞' : plan.max_active_projects}</span> active project{plan.max_active_projects !== 1 ? 's' : ''}
                       </span>
                     </div>

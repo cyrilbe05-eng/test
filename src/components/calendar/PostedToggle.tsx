@@ -68,7 +68,7 @@ export function PostedToggle({ event }: { event: CalendarEvent }) {
       disabled={saving}
       title="Mark once this piece is actually published"
       className={cn(
-        'flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all disabled:opacity-50',
+        'flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ds-chip text-xs font-medium border transition-all disabled:opacity-50',
         posted
           ? 'bg-gray-400 text-white border-gray-400'
           : 'bg-muted text-muted-foreground border-border hover:border-gray-400 hover:text-foreground',

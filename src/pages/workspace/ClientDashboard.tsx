@@ -139,7 +139,7 @@ function Plan({ steps }: { steps: Dashboard['plan'] }) {
             )}
             <span className={cn('w-12 flex-shrink-0 text-xs tabular-nums', s.state === 'overdue' ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-muted-foreground', s.done && 'opacity-50')}>{day(s.date)}</span>
             <span className={cn('flex-1 min-w-0 text-sm leading-snug break-words py-1', s.state === 'next' && 'font-semibold', s.done && 'opacity-50')}>{s.title}</span>
-            <span className={cn('text-xs px-2 py-0.5 rounded-full whitespace-nowrap', s.done && 'opacity-50',
+            <span className={cn('text-xs px-2 py-0.5 rounded-full ds-tag whitespace-nowrap', s.done && 'opacity-50',
               s.owner === 'client' ? 'bg-primary/10 text-primary' : s.owner === 'both' ? 'bg-violet-500/10 text-violet-700 dark:text-violet-300' : 'bg-muted text-muted-foreground')}>
               {OWNER[s.owner]}
             </span>

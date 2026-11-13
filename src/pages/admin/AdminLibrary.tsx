@@ -132,7 +132,7 @@ export default function AdminLibrary() {
                         <p className="font-medium text-sm">{s.client_name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{s.plan_name ?? 'No plan'} · {s.file_count} files</p>
                       </div>
-                      {clientFilter === s.client_id && <span className="text-xs text-primary font-medium bg-primary/10 px-2 py-0.5 rounded-full">Filtered</span>}
+                      {clientFilter === s.client_id && <span className="text-xs text-primary font-medium bg-primary/10 px-2 py-0.5 rounded-full ds-tag">Filtered</span>}
                     </div>
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
@@ -213,7 +213,7 @@ export default function AdminLibrary() {
                         <p className="font-medium truncate" title={f.file_name}>{f.file_name}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${FILE_TYPE_COLORS[f.file_type] ?? 'bg-muted text-muted-foreground border-border'}`}>
+                        <span className={`px-2.5 py-1 rounded-full ds-tag text-xs font-medium border ${FILE_TYPE_COLORS[f.file_type] ?? 'bg-muted text-muted-foreground border-border'}`}>
                           {FILE_TYPE_LABELS[f.file_type] ?? f.file_type}
                         </span>
                       </td>
@@ -227,9 +227,9 @@ export default function AdminLibrary() {
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{f.file_size != null ? formatBytes(f.file_size) : '—'}</td>
                       <td className="px-4 py-3">
                         {f.approved ? (
-                          <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Approved</span>
+                          <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full ds-tag">Approved</span>
                         ) : (
-                          <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Pending</span>
+                          <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full ds-tag">Pending</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">

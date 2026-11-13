@@ -136,7 +136,7 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
           <p className="text-xs text-muted-foreground">{formatBytes(size)}</p>
         </div>
         {badge && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0">{badge}</span>
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-tag bg-muted text-muted-foreground flex-shrink-0">{badge}</span>
         )}
         {downloading && <div className="w-3.5 h-3.5 rounded-full border border-primary border-t-transparent animate-spin flex-shrink-0" />}
       </button>
@@ -359,7 +359,7 @@ export default function TeamProjectDetail() {
             <div className="clay-card overflow-hidden">
               <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
                 <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Source Files from Client</h3>
-                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{sourceFiles.length}</span>
+                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full ds-num">{sourceFiles.length}</span>
               </div>
               {isCarousel && clientSlides.length > 0 && (
                 <div className="p-3 pb-1">
@@ -413,13 +413,13 @@ export default function TeamProjectDetail() {
                   <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Revision Comments</h3>
                   <div className="ml-auto flex items-center gap-1.5">
                     {comments.some((c) => !c.resolved) ? (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600">
+                      <span className="text-xs px-1.5 py-0.5 rounded-full ds-tag bg-amber-500/15 text-amber-600">
                         {comments.filter((c) => !c.resolved).length} open
                       </span>
                     ) : (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-600">All addressed</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-full ds-tag bg-green-500/15 text-green-600">All addressed</span>
                     )}
-                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{comments.length}</span>
+                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full ds-num">{comments.length}</span>
                   </div>
                 </div>
                 <div className="divide-y divide-border/40">
@@ -443,9 +443,9 @@ export default function TeamProjectDetail() {
                           {c.profiles?.full_name?.charAt(0) ?? '?'}
                         </span>
                         <span className="text-xs font-medium">{c.profiles?.full_name ?? 'Unknown'}</span>
-                        <span className="text-[10px] text-muted-foreground capitalize bg-muted px-1.5 py-0.5 rounded-full">{c.author_role}</span>
+                        <span className="text-[10px] text-muted-foreground capitalize bg-muted px-1.5 py-0.5 rounded-full ds-tag">{c.author_role}</span>
                         {c.timestamp_sec !== null && (
-                          <span className="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full ds-num">
                             {formatTimestamp(c.timestamp_sec)}
                             {c.timestamp_end_sec != null && `–${formatTimestamp(c.timestamp_end_sec)}`}
                           </span>
@@ -542,7 +542,7 @@ export default function TeamProjectDetail() {
                   </span>
                   <span className="text-sm">{a.profiles?.full_name ?? 'Unknown'}</span>
                   {a.team_member_id === profile?.id && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">You</span>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-tag bg-primary/10 text-primary">You</span>
                   )}
                 </div>
               ))}

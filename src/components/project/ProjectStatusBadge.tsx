@@ -21,7 +21,7 @@ export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
   const cfg = STATUS_CONFIG[status]
   return (
     <span className={cn(
-      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border flex-shrink-0',
+      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ds-tag nodot text-xs font-medium border flex-shrink-0',
       cfg.className,
     )}>
       {cfg.check ? (

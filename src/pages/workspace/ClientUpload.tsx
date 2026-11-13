@@ -213,7 +213,7 @@ export default function ClientUpload() {
           <div className="flex items-center justify-between gap-3 min-w-0">
             <h1 className="text-xl md:text-2xl font-heading font-semibold tracking-tight">{carousel ? 'New carousel' : 'New video'}</h1>
             {prefill.fromEventTitle && (
-              <span className="min-w-0 truncate text-xs font-medium px-2.5 py-1 rounded-full bg-primary/10 text-primary">{prefill.fromEventTitle}</span>
+              <span className="min-w-0 truncate text-xs font-medium px-2.5 py-1 rounded-full ds-num bg-primary/10 text-primary">{prefill.fromEventTitle}</span>
             )}
           </div>
           {fromEntry && <ScriptCard entry={prefill.entry ?? { script: prefill.video_script, comments: prefill.instructions, inspiration_url: prefill.inspiration_url }} />}

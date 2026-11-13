@@ -42,10 +42,10 @@ function TeamKanban({ projects }: { projects: (Project & { is_assigned?: boolean
             onDrop={() => { setDragging(null); setDragOver(null) }}
           >
             <div className="flex items-center justify-between px-3 py-2.5">
-              <span className={cn('text-xs font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border', col.color)}>
+              <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full ds-tag border', col.color)}>
                 {col.label}
               </span>
-              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full font-medium">
+              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full ds-num font-medium">
                 {cards.length}
               </span>
             </div>
@@ -66,9 +66,9 @@ function TeamKanban({ projects }: { projects: (Project & { is_assigned?: boolean
                   <Link to={`/team/projects/${p.id}`} className="block">
                     <div className="flex items-start justify-between gap-1 mb-0.5">
                       <p className="font-medium text-sm text-foreground line-clamp-2 leading-snug flex-1">{p.title}</p>
-                      {p.kind === 'carousel' && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 flex-shrink-0 mt-0.5">Carousel</span>}
+                      {p.kind === 'carousel' && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full ds-tag bg-amber-500/15 text-amber-700 dark:text-amber-300 flex-shrink-0 mt-0.5">Carousel</span>}
                       {(p as any).is_assigned && (
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary flex-shrink-0 mt-0.5">Mine</span>
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full ds-tag bg-primary/10 text-primary flex-shrink-0 mt-0.5">Mine</span>
                       )}
                     </div>
                     {(p as any).profiles?.full_name && (
@@ -192,7 +192,7 @@ export default function TeamDashboard() {
                     </td>
                     <td className="px-4 py-3">
                       {(p as any).is_assigned && (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">Mine</span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full ds-tag bg-primary/10 text-primary">Mine</span>
                       )}
                     </td>
                   </tr>

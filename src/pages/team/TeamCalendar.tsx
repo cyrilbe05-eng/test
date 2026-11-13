@@ -137,7 +137,7 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
                     type="button"
                     onClick={() => setAssignedClientIds((prev) => prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id])}
                     className={cn(
-                      'flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
+                      'flex items-center gap-1 px-2.5 py-1 rounded-full ds-chip text-xs font-medium border transition-all',
                       assignedClientIds.includes(c.id)
                         ? 'bg-teal-500 text-white border-teal-500'
                         : 'bg-muted text-muted-foreground border-border hover:border-teal-400 hover:text-teal-600',
@@ -301,7 +301,7 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
             ) : (
               <h2 className="text-lg font-heading font-semibold flex-1 truncate">{event.title}</h2>
             )}
-            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize flex-shrink-0">
+            <span className="text-xs px-2 py-0.5 rounded-full ds-tag bg-muted text-muted-foreground capitalize flex-shrink-0">
               {event.type.replace('_', ' ')}
             </span>
           </div>
@@ -319,7 +319,7 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
                 </select>
               ) : (
                 event.content_status
-                  ? <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', CONTENT_STATUS_STYLES[event.content_status])}>{event.content_status}</span>
+                  ? <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full ds-tag', CONTENT_STATUS_STYLES[event.content_status])}>{event.content_status}</span>
                   : <span className="text-xs text-muted-foreground">—</span>
               )}
             </PropRow>
@@ -331,7 +331,7 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
                 </select>
               ) : (
                 event.content_type
-                  ? <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', CONTENT_TYPE_STYLES[event.content_type])}>{event.content_type}</span>
+                  ? <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full ds-tag', CONTENT_TYPE_STYLES[event.content_type])}>{event.content_type}</span>
                   : <span className="text-xs text-muted-foreground">—</span>
               )}
             </PropRow>
@@ -347,7 +347,7 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
             </PropRow>
             <PropRow label="Double Down">
               {canEdit ? (
-                <button onClick={() => setDoubleDown(!doubleDown)} className={cn('flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all', doubleDown ? 'bg-orange-500 text-white border-orange-500' : 'bg-muted text-muted-foreground border-border hover:border-orange-400 hover:text-orange-500')}>
+                <button onClick={() => setDoubleDown(!doubleDown)} className={cn('flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ds-chip text-xs font-medium border transition-all', doubleDown ? 'bg-orange-500 text-white border-orange-500' : 'bg-muted text-muted-foreground border-border hover:border-orange-400 hover:text-orange-500')}>
                   🔥 {doubleDown ? 'Yes' : 'No'}
                 </button>
               ) : (

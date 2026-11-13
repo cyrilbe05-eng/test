@@ -21,7 +21,7 @@ const todayStr = () => new Date().toISOString().slice(0, 10)
 
 function OwnerTag({ owner }: { owner: PlanOwner }) {
   return (
-    <span className={cn('text-xs px-2 py-0.5 rounded-full whitespace-nowrap',
+    <span className={cn('text-xs px-2 py-0.5 rounded-full ds-tag whitespace-nowrap',
       owner === 'client' ? 'bg-primary/10 text-primary' : owner === 'both' ? 'bg-violet-500/10 text-violet-700 dark:text-violet-300' : 'bg-muted text-muted-foreground')}>
       {OWNER_LABEL[owner]}
     </span>

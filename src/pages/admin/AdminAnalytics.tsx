@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Segmented } from '@/components/ds'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts'
@@ -67,14 +68,9 @@ function PeriodBar({ value, from, to, onChange }: {
   const today = format(new Date(), 'yyyy-MM-dd')
   return (
     <div className="space-y-2">
-      <div role="radiogroup" aria-label="Period" className="flex flex-wrap gap-1.5">
-        {PERIOD_OPTIONS.map((o) => (
-          <button key={o.key} role="radio" aria-checked={value === o.key} onClick={() => onChange({ period: o.key, from, to })}
-            className={cn('min-h-[44px] px-3.5 rounded-full text-sm font-medium border transition-colors whitespace-nowrap',
-              value === o.key ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted')}>
-            {o.label}
-          </button>
-        ))}
+      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1">
+        <Segmented label="Period" width={104} value={value} onChange={(k) => onChange({ period: k, from, to })}
+          options={PERIOD_OPTIONS.map((o) => ({ value: o.key, label: o.label }))} />
       </div>
       {value === 'custom' && (
         <div className="flex flex-wrap items-center gap-2">
