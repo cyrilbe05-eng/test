@@ -318,29 +318,3 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 @keyframes ds-tip-in{from{opacity:0}to{opacity:1}}
 .ds-tip p+p{margin-top:2px}
 @media (prefers-reduced-motion: reduce){.ds-bar-grow,.ds-bar-x,.ds-ring-draw{animation:none}}
-
-/* ── Side panel ("My report" on the client Home) ── */
-.ds-side-veil{position:fixed;inset:0;z-index:60;background:var(--veil);animation:ds-veil-in .35s var(--out) both}
-.ds-side-panel{position:fixed;z-index:61;top:12px;right:12px;bottom:12px;width:min(380px,calc(100vw - 24px));overflow-y:auto;padding:20px;border-radius:22px;background:linear-gradient(180deg,var(--sheet-a),var(--sheet-b));box-shadow:var(--sheet-sh);color:var(--text);animation:ds-side-in .5s var(--out) both}
-@keyframes ds-side-in{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
-
-/* ── Plan steps (client Home): a horizontal track ── */
-.ds-steps{display:flex;gap:10px;overflow-x:auto;padding:4px 20px 8px;scroll-snap-type:x proximity}
-.ds-steps::-webkit-scrollbar{height:6px}
-.ds-steps::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:6px}
-.ds-step{position:relative;flex:0 0 200px;display:flex;flex-direction:column;min-height:138px;padding:12px 14px;border-radius:14px;scroll-snap-align:start;background:var(--panel);box-shadow:inset 0 0 0 1px var(--panel-ring);animation:ds-fade .5s var(--out) backwards}
-.ds-step.next{background:linear-gradient(180deg,var(--card-a),var(--card-b));box-shadow:var(--card-sh),inset 0 0 0 1px var(--focus)}
-.ds-step.late{box-shadow:inset 0 0 0 1px var(--bad)}
-.ds-step.done{opacity:.6}
-.ds-step-rail{position:relative;height:20px;margin-bottom:8px}
-.ds-step-rail::before{content:"";position:absolute;left:20px;right:-24px;top:9px;height:2px;background:var(--line)}
-.ds-step:last-child .ds-step-rail::before{display:none}
-.ds-step-node{position:relative;z-index:1;display:grid;place-items:center;width:20px;height:20px;border-radius:999px;background:var(--field);box-shadow:inset 0 0 0 1.5px var(--dash);color:var(--accent-fg)}
-.ds-step.done .ds-step-node{background:var(--ds-accent);box-shadow:none}
-.ds-step.next .ds-step-node{box-shadow:inset 0 0 0 5px var(--ds-accent)}
-.ds-step.late .ds-step-node{box-shadow:inset 0 0 0 5px var(--bad)}
-.ds-step-t{margin-top:2px;font-size:13.5px;font-weight:500;line-height:1.35;color:var(--strong);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.ds-step-tick{height:30px;padding:0 10px;border:0;border-radius:8px;background:var(--ghost);color:var(--text);font-size:12px;font-weight:500;cursor:pointer;transition:background .2s}
-.ds-step-tick:hover{background:var(--ghost-h)}
-.ds-step-tick[aria-checked="true"]{background:var(--ds-accent);color:var(--accent-fg)}
-@media (max-width:767px){.ds-step{flex-basis:170px}.ds-step-tick{height:40px}}

@@ -37,7 +37,7 @@ export function MarkPosted({ project, className }: { project: Pick<Project, 'id'
       aria-pressed={posted}
       className={cn(
         'min-h-[44px] px-4 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors disabled:opacity-50',
-        posted ? 'bg-muted text-muted-foreground hover:bg-muted/70' : 'bg-[var(--ghost)] text-foreground hover:bg-[var(--ghost-h)]',
+        posted ? 'bg-muted text-muted-foreground hover:bg-muted/70' : 'bg-green-600 text-white hover:bg-green-700',
         className,
       )}
     >
