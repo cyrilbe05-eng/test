@@ -6,10 +6,6 @@ import {
   startOfWeek,
   endOfWeek,
   eachDayOfInterval,
-  isSameMonth,
-  isSameDay,
-  addMonths,
-  subMonths,
   parseISO,
 } from 'date-fns'
 import { toast } from 'sonner'
@@ -26,8 +22,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
 import { ProjectEntryModal } from '@/components/calendar/ProjectEntryModal'
-import { calendarLabel } from '@/lib/calendarLabel'
-import { EventChip } from '@/components/calendar/EventChip'
+import { MonthView } from '@/components/calendar/MonthView'
 import { Icon, Segmented } from '@/components/ds'
 import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
@@ -47,7 +42,6 @@ const EVENT_COLORS = [
 const CONTENT_TYPES: ContentType[] = ['Reel', 'Story', 'Carousel', 'Post']
 const CONTENT_STATUSES: ContentStatus[] = ['Idea', 'Drafting', 'Scheduled']
 
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function PropRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -541,100 +535,16 @@ export default function AdminCalendar() {
 
   return (
     <AdminLayout>
-      <main className="px-6 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-heading font-semibold tracking-tight">
-              {format(viewDate, 'MMMM yyyy')}
-            </h2>
-            <p className="text-muted-foreground text-sm mt-0.5">Calendar</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setViewDate(subMonths(viewDate, 1))}
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setViewDate(new Date())}
-              className="px-3 py-1.5 text-sm font-medium bg-muted rounded-lg hover:bg-muted/80 transition-colors"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => setViewDate(addMonths(viewDate, 1))}
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex items-center gap-3 mb-4 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1">
-          <span className="text-xs text-muted-foreground flex-none">Filter:</span>
-          <Segmented label="Type" width={84} value={filterType} onChange={(v) => setFilterType(filterType === v ? 'all' : v)}
-            options={[{ value: 'all', label: 'All types' }, ...CONTENT_TYPES.map((t) => ({ value: t, label: t }))]} />
-          <div className="w-px h-5 bg-border flex-none" />
-          <Segmented label="Status" width={88} value={filterStatus} onChange={(v) => setFilterStatus(filterStatus === v ? 'all' : v)}
-            options={[{ value: 'all', label: 'All statuses' }, ...CONTENT_STATUSES.map((t) => ({ value: t, label: t }))]} />
-        </div>
-
-        {/* Grid */}
-        <div className="clay-card overflow-hidden">
-          <div className="grid grid-cols-7 border-b border-border">
-            {DAY_NAMES.map((d) => (
-              <div key={d} className="px-2 py-2.5 text-xs font-medium text-muted-foreground text-center">{d}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {days.map((day, idx) => {
-              const dayEvents = eventsForDay(day)
-              const isCurrentMonth = isSameMonth(day, viewDate)
-              const isToday = isSameDay(day, new Date())
-              const visible = dayEvents.slice(0, 3)
-              const overflow = dayEvents.length - visible.length
-              return (
-                <div
-                  key={idx}
-                  onClick={() => setCreateDay(day)}
-                  className={cn('min-h-[112px] p-1.5 border-b border-r border-border/50 cursor-pointer transition-colors hover:bg-muted/30', !isCurrentMonth && 'opacity-40', idx % 7 === 6 && 'border-r-0', idx >= days.length - 7 && 'border-b-0')}
-                >
-                  <div className={cn('w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold mb-1 ml-0.5', isToday ? 'bg-primary text-white' : 'text-foreground')}>
-                    {format(day, 'd')}
-                  </div>
-                  <div className="flex flex-wrap gap-1 sm:block sm:space-y-0.5">
-                    {visible.map((event) => (
-                      <EventChip key={event.id} event={event} label={calendarLabel(event)} onClick={(e) => { e.stopPropagation(); setSelectedEvent(event) }} />
-                    ))}
-                    {overflow > 0 && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDayDetail(day) }}
-                        className="text-[11.5px] text-muted-foreground hover:text-foreground font-medium px-1.5 py-0.5"
-                      >
-                        +{overflow}<span className="hidden sm:inline"> more</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center gap-3 mt-3 flex-wrap">
-          {CONTENT_TYPES.map((t) => <span key={t} className="text-[11.5px] text-muted-foreground"><b className="font-semibold text-foreground mr-1">{t.slice(0, 1)}</b>{t}</span>)}
-          <div className="w-px h-3 bg-border mx-1" />
-          {CONTENT_STATUSES.map((s) => <span key={s} className="text-[11.5px] text-muted-foreground">{s}</span>)}
-          <span className="ml-auto text-[11.5px] text-muted-foreground"><Icon name="local_fire_department" className="text-orange-500" /> Double Down</span>
-        </div>
+      <main className="px-4 md:px-7 pb-10">
+        <MonthView viewDate={viewDate} onMonth={setViewDate} days={days} eventsForDay={eventsForDay}
+          onCreate={setCreateDay} onSelect={setSelectedEvent} onMore={setDayDetail}
+          filters={<>
+      <Segmented label="Type" width={84} value={filterType} onChange={(v) => setFilterType(filterType === v ? 'all' : v)}
+      options={[{ value: 'all', label: 'All types' }, ...CONTENT_TYPES.map((t) => ({ value: t, label: t }))]} />
+      <div className="w-px h-5 bg-border flex-none" />
+      <Segmented label="Status" width={88} value={filterStatus} onChange={(v) => setFilterStatus(filterStatus === v ? 'all' : v)}
+      options={[{ value: 'all', label: 'All statuses' }, ...CONTENT_STATUSES.map((t) => ({ value: t, label: t }))]} />
+          </>} />
       </main>
 
       {createDay && (

@@ -1,130 +1,133 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { ClientMark, EditorAvatar, Ms } from '@/components/ds'
+import { editorColor } from '@/lib/dsColors'
 import { cn } from '@/lib/utils'
 import type { EditorPerformance, PerfStats } from '@/types/editors'
 
-// Editor Performance — now the "Editors" tab of Analytics (follows its
-// period bar). Every number is computed by the API
-// (api/_helpers/care/editors.ts) with the same definitions as Client Care.
-
-// Editor colours: validated categorical palette (colour-blind safe, light and
-// dark steps). Assigned by the API's stable legend order, so an editor keeps
-// the same colour on every row and every period. Names + % are always written
-// next to the bar, so colour is never the only cue.
-const EDITOR_COLORS = [
-  'bg-[#2a78d6] dark:bg-[#3987e5]',
-  'bg-[#eb6834] dark:bg-[#d95926]',
-  'bg-[#1baf7a] dark:bg-[#199e70]',
-  'bg-[#eda100] dark:bg-[#c98500]',
-  'bg-[#e87ba4] dark:bg-[#d55181]',
-  'bg-[#008300] dark:bg-[#008300]',
-  'bg-[#6250d6] dark:bg-[#9085e9]',
-  'bg-[#e34948] dark:bg-[#e66767]',
-]
-const NEUTRAL = { other: 'bg-zinc-400 dark:bg-zinc-500', unassigned: 'bg-zinc-300 dark:bg-zinc-600' }
+// Editor Performance — the "Editors" tab of Analytics (follows its period
+// bar). Every number is computed by the API (api/_helpers/care/editors.ts)
+// with the same definitions as Client Care.
+//
+// One team table (labels once, a row per editor; a row opens that editor's
+// revision breakdown) and "Who edits each client" (bars in each editor's
+// avatar colour, % written under each part). Nothing is hidden for good.
 
 const fmt = (n: number | null, suffix = '') => (n == null ? '—' : `${n}${suffix}`)
 type Editor = EditorPerformance['editors'][number]
 type Split = EditorPerformance['client_split']
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-muted/50 px-3 py-2 min-w-0">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-lg font-heading font-semibold tabular-nums">{value}</p>
-    </div>
-  )
-}
+const COLS = 'md:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,0.8fr))_minmax(0,1.3fr)_28px]'
 
-/** Labelled bars, one hue; the number and % are always written out. */
+/** Revision reasons of one editor: labelled bars, count and % written out. */
 function CategoryBars({ stats, labels }: { stats: PerfStats; labels: Record<string, string> }) {
-  if (!stats.top_categories.length) return <p className="text-sm text-muted-foreground">—</p>
+  if (!stats.top_categories.length) return <p style={{ fontSize: 13, color: 'var(--faint)' }}>—</p>
   return (
-    <ul className="space-y-1.5">
+    <ul className="grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
       {stats.top_categories.slice(0, 4).map((c) => (
-        <li key={c.category} className="grid grid-cols-[6.5rem_minmax(0,1fr)_4.5rem] items-center gap-2 text-sm">
+        <li key={c.category} className="grid grid-cols-[6.5rem_minmax(0,1fr)_4.5rem] items-center gap-3" style={{ fontSize: 13 }}>
           <span className="truncate">{labels[c.category] ?? c.category}</span>
-          <span className="h-2.5 rounded-full bg-muted overflow-hidden" aria-hidden>
-            <span className="block h-full rounded-full bg-primary" style={{ width: `${Math.max(c.share, 3)}%` }} />
-          </span>
-          <span className="text-right tabular-nums text-muted-foreground">{c.count} · {c.share}%</span>
+          <span className="ds-track" aria-hidden><i style={{ width: `${Math.max(c.share, 3)}%` }} /></span>
+          <span className="text-right tabular-nums" style={{ color: 'var(--faint)' }}>{c.count} · {c.share}%</span>
         </li>
       ))}
     </ul>
   )
 }
 
-function EditorCard({ e, labels, colorClass }: { e: Editor; labels: Record<string, string>; colorClass?: string }) {
-  const t = e.totals
+function Num({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <section className="clay-card p-4 md:p-5 min-w-0">
-      <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h3 className="font-heading font-semibold break-words flex items-center gap-2">
-          {colorClass && <span className={cn('w-3 h-3 rounded-full flex-shrink-0 self-center', colorClass)} aria-hidden />}
-          {e.name}
-          {e.disabled && <span className="text-xs font-medium text-muted-foreground">(disabled)</span>}
-        </h3>
-        <span className="text-xs text-muted-foreground capitalize whitespace-nowrap">{e.team_role}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Stat label="Videos" value={String(t.videos)} />
-        <Stat label="Revisions / video" value={fmt(t.revisions_per_video)} />
-        <Stat label="Turnaround" value={fmt(t.avg_turnaround_days, ' d')} />
-        <Stat label="On time" value={fmt(t.on_time_pct, '%')} />
-      </div>
-      <h4 className="text-sm font-semibold mt-4 mb-2">
-        Revisions
-        {t.revision_notes > 0 && <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">{t.revision_notes}</span>}
-      </h4>
-      <CategoryBars stats={t} labels={labels} />
-    </section>
+    <div className="min-w-0">
+      <p className="md:hidden" style={{ fontSize: 11.5, color: 'var(--faint)' }}>{label}</p>
+      <p className="tabular-nums" style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>{value}</p>
+    </div>
   )
 }
 
-// ── Who edits each client (client-first percentage bars) ────────────────────
-
-function colorFor(key: string, legend: Split['legend']): string {
-  if (key === 'other') return NEUTRAL.other
-  if (key === 'unassigned') return NEUTRAL.unassigned
-  const i = legend.find((l) => l.key === key)?.color_index ?? -1
-  return i >= 0 ? EDITOR_COLORS[i % EDITOR_COLORS.length] : NEUTRAL.other
+function EditorRow({ e, labels, open, onToggle, i }: { e: Editor; labels: Record<string, string>; open: boolean; onToggle: () => void; i: number }) {
+  const t = e.totals
+  const top = t.top_categories[0]
+  return (
+    <li className="ds-erow" style={{ animationDelay: `${80 + i * 50}ms` }}>
+      <button type="button" onClick={onToggle} aria-expanded={open}
+        className={cn('grid w-full grid-cols-4 gap-x-3 gap-y-3 items-center text-left md:gap-x-4', COLS)}>
+        <div className="col-span-4 md:col-span-1 flex items-center gap-3 min-w-0">
+          <EditorAvatar name={e.name} size={30} />
+          <div className="min-w-0">
+            <p className="truncate" style={{ fontSize: 14, fontWeight: 600, color: 'var(--strong)' }}>
+              {e.name}{e.disabled && <span style={{ fontWeight: 400, color: 'var(--faint)' }}> (disabled)</span>}
+            </p>
+            <p className="capitalize" style={{ fontSize: 12, color: 'var(--faint)' }}>{e.team_role}</p>
+          </div>
+        </div>
+        <Num label="Videos" value={t.videos} />
+        <Num label="Revisions / video" value={fmt(t.revisions_per_video)} />
+        <Num label="Turnaround" value={fmt(t.avg_turnaround_days, ' d')} />
+        <div className="min-w-0">
+          <p className="md:hidden" style={{ fontSize: 11.5, color: 'var(--faint)' }}>On time</p>
+          <p className="tabular-nums" style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>{fmt(t.on_time_pct, '%')}</p>
+          {t.on_time_pct != null && <span className="ds-track block mt-1.5" style={{ maxWidth: 72 }} aria-hidden><i style={{ width: `${t.on_time_pct}%` }} /></span>}
+        </div>
+        <div className="col-span-3 md:col-span-1 min-w-0" style={{ fontSize: 13 }}>
+          <span className="tabular-nums" style={{ fontWeight: 600, color: 'var(--strong)' }}>{t.revision_notes}</span>
+          <span style={{ color: 'var(--faint)' }}> revision{t.revision_notes === 1 ? '' : 's'}</span>
+          {top && <p className="truncate" style={{ color: 'var(--faint)', fontSize: 12 }}>Mostly {(labels[top.category] ?? top.category).toLowerCase()} · {top.share}%</p>}
+        </div>
+        <Ms name="expand_more" className="justify-self-end" style={{ transition: 'transform .35s cubic-bezier(.34,1.4,.64,1)', transform: open ? 'rotate(180deg)' : 'none' }} />
+      </button>
+      {open && (
+        <div className="ds-erow-more">
+          <CategoryBars stats={t} labels={labels} />
+        </div>
+      )}
+    </li>
+  )
 }
+
+// ── Who edits each client ───────────────────────────────────────────────────
 
 function ClientSplit({ split }: { split: Split }) {
   const [all, setAll] = useState(false)
   const names = Object.fromEntries(split.legend.map((l) => [l.key, l.name]))
-  if (!split.clients.length) return <p className="text-sm text-muted-foreground">—</p>
+  const color = (key: string) => key === 'other' ? 'var(--dash)' : key === 'unassigned' ? 'var(--track)' : editorColor(names[key] ?? key)
+  if (!split.clients.length) return <p style={{ fontSize: 13, color: 'var(--faint)' }}>—</p>
   const shown = all ? split.clients : split.clients.slice(0, 10)
   return (
     <>
-      {/* Legend: same colour per editor on every row. */}
-      <ul className="flex flex-wrap gap-x-4 gap-y-1.5 mb-4 text-sm">
+      <ul className="flex flex-wrap gap-x-5 gap-y-2 mb-5" style={{ fontSize: 13 }}>
         {split.legend.map((l) => (
-          <li key={l.key} className="flex items-center gap-1.5">
-            <span className={cn('w-3 h-3 rounded-sm', colorFor(l.key, split.legend))} aria-hidden />{l.name}
+          <li key={l.key} className="flex items-center gap-2">
+            {l.key === 'other' || l.key === 'unassigned'
+              ? <span className="w-2.5 h-2.5 rounded-full" style={{ background: color(l.key) }} aria-hidden />
+              : <EditorAvatar name={l.name} size={20} />}
+            {l.name}
           </li>
         ))}
       </ul>
 
-      <ul className="grid gap-x-10 gap-y-4 lg:grid-cols-2">
+      <ul className="grid gap-x-12 gap-y-5 lg:grid-cols-2">
         {shown.map((c) => {
-          const label = c.split.map((s) => `${names[s.key]} ${s.share}%`).join(', ')
+          const parts = c.split.filter((s) => s.share > 0)
+          const label = parts.map((s) => `${names[s.key]} ${s.share}%`).join(', ')
           return (
             <li key={c.client_id} className="min-w-0">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-semibold break-words min-w-0">{c.name}</span>
-                <span className="text-sm tabular-nums whitespace-nowrap text-muted-foreground">{c.videos} video{c.videos === 1 ? '' : 's'}</span>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <span className="flex items-center gap-2.5 min-w-0">
+                  <ClientMark name={c.name} size={20} />
+                  <span className="truncate" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--strong)' }}>{c.name}</span>
+                </span>
+                <span className="tabular-nums whitespace-nowrap" style={{ fontSize: 12, color: 'var(--faint)' }}>{c.videos} video{c.videos === 1 ? '' : 's'}</span>
               </div>
-              {/* 100% stacked bar, % written inside each segment (the legend
-                  above names the colours). Tiny segments keep it in the tooltip. */}
-              <div className="flex h-6 gap-[2px] rounded-full overflow-hidden mt-1.5 bg-muted" role="img" aria-label={`${c.name}: ${label}`}>
-                {c.split.filter((s) => s.share > 0).map((s) => (
-                  <span
-                    key={s.key}
-                    className={cn('h-full flex items-center justify-center text-[11px] font-semibold text-white tabular-nums first:rounded-l-full last:rounded-r-full', colorFor(s.key, split.legend))}
-                    style={{ width: `${s.share}%` }}
-                    title={`${names[s.key]}: ${s.videos} of ${c.videos} video${c.videos === 1 ? '' : 's'} (${s.share}%)`}
-                  >
+              <div className="flex gap-[3px]" role="img" aria-label={`${c.name}: ${label}`}>
+                {parts.map((s) => (
+                  <span key={s.key} className="h-2 rounded-full" style={{ width: `${s.share}%`, background: color(s.key) }}
+                    title={`${names[s.key]}: ${s.videos} of ${c.videos} video${c.videos === 1 ? '' : 's'} (${s.share}%)`} />
+                ))}
+              </div>
+              {/* The % of each part, under it (tiny parts: in the tooltip). */}
+              <div className="flex gap-[3px] mt-1.5" aria-hidden>
+                {parts.map((s) => (
+                  <span key={s.key} className="tabular-nums truncate" style={{ width: `${s.share}%`, fontSize: 11, color: 'var(--faint)' }}>
                     {s.share >= 10 ? `${s.share}%` : ''}
                   </span>
                 ))}
@@ -134,7 +137,7 @@ function ClientSplit({ split }: { split: Split }) {
         })}
       </ul>
       {split.clients.length > 10 && (
-        <button onClick={() => setAll((a) => !a)} className="mt-3 min-h-[44px] px-3 rounded-xl text-sm text-primary hover:bg-primary/5 font-medium">
+        <button onClick={() => setAll((a) => !a)} className="ds-ghost-btn mt-5">
           {all ? 'Show fewer' : `Show all ${split.clients.length} clients`}
         </button>
       )}
@@ -142,20 +145,25 @@ function ClientSplit({ split }: { split: Split }) {
   )
 }
 
-/** The Editors tab of Analytics: one card per editor + who edits each client. */
+/** The Editors tab of Analytics: the team table + who edits each client. */
 export function EditorsPanel({ data }: { data: EditorPerformance }) {
   const labels = Object.fromEntries(data.categories.map((c) => [c.key, c.label]))
-  if (!data.editors.length) return <div className="clay-card p-6 text-sm text-muted-foreground">—</div>
+  const [open, setOpen] = useState<string | null>(null)
+  if (!data.editors.length) return <div className="ds-panel" style={{ fontSize: 13, color: 'var(--faint)' }}>—</div>
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {data.editors.map((e) => {
-          const inLegend = data.client_split.legend.find((l) => l.key === e.editor_id)
-          return <EditorCard key={e.editor_id} e={e} labels={labels} colorClass={inLegend ? colorFor(e.editor_id, data.client_split.legend) : undefined} />
-        })}
-      </div>
-      <section className="clay-card p-4 md:p-5 min-w-0">
-        <h3 className="font-heading font-semibold mb-3">Who edits each client</h3>
+      <section className="ds-panel" style={{ padding: '6px 8px' }}>
+        <div className={cn('hidden md:grid gap-x-4 px-3 pt-3 pb-2', COLS)} style={{ fontSize: 11.5, color: 'var(--faint)' }}>
+          <span>Editor</span><span>Videos</span><span>Revisions / video</span><span>Turnaround</span><span>On time</span><span>Revisions</span><span />
+        </div>
+        <ul>
+          {data.editors.map((e, i) => (
+            <EditorRow key={e.editor_id} e={e} i={i} labels={labels} open={open === e.editor_id} onToggle={() => setOpen(open === e.editor_id ? null : e.editor_id)} />
+          ))}
+        </ul>
+      </section>
+      <section className="ds-panel" style={{ padding: '18px 20px 20px', animationDelay: '120ms' }}>
+        <div className="ds-panel-head" style={{ marginBottom: 12 }}><h2>Who edits each client</h2></div>
         <ClientSplit split={data.client_split} />
       </section>
     </div>
