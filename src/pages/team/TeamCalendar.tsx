@@ -27,6 +27,7 @@ import {
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
 import { ProjectEntryModal } from '@/components/calendar/ProjectEntryModal'
 import { calendarLabel } from '@/lib/calendarLabel'
+import { EventChip } from '@/components/calendar/EventChip'
 import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus, Profile } from '@/types'
@@ -116,16 +117,16 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
         <h2 className="font-heading font-semibold text-lg">New Event</h2>
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Title</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Title</label>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title…" className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" autoFocus />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Date</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Date</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
           </div>
           {clients.length > 0 && (
             <div>
-              <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5 block">
+              <label className="text-xs text-muted-foreground mb-1.5 block">
                 For client <span className="normal-case tracking-normal text-muted-foreground/70">(they'll see it in their calendar)</span>
               </label>
               <div className="flex flex-wrap gap-1.5">
@@ -150,14 +151,14 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
           )}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Content type</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Content type</label>
               <select value={contentType} onChange={(e) => setContentType(e.target.value as ContentType | '')} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
                 <option value="">None</option>
                 {CONTENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Status</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Status</label>
               <select value={contentStatus} onChange={(e) => setContentStatus(e.target.value as ContentStatus | '')} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
                 <option value="">None</option>
                 {CONTENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -165,24 +166,24 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
             </div>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Notes</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Notes</label>
             <textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Notes…" rows={2} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Inspiration URL</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Inspiration URL</label>
             <input value={inspirationUrl} onChange={(e) => setInspirationUrl(e.target.value)} placeholder="https://…" className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Script</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Script</label>
             <textarea value={script} onChange={(e) => setScript(e.target.value)} placeholder="Script…" rows={3} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Caption</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Caption</label>
             <textarea value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Caption…" rows={2} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Color</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Color</label>
               <div className="flex gap-2 flex-wrap">
                 {EVENT_COLORS.map((c) => (
                   <button key={c.value} onClick={() => setColor(c.value)} title={c.label} className={cn('w-6 h-6 rounded-full transition-all', c.value, color === c.value && 'ring-2 ring-offset-2 ring-foreground')} />
@@ -366,14 +367,14 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
           {/* Content fields */}
           <div className="pt-3 pb-3 space-y-3">
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">Notes</p>
+              <p className="text-xs text-muted-foreground mb-1.5">Notes</p>
               {canEdit
                 ? <textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Add notes…" rows={2} className="w-full bg-muted/50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
                 : event.comments ? <p className="text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2">{event.comments}</p> : <span className="text-xs text-muted-foreground">—</span>
               }
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">Inspiration URL</p>
+              <p className="text-xs text-muted-foreground mb-1.5">Inspiration URL</p>
               {canEdit
                 ? <input value={inspirationUrl} onChange={(e) => setInspirationUrl(e.target.value)} placeholder="https://…" className="w-full bg-muted/50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
                 : event.inspiration_url
@@ -382,14 +383,14 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
               }
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">Script</p>
+              <p className="text-xs text-muted-foreground mb-1.5">Script</p>
               {canEdit
                 ? <textarea value={script} onChange={(e) => setScript(e.target.value)} placeholder="Script…" rows={4} className="w-full bg-muted/50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
                 : event.script ? <p className="text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2 whitespace-pre-wrap">{event.script}</p> : <span className="text-xs text-muted-foreground">—</span>
               }
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">Caption</p>
+              <p className="text-xs text-muted-foreground mb-1.5">Caption</p>
               {canEdit
                 ? <textarea value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Caption…" rows={2} className="w-full bg-muted/50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
                 : event.caption ? <p className="text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2">{event.caption}</p> : <span className="text-xs text-muted-foreground">—</span>
@@ -399,7 +400,7 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
 
           {/* Comment thread */}
           <div className="pt-3">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Comments</p>
+            <p className="text-xs text-muted-foreground mb-2">Comments</p>
             <EventCommentThread eventId={event.id} currentUserId={currentUserId} isAdmin={false} />
           </div>
         </div>
@@ -484,7 +485,7 @@ export default function TeamCalendar() {
 
         {/* Filters */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Filter:</span>
+          <span className="text-xs text-muted-foreground font-semibold">Filter:</span>
           {isCopywriter && assignableClients.length > 0 && (
             <select
               value={filterClient}
@@ -499,16 +500,16 @@ export default function TeamCalendar() {
             </select>
           )}
           <div className="flex gap-1 flex-wrap">
-            <button onClick={() => setFilterType('all')} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium transition-colors', filterType === 'all' ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>All types</button>
+            <button onClick={() => setFilterType('all')} className={cn('h-8 px-3 rounded-full text-[13px] font-medium transition-colors', filterType === 'all' ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>All types</button>
             {CONTENT_TYPES.map((t) => (
-              <button key={t} onClick={() => setFilterType(filterType === t ? 'all' : t)} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium transition-colors', filterType === t ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>{t}</button>
+              <button key={t} onClick={() => setFilterType(filterType === t ? 'all' : t)} className={cn('h-8 px-3 rounded-full text-[13px] font-medium transition-colors', filterType === t ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>{t}</button>
             ))}
           </div>
           <div className="w-px h-4 bg-border mx-1" />
           <div className="flex gap-1 flex-wrap">
-            <button onClick={() => setFilterStatus('all')} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium transition-colors', filterStatus === 'all' ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>All statuses</button>
+            <button onClick={() => setFilterStatus('all')} className={cn('h-8 px-3 rounded-full text-[13px] font-medium transition-colors', filterStatus === 'all' ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>All statuses</button>
             {CONTENT_STATUSES.map((s) => (
-              <button key={s} onClick={() => setFilterStatus(filterStatus === s ? 'all' : s)} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium transition-colors', filterStatus === s ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>{s}</button>
+              <button key={s} onClick={() => setFilterStatus(filterStatus === s ? 'all' : s)} className={cn('h-8 px-3 rounded-full text-[13px] font-medium transition-colors', filterStatus === s ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:text-foreground')}>{s}</button>
             ))}
           </div>
         </div>
@@ -516,7 +517,7 @@ export default function TeamCalendar() {
         <div className="clay-card overflow-hidden">
           <div className="grid grid-cols-7 border-b border-border">
             {DAY_NAMES.map((d) => (
-              <div key={d} className="px-2 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide text-center">{d}</div>
+              <div key={d} className="px-2 py-2.5 text-xs font-medium text-muted-foreground text-center">{d}</div>
             ))}
           </div>
           <div className="grid grid-cols-7">
@@ -527,23 +528,18 @@ export default function TeamCalendar() {
               const visible = dayEvents.slice(0, 3)
               const overflow = dayEvents.length - visible.length
               return (
-                <div key={idx} onClick={() => setCreateDay(day)} className={cn('min-h-[100px] p-2 border-b border-r border-border/50 cursor-pointer transition-colors hover:bg-muted/30', !isCurrentMonth && 'opacity-40', idx % 7 === 6 && 'border-r-0', idx >= days.length - 7 && 'border-b-0')}>
-                  <div className={cn('w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold mb-1', isToday ? 'bg-primary text-white' : 'text-foreground')}>{format(day, 'd')}</div>
-                  <div className="space-y-0.5">
+                <div key={idx} onClick={() => setCreateDay(day)} className={cn('min-h-[112px] p-1.5 border-b border-r border-border/50 cursor-pointer transition-colors hover:bg-muted/30', !isCurrentMonth && 'opacity-40', idx % 7 === 6 && 'border-r-0', idx >= days.length - 7 && 'border-b-0')}>
+                  <div className={cn('w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold mb-1 ml-0.5', isToday ? 'bg-primary text-white' : 'text-foreground')}>{format(day, 'd')}</div>
+                  <div className="flex flex-wrap gap-1 sm:block sm:space-y-0.5">
                     {visible.map((event) => (
-                      <button key={event.id} onClick={(e) => { e.stopPropagation(); setSelectedEvent(event) }} className={cn('w-full flex items-center gap-1 px-1.5 py-0.5 rounded text-left hover:opacity-80 transition-opacity', event.color ?? 'bg-slate-500')}>
-                        {event.posted && <span className="text-white/90 text-[9px] leading-none flex-shrink-0" title="Posted">✓</span>}
-                        {event.double_down && <span className="text-[9px] leading-none">🔥</span>}
-                        {event.content_type && <span className="text-white/70 text-[9px] leading-none font-bold uppercase tracking-tight flex-shrink-0">{event.content_type.slice(0, 1)}</span>}
-                        <span className="text-white text-[10px] font-medium truncate leading-tight">{calendarLabel(event)}</span>
-                      </button>
+                      <EventChip key={event.id} event={event} label={calendarLabel(event)} onClick={(e) => { e.stopPropagation(); setSelectedEvent(event) }} />
                     ))}
                     {overflow > 0 && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setDayDetail(day) }}
-                        className="text-[10px] text-muted-foreground hover:text-foreground font-medium px-1 hover:underline"
+                        className="text-[11.5px] text-muted-foreground hover:text-foreground font-medium px-1.5 py-0.5"
                       >
-                        +{overflow} more
+                        +{overflow}<span className="hidden sm:inline"> more</span>
                       </button>
                     )}
                   </div>

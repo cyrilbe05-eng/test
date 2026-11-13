@@ -49,7 +49,7 @@ export function DayEventsModal({
               {event.double_down && <span className="text-[10px] leading-none flex-shrink-0">🔥</span>}
               <span className="text-sm font-medium truncate flex-1">{calendarLabel(event)}</span>
               {event.content_type && (
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase flex-shrink-0">{event.content_type}</span>
+                <span className="text-[10px] font-semibold text-muted-foreground flex-shrink-0">{event.content_type}</span>
               )}
             </button>
           ))}
