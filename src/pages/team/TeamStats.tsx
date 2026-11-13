@@ -225,7 +225,7 @@ export default function TeamStats() {
                               : deadline.status === 'missed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                               : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
                           )}>
-                            {deadline.status === 'met' ? '✓ deadline' : deadline.status === 'missed' ? '✗ deadline' : '⏰ deadline'}
+                            {deadline.status === 'met' ? 'Deadline met' : deadline.status === 'missed' ? 'Deadline missed' : 'Deadline pending'}
                           </span>
                         )}
                         <span className={cn('flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full ds-tag text-xs font-medium', STATUS_COLORS[p.status])}>

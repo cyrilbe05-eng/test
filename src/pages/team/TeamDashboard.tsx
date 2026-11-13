@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ds'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useProjects } from '@/hooks/useProjects'
@@ -79,7 +80,7 @@ function TeamKanban({ projects }: { projects: (Project & { is_assigned?: boolean
                     )}
                     <p className="text-[10px] text-muted-foreground/70 mt-1 truncate">
                       {(p as any).assigned_team_names
-                        ? <>👤 {(p as any).assigned_team_names}</>
+                        ? <><Icon name="person" size={12} /> {(p as any).assigned_team_names}</>
                         : <span className="text-amber-600/80">Unassigned</span>}
                     </p>
                     <p className="text-[10px] text-muted-foreground/70 mt-1">

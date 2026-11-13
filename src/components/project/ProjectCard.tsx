@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ds'
 import { Link } from 'react-router-dom'
 import { projectTimeLabel } from '@/lib/utils'
 import { ProjectStatusBadge } from './ProjectStatusBadge'
@@ -24,7 +25,7 @@ export function ProjectCard({ project, href, showClient = false }: Props) {
             <p className="text-xs text-muted-foreground mt-0.5">{project.profiles.full_name}</p>
           )}
           {project.inspiration_url && (
-            <p className="text-xs text-primary/70 mt-1.5 truncate leading-relaxed">🎬 {project.inspiration_url}</p>
+            <p className="text-xs text-primary/70 mt-1.5 truncate leading-relaxed"><Icon name="movie" size={13} /> {project.inspiration_url}</p>
           )}
         </div>
         <ProjectStatusBadge status={project.status} />

@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ds'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -130,7 +131,7 @@ function DoneRow({ q }: { q: Data['questions'][number] }) {
         ) : <Answer q={q} />}
       </div>
       {!editing && (
-        <button onClick={() => setDraft(q.value)} aria-label="Edit" className="-mr-2 w-11 h-11 rounded-lg flex-shrink-0 text-muted-foreground hover:bg-muted">✎</button>
+        <button onClick={() => setDraft(q.value)} aria-label="Edit" className="-mr-2 w-11 h-11 rounded-lg flex-shrink-0 text-muted-foreground hover:bg-muted"><Icon name="edit" size={18} /></button>
       )}
     </li>
   )

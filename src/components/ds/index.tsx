@@ -11,6 +11,13 @@ export function Ms({ name, className, style }: { name: string; className?: strin
   return <span className={cn('ds-ms', className)} style={style} aria-hidden="true">{name}</span>
 }
 
+/** Inline icon that takes the surrounding text colour (replaces emojis). */
+export function Icon({ name, size = 14, className, style }: { name: string; size?: number; className?: string; style?: React.CSSProperties }) {
+  // A colour class on the icon itself wins; otherwise it follows the text.
+  const own = /(^|\s)text-(muted|primary|foreground|[a-z]+-\d)/.test(className ?? '')
+  return <Ms name={name} className={cn('align-[-0.15em]', className)} style={{ fontSize: size, width: size, ...(own ? {} : { color: 'inherit' }), ...style }} />
+}
+
 /** Theme toggle. The content fades out (0.16s), the theme switches while
  *  it's hidden, then it fades back in (0.42s); the page background glides
  *  underneath. Only opacity + one background animate, so it stays fluid.

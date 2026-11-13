@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ds'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Plyr from 'plyr'
 import 'plyr/dist/plyr.css'
@@ -660,14 +661,14 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
                               onClick={() => { setEditingId(comment.id); setEditText(comment.comment_text) }}
                               title="Edit comment"
                               className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                            >✎</button>
+                            ><Icon name="edit" /></button>
                           )}
                           {(comment.author_id === currentUserId || currentUserRole === 'admin') && (
                             <button
                               onClick={() => deleteComment(comment.id)}
                               title="Delete comment"
                               className="text-[10px] text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-                            >🗑</button>
+                            ><Icon name="delete" /></button>
                           )}
                         </div>
                         {editingId === comment.id ? (

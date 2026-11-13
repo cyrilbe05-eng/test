@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ds'
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -118,7 +119,7 @@ function StorageTab({ files, approvedDeliverables, projectId, onDownload, onUplo
             {sources.map((f) => (
               <div key={f.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/40 transition-colors">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-sm">
-                  {f.file_name.match(/\.(mp4|mov|avi|webm)$/i) ? '🎬' : f.file_name.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? '🖼️' : '📎'}
+                  <Icon size={16} className="text-muted-foreground" name={f.file_name.match(/\.(mp4|mov|avi|webm)$/i) ? 'movie' : f.file_name.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'attach_file'} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{f.file_name}</p>
@@ -331,7 +332,7 @@ export default function ClientProjectDetail() {
                   : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
-              {tab === 'review' ? (isCarousel ? '🖼️ My Carousel' : '📺 My Video') : '📁 Files'}
+              <Icon size={16} className="mr-1.5" name={tab === 'review' ? (isCarousel ? 'photo_library' : 'smart_display') : 'folder'} />{tab === 'review' ? (isCarousel ? 'My Carousel' : 'My Video') : 'Files'}
             </button>
           ))}
         </div>

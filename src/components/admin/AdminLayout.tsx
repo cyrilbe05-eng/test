@@ -9,6 +9,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { ProductionChatPanel } from '@/components/chat/ProductionChatPanel'
 import { Ms, ThemeFadeButton } from '@/components/ds'
 import { cn } from '@/lib/utils'
+import { useCardTilt } from '@/hooks/useCardTilt'
 
 // Admin frame (DESIGN.md): 236px sidebar with a single sliding indicator,
 // logo on top, profile + sign out at the bottom; no top bar on desktop.
@@ -72,6 +73,7 @@ export function AdminLayout({ children, bare }: AdminLayoutProps) {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  useCardTilt()
 
   const handleSignOut = () => {
     clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })

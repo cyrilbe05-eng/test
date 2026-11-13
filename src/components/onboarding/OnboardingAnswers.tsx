@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ds'
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
@@ -61,7 +62,7 @@ function Row({ q, clientId }: { q: Q; clientId: string }) {
       ) : <Answer q={q} />}
       </div>
       {!editing && (
-        <button onClick={() => setDraft(q.value)} aria-label="Edit" className="-mr-2 w-11 h-11 rounded-lg flex-shrink-0 text-muted-foreground hover:bg-muted">✎</button>
+        <button onClick={() => setDraft(q.value)} aria-label="Edit" className="-mr-2 w-11 h-11 rounded-lg flex-shrink-0 text-muted-foreground hover:bg-muted"><Icon name="edit" size={18} /></button>
       )}
     </li>
   )

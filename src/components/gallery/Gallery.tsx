@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ds'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -868,7 +869,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                   }
                   {batchDownloading && selectedIds.size > 1 ? `${batchDone}/${selectedIds.size}` : 'Download'}
                 </button>
-                <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground transition-colors">✕</button>
+                <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground transition-colors" aria-label="Clear selection"><Icon name="close" size={16} /></button>
               </>
             ) : (
               <button

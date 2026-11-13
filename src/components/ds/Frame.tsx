@@ -9,6 +9,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { ProductionChatPanel } from '@/components/chat/ProductionChatPanel'
 import { Ms, ThemeFadeButton } from '@/components/ds'
 import { cn } from '@/lib/utils'
+import { useCardTilt } from '@/hooks/useCardTilt'
 
 // The app frame of the design system (same as the admin frame): 236px
 // sidebar with one sliding indicator, profile + sign out at the bottom;
@@ -45,6 +46,7 @@ export function AppFrame({ groups, bottom, subtitle, viewingAs, footer, children
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  useCardTilt()
   const close = () => setDrawerOpen(false)
 
   const handleSignOut = () => {

@@ -27,7 +27,7 @@ import { EventCommentThread } from '@/components/calendar/EventCommentThread'
 import { ProjectEntryModal } from '@/components/calendar/ProjectEntryModal'
 import { calendarLabel } from '@/lib/calendarLabel'
 import { EventChip } from '@/components/calendar/EventChip'
-import { Segmented } from '@/components/ds'
+import { Icon, Segmented } from '@/components/ds'
 import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
 import type { CalendarEvent, ContentType, ContentStatus } from '@/types'
@@ -162,7 +162,7 @@ function CreateEventModal({ defaultDate, onClose }: { defaultDate: Date; onClose
               </div>
             </div>
             <button onClick={() => setDoubleDown(!doubleDown)} className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border', doubleDown ? 'bg-orange-500 text-white border-orange-500' : 'bg-muted text-muted-foreground border-border hover:border-orange-400 hover:text-orange-500')}>
-              🔥 Double Down
+              <Icon name="local_fire_department" className="text-orange-500" /> Double Down
             </button>
           </div>
         </div>
@@ -341,10 +341,10 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
             <PropRow label="Double Down">
               {canEdit ? (
                 <button onClick={() => setDoubleDown(!doubleDown)} className={cn('flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ds-chip text-xs font-medium border transition-all', doubleDown ? 'bg-orange-500 text-white border-orange-500' : 'bg-muted text-muted-foreground border-border hover:border-orange-400 hover:text-orange-500')}>
-                  🔥 {doubleDown ? 'Yes' : 'No'}
+                  <Icon name="local_fire_department" className="text-orange-500" /> {doubleDown ? 'Yes' : 'No'}
                 </button>
               ) : (
-                <span className="text-xs text-muted-foreground">{event.double_down ? '🔥 Yes' : 'No'}</span>
+                <span className="text-xs text-muted-foreground">{event.double_down ? <><Icon name="local_fire_department" className="text-orange-500" /> Yes</> : 'No'}</span>
               )}
             </PropRow>
             {canEdit && (
@@ -527,7 +527,7 @@ export default function ClientCalendar() {
           {CONTENT_TYPES.map((t) => <span key={t} className="text-[11.5px] text-muted-foreground"><b className="font-semibold text-foreground mr-1">{t.slice(0, 1)}</b>{t}</span>)}
           <div className="w-px h-3 bg-border mx-1" />
           {CONTENT_STATUSES.map((s) => <span key={s} className="text-[11.5px] text-muted-foreground">{s}</span>)}
-          <span className="ml-auto text-[11.5px] text-muted-foreground">🔥 Double Down</span>
+          <span className="ml-auto text-[11.5px] text-muted-foreground"><Icon name="local_fire_department" className="text-orange-500" /> Double Down</span>
         </div>
       </main>
 
