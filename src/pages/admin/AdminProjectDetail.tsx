@@ -1,4 +1,4 @@
-import { Icon } from '@/components/ds'
+import { ClientMark, EditorAvatar, Icon, Ms, Segmented, StatusDot } from '@/components/ds'
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getSignedUrlById } from '@/lib/storage'
@@ -11,14 +11,14 @@ import { CarouselReview, SlideManager } from '@/components/carousel/Carousel'
 import { VersionTabs } from '@/components/project/VersionTabs'
 import { currentVersions, commentsForVersion } from '@/lib/versions'
 import { slidesOf } from '@/lib/slides'
-import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
+import { statusLabel } from '@/lib/dsStatus'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
 import { ReviewCopyControl } from '@/components/project/ReviewCopyControl'
 import { FileUploader } from '@/components/project/FileUploader'
 import { useAuth } from '@/hooks/useAuth'
 import { useApiFetch } from '@/lib/api'
 import { formatDistanceToNow } from 'date-fns'
-import { AdminLayout } from '@/components/admin/AdminLayout'
+import { AdminLayout, HeaderTools } from '@/components/admin/AdminLayout'
 import type { Profile } from '@/types'
 
 interface Deadline {
@@ -49,12 +49,12 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
+function Section({ title, children, className, right }: { title: string; children: React.ReactNode; className?: string; right?: React.ReactNode }) {
   return (
-    <div className={cn('clay-card p-4', className)}>
-      <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground mb-3">{title}</h3>
+    <section className={cn('ds-panel', className)} style={{ padding: '16px 18px 16px' }}>
+      <div className="ds-panel-head" style={{ marginBottom: 10 }}><h2>{title}</h2>{right}</div>
       {children}
-    </div>
+    </section>
   )
 }
 
@@ -62,26 +62,42 @@ function TextBlock({ label, value }: { label: string; value: string }) {
   const [expanded, setExpanded] = useState(false)
   const isLong = value.length > 300
   return (
-    <div className="clay-card overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-        <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">{label}</h3>
+    <section className="ds-panel" style={{ padding: '16px 18px' }}>
+      <div className="ds-panel-head" style={{ marginBottom: 8 }}>
+        <h2>{label}</h2>
         {isLong && (
-          <button onClick={() => setExpanded((e) => !e)} className="text-xs text-primary hover:underline flex-shrink-0">
+          <button onClick={() => setExpanded((e) => !e)} className="flex-shrink-0 hover:underline" style={{ fontSize: 12.5, color: 'var(--faint)' }}>
             {expanded ? 'Show less' : 'Show more'}
           </button>
         )}
       </div>
       <div
-        className={cn('px-4 py-3 text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap overflow-hidden transition-all', !expanded && isLong ? 'max-h-32' : 'max-h-none')}
-        style={!expanded && isLong ? { WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)' } : {}}
+        className={cn('whitespace-pre-wrap overflow-hidden transition-all', !expanded && isLong ? 'max-h-32' : 'max-h-none')}
+        style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)', ...(!expanded && isLong ? { WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)' } : {}) }}
       >
         {value}
       </div>
       {!expanded && isLong && (
-        <button onClick={() => setExpanded(true)} className="w-full px-4 pb-3 text-xs text-primary hover:underline text-left">
-          Read full text ↓
+        <button onClick={() => setExpanded(true)} className="mt-2 hover:underline" style={{ fontSize: 12.5, color: 'var(--faint)' }}>
+          Read full text
         </button>
       )}
+    </section>
+  )
+}
+
+/** A file in a list: name, size · time (· who), a label, download. */
+function FileLine({ f, label, who }: { f: { id: string; file_name: string; file_size: number | null; created_at: string }; label: React.ReactNode; who?: string }) {
+  return (
+    <div className="flex items-center gap-3 py-2.5" style={{ borderTop: '1px solid var(--line)' }}>
+      <div className="flex-1 min-w-0">
+        <p className="truncate" style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--strong)' }}>{f.file_name}</p>
+        <p style={{ fontSize: 12, color: 'var(--faint)' }}>
+          {f.file_size ? formatBytes(f.file_size) : '—'} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}{who && ` · ${who}`}
+        </p>
+      </div>
+      {label}
+      <FileRow name="" size={null} fileId={f.id} iconOnly />
     </div>
   )
 }
@@ -112,7 +128,7 @@ function FileRow({ name, size, fileId, iconOnly }: { name: string; size: number 
   }
   if (iconOnly) {
     return (
-      <button onClick={handleDownload} disabled={loading} title="Download" className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 flex-shrink-0">
+      <button onClick={handleDownload} disabled={loading} title="Download" className="ds-ibtn flex-shrink-0 disabled:opacity-50" style={{ width: 34, height: 34 }}>
         {loading
           ? <div className="w-4 h-4 rounded-full border border-primary border-t-transparent animate-spin" />
           : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -126,13 +142,13 @@ function FileRow({ name, size, fileId, iconOnly }: { name: string; size: number 
       disabled={loading}
       className="flex items-center gap-3 w-full text-left hover:bg-muted/60 transition-colors rounded-lg px-2 py-2 group disabled:opacity-60"
     >
-      <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-        <svg className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+        <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
         </svg>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium truncate text-foreground group-hover:text-primary transition-colors">{name}</p>
+        <p className="truncate" style={{ fontSize: 13, fontWeight: 500, color: 'var(--strong)' }}>{name}</p>
         {size != null && <p className="text-[10px] text-muted-foreground">{formatBytes(size)}</p>}
       </div>
       {loading && <div className="w-3 h-3 rounded-full border border-primary border-t-transparent animate-spin flex-shrink-0" />}
@@ -266,334 +282,62 @@ export default function AdminProjectDetail() {
   const client = (project as any).profiles
 
   return (
-    <AdminLayout>
-      {/* Breadcrumb header */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-20" style={{ height: '52px' }}>
-        <div className="h-full flex items-center px-4 gap-3">
-          <Link to="/admin" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span className="hidden sm:inline">Projects</span>
-          </Link>
-          <span className="text-border/60">/</span>
-          <span className="text-sm font-medium truncate max-w-xs">{project.title}</span>
-          <div className="ml-auto flex items-center gap-2">
-            <ProjectStatusBadge status={project.status} />
-            <button
-              onClick={handleDeleteProject}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800/40 transition-colors"
-              title="Delete project"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Delete
-            </button>
+    <AdminLayout bare>
+      <main className="px-4 md:px-7 pb-12" style={{ maxWidth: theater ? 'none' : 1320 }}>
+        {/* Header */}
+        <header className="flex flex-wrap items-center gap-3 pt-5 pb-5">
+          <Link to="/admin" aria-label="Back to projects" className="ds-ibtn -ml-2 flex-none"><Ms name="arrow_back" /></Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate">{project.title}</h1>
+            <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1" style={{ fontSize: 13 }}>
+              {client && <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--ds-muted)' }}><ClientMark name={client.full_name ?? '?'} /><span className="truncate">{client.full_name}</span></span>}
+              <span className="flex items-center gap-2" style={{ color: 'var(--soft-text)' }}><StatusDot status={project.status} size={7} />{statusLabel(project.status)}</span>
+            </div>
           </div>
-        </div>
-      </header>
-
-      <div className="flex flex-col md:flex-row" style={{ minHeight: 'calc(100vh - 52px)' }}>
-        {/* ── Left metadata sidebar ── */}
-        <aside className="w-full md:w-56 border-b md:border-b-0 md:border-r border-border bg-card/20 flex flex-col overflow-y-auto p-3 space-y-3 md:flex-shrink-0">
-          {/* Client */}
-          {client && (
-            <Section title="Client">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-green-50 text-green-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                  {client.full_name?.charAt(0)}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{client.full_name}</p>
-                  {client.email && <p className="text-xs text-muted-foreground truncate">{client.email}</p>}
-                </div>
-              </div>
-            </Section>
-          )}
-
-          {/* Source files */}
-          <Section title="Source Files">
-            {sourceFiles.length === 0
-              ? <p className="text-xs text-muted-foreground">None uploaded</p>
-              : sourceFiles.map((f) => <FileRow key={f.id} name={f.file_name} size={f.file_size} fileId={f.id} />)}
-            {/* Supporting files can now be added after creation, not only in
-                the create-project form. */}
-            <div className="mt-3">
-              <FileUploader
-                projectId={project.id}
-                fileType="attachment"
-                label="Add supporting files"
-                context={project.title}
-                onUploaded={() => qc.invalidateQueries({ queryKey: ['project_files', id] })}
-              />
-            </div>
-          </Section>
-
-          {/* Deliverables */}
-          <div className="clay-card p-4">
-            <div className="flex items-center justify-between gap-2 mb-3 overflow-hidden">
-              <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground truncate">Deliverables</h3>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {!isCarousel && <DeliverableCounter used={deliverables.length} max={project.max_deliverables} />}
-                {!isCarousel && <button
-                  onClick={async () => {
-                    const input = prompt('Deliverable limit for this project (-1 for unlimited):', String(project.max_deliverables))
-                    if (input === null) return
-                    const value = Number(input)
-                    if (!Number.isInteger(value) || (value !== -1 && value < 1)) { toast.error('Enter -1 or a positive whole number'); return }
-                    try {
-                      await apiFetch(`/api/projects/${id}/limits`, { method: 'PATCH', body: JSON.stringify({ max_deliverables: value }) })
-                      qc.invalidateQueries({ queryKey: ['project', id] })
-                      qc.invalidateQueries({ queryKey: ['projects'] })
-                      toast.success('Deliverable limit updated')
-                    } catch (err) { toast.error((err as Error).message) }
-                  }}
-                  className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                  title="Change deliverable limit"
-                >
-                  <Icon name="edit" />
-                </button>}
-              </div>
-            </div>
-            {isCarousel ? (
-              <SlideManager projectId={project.id} slides={slides} canEdit onChanged={() => qc.invalidateQueries({ queryKey: ['project_files', id] })} />
-            ) : (
-            <div className="space-y-0.5">
-              {deliverables.length === 0
-                ? <p className="text-xs text-muted-foreground">None uploaded</p>
-                : deliverables.map((f) => (
-                    <div key={f.id}>
-                      <FileRow name={f.file_name} size={f.file_size} fileId={f.id} />
-                      <ReviewCopyControl
-                        file={f}
-                        projectId={project.id}
-                        canEdit
-                        onChanged={() => qc.invalidateQueries({ queryKey: ['project_files', id] })}
-                      />
-                    </div>
-                  ))}
-            </div>
-            )}
+          <div className="flex items-center gap-2 flex-none">
+            <Link to={`/admin/sops/${project.client_id}`} className="ds-ghost-btn ds-tap inline-flex items-center gap-2" style={{ textDecoration: 'none' }}>
+              <Ms name="menu_book" style={{ fontSize: 18, width: 18, color: 'inherit' }} /><span className="hidden sm:inline">Client SOPs</span>
+            </Link>
+            <button type="button" onClick={handleDeleteProject} className="ds-ibtn ds-danger" title="Delete project" aria-label="Delete project"><Ms name="delete" style={{ color: 'inherit' }} /></button>
+            <div className="hidden md:block"><HeaderTools /></div>
           </div>
+        </header>
 
-          {/* Team assignment */}
-          <Section title="Assigned Team">
-            {(assignments ?? []).length === 0 && (
-              <p className="text-xs text-muted-foreground mb-2">Unassigned</p>
-            )}
-            {(assignments ?? []).map((a) => {
-              const dl = deadlines.find((d) => d.assignment_id === a.id)
-              return (
-                <div key={a.id} className="mb-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-6 h-6 rounded-full bg-zinc-50 text-zinc-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                      {a.profiles.full_name.charAt(0)}
-                    </div>
-                    <span className="text-xs font-medium flex-1">{a.profiles.full_name}</span>
-                    <button
-                      onClick={async () => {
-                        if (!id || !confirm(`Unassign ${a.profiles.full_name}?`)) return
-                        try {
-                          await apiFetch(`/api/projects/${id}/unassign`, { method: 'DELETE', body: JSON.stringify({ team_member_id: a.team_member_id }) })
-                          qc.invalidateQueries({ queryKey: ['project_assignments', id] })
-                          qc.invalidateQueries({ queryKey: ['project_deadlines', id] })
-                          qc.invalidateQueries({ queryKey: ['projects'] }); qc.invalidateQueries({ queryKey: ['admin-home'] })
-                          toast.success('Unassigned')
-                        } catch (err) { toast.error((err as Error).message) }
-                      }}
-                      className="text-[10px] text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-                      title="Unassign"
-                    ><Icon name="close" /></button>
-                  </div>
-                  {dl && (
-                    <div className="ml-8">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={cn(
-                          'text-[10px] font-semibold px-1.5 py-0.5 rounded-full ds-tag',
-                          dl.status === 'met' ? 'bg-green-100 text-green-700' :
-                          dl.status === 'missed' ? 'bg-red-100 text-red-700' :
-                          'bg-orange-100 text-orange-700',
-                        )}>
-                          {dl.status === 'met' ? 'Met' : dl.status === 'missed' ? 'Missed' : 'Pending'}
-                        </span>
-                        {editDeadlineId === dl.id ? (
-                          <div className="flex items-center gap-1 mt-1">
-                            <input
-                              type="datetime-local"
-                              value={editDeadlineValue}
-                              onChange={(e) => setEditDeadlineValue(e.target.value)}
-                              className="text-[10px] px-1.5 py-0.5 border border-border rounded bg-input"
-                            />
-                            <button onClick={() => saveDeadlineEdit(dl.id)} className="text-[10px] text-primary hover:underline">Save</button>
-                            <button onClick={() => setEditDeadlineId(null)} className="text-[10px] text-muted-foreground hover:underline" aria-label="Cancel"><Icon name="close" /></button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => { setEditDeadlineId(dl.id); setEditDeadlineValue(dl.due_at.slice(0, 16)) }}
-                            className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
-                          >
-                            Due {new Date(dl.due_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} <Icon name="edit" size={12} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-            {unassignedTeam.length > 0 && (
-              <div className="flex gap-1.5 mt-1">
-                <select
-                  value={selectedTeamMember}
-                  onChange={(e) => setSelectedTeamMember(e.target.value)}
-                  className="flex-1 px-2 py-1.5 bg-input border border-border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="">Assign…</option>
-                  {unassignedTeam.map((m) => (
-                    <option key={m.id} value={m.id}>{m.full_name}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={assignTeamMember}
-                  disabled={!selectedTeamMember}
-                  className="px-2.5 py-1.5 bg-primary rounded-lg text-white text-xs disabled:opacity-40 hover:bg-primary/90 transition-colors"
-                >
-                  +
-                </button>
-              </div>
-            )}
-          </Section>
-
-          {/* C1: status transition history (populated once migration 003 runs) */}
-          {statusHistory.length > 0 && (
-            <Section title="Status History">
-              <div className="space-y-2">
-                {[...statusHistory].reverse().map((h) => (
-                  <div key={h.id} className="text-[11px] leading-snug">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {h.old_status && (
-                        <>
-                          <span className="text-muted-foreground">{h.old_status.replace(/_/g, ' ')}</span>
-                          <span className="text-muted-foreground">→</span>
-                        </>
-                      )}
-                      <span className="font-medium">{h.new_status.replace(/_/g, ' ')}</span>
-                    </div>
-                    <div className="text-muted-foreground">
-                      {h.actor_name ?? 'system'} · {formatDistanceToNow(new Date(h.created_at), { addSuffix: true })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {/* Inspiration URL */}
-          {project.inspiration_url && (
-            <Section title="Inspiration Video">
-              <a
-                href={project.inspiration_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-primary hover:underline"
-              >
-                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                Open link
-              </a>
-            </Section>
-          )}
-        </aside>
-
-        {/* ── Main ── */}
-        <div className="flex-1 overflow-y-auto">
-          <div className={cn('px-6 pt-6 pb-12 mx-auto transition-all duration-300', theater ? 'max-w-full' : 'max-w-3xl')}>
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <h1 className="text-xl font-heading font-semibold tracking-tight">{project.title}</h1>
-              <Link to={`/admin/sops/${project.client_id}`} className="min-h-[44px] px-3 inline-flex items-center rounded-lg border border-border text-sm font-medium hover:bg-muted whitespace-nowrap flex-shrink-0 -my-1.5">
-                Client SOPs
-              </Link>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-1 mb-5 border-b border-border">
-              {(['review', 'storage'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={cn(
-                    'px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors',
-                    activeTab === tab
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  <Icon name={tab === 'review' ? 'movie' : 'folder'} size={16} className="mr-1.5" />{tab === 'review' ? 'Review' : 'Storage'}
-                </button>
-              ))}
-            </div>
+        <div className={cn('grid gap-5 items-start', !theater && 'lg:grid-cols-[minmax(0,1fr)_320px]')}>
+          {/* ── Main: review / storage ── */}
+          <div className="min-w-0 space-y-4">
+            <Segmented label="View" width={88} value={activeTab} onChange={setActiveTab}
+              options={[{ value: 'review', label: 'Review' }, { value: 'storage', label: 'Storage' }]} />
 
             {/* Storage tab */}
             {activeTab === 'storage' && (
               <div className="space-y-4 animate-slide-up">
-                {/* Deliverables */}
-                <div>
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Deliverables</h3>
-                  {deliverables.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No deliverables yet</p>
-                  ) : (
-                    <div className="clay-card divide-y divide-border/50 overflow-hidden">
+                <Section title="Deliverables" right={deliverables.length > 0 ? <span className="ds-count">{deliverables.length}</span> : undefined}>
+                  {deliverables.length === 0 ? <p className="ds-empty">No deliverables yet</p> : (
+                    <div className="-mb-2.5">
                       {deliverables.map((f) => (
-                        <div key={f.id} className="flex items-center gap-3 px-4 py-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{f.file_name}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {f.file_size ? formatBytes(f.file_size) : '—'} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
-                              {(f as any).profiles?.full_name && ` · ${(f as any).profiles.full_name}`}
-                            </p>
-                          </div>
-                          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full ds-tag border flex-shrink-0', f.approved ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800')}>
-                            {f.approved ? 'Approved' : 'Pending'}
-                          </span>
-                          <FileRow name="" size={null} fileId={f.id} iconOnly />
-                        </div>
+                        <FileLine key={f.id} f={f} who={(f as any).profiles?.full_name}
+                          label={<span className={cn('ds-tag flex-shrink-0', f.approved ? 'text-green-700' : 'text-amber-700')} style={{ fontSize: 12 }}>{f.approved ? 'Approved' : 'Pending'}</span>} />
                       ))}
                     </div>
                   )}
-                </div>
-
-                {/* Source files */}
-                <div>
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Source Files</h3>
-                  {sourceFiles.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No source files</p>
-                  ) : (
-                    <div className="clay-card divide-y divide-border/50 overflow-hidden">
+                </Section>
+                <Section title="Source files" right={sourceFiles.length > 0 ? <span className="ds-count">{sourceFiles.length}</span> : undefined}>
+                  {sourceFiles.length === 0 ? <p className="ds-empty">No source files</p> : (
+                    <div className="-mb-2.5">
                       {sourceFiles.map((f) => (
-                        <div key={f.id} className="flex items-center gap-3 px-4 py-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{f.file_name}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {f.file_size ? formatBytes(f.file_size) : '—'} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
-                            </p>
-                          </div>
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full ds-num bg-muted text-muted-foreground flex-shrink-0">
-                            {f.file_type === 'source_video' ? 'Main video' : f.file_type === 'attachment' ? 'Attachment' : f.file_type}
-                          </span>
-                          <FileRow name="" size={null} fileId={f.id} iconOnly />
-                        </div>
+                        <FileLine key={f.id} f={f}
+                          label={<span className="flex-shrink-0" style={{ fontSize: 12, color: 'var(--faint)' }}>{f.file_type === 'source_video' ? 'Main video' : f.file_type === 'attachment' ? 'Attachment' : f.file_type}</span>} />
                       ))}
                     </div>
                   )}
-                </div>
+                </Section>
               </div>
             )}
 
             {/* Review tab */}
             {activeTab === 'review' && (
-              <div className="animate-slide-up">
+              <div className="space-y-4 animate-slide-up">
                 {isCarousel && slides.length > 0 ? (
                   <CarouselReview
                     projectId={project.id}
@@ -623,67 +367,239 @@ export default function AdminProjectDetail() {
                   />
                   </div>
                 ) : (
-                  <div className="aspect-video bg-muted rounded-2xl flex items-center justify-center border border-border/60">
-                    <p className="text-muted-foreground text-sm">No deliverable uploaded yet</p>
+                  <div className="aspect-video rounded-2xl grid place-items-center" style={{ background: 'var(--panel)', boxShadow: 'inset 0 0 0 1px var(--panel-ring)' }}>
+                    <div className="text-center">
+                      <Ms name="movie" style={{ fontSize: 28, width: 28 }} />
+                      <p className="mt-2" style={{ fontSize: 13.5, color: 'var(--faint)' }}>No deliverable uploaded yet</p>
+                    </div>
                   </div>
                 )}
 
                 {/* Admin review actions */}
                 {(project.status === 'in_review' || project.status === 'admin_approved') && (
-                  <div className="flex gap-3 mt-4">
-                    <button
-                      onClick={handleApprove}
-                      className="px-5 py-2.5 bg-green-600 rounded-xl text-white font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.98] shadow-sm"
-                    >
-                      Approve for Client
+                  <div className="flex flex-wrap gap-2.5">
+                    <button onClick={handleApprove} className="ds-primary ds-tap">
+                      <Ms name="check" style={{ fontSize: 18, width: 18, color: 'inherit' }} />Approve for Client
                     </button>
-                    <button
-                      onClick={handleReject}
-                      className="px-5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-red-700 font-semibold text-sm hover:bg-red-100 transition-colors"
-                    >
-                      Request Revision
-                    </button>
+                    <button onClick={handleReject} className="ds-ghost-btn ds-tap">Request Revision</button>
                   </div>
                 )}
 
                 {/* Description / script / instructions — below the video */}
-                {(project.description || project.video_script || project.instructions) && (
-                  <div className="space-y-3 mt-5">
-                    {project.description && <TextBlock label="Description" value={project.description} />}
-                    {project.instructions && <TextBlock label="Client Instructions" value={project.instructions} />}
-                    {project.video_script && <TextBlock label="Video Script" value={project.video_script} />}
-                  </div>
-                )}
+                {project.description && <TextBlock label="Description" value={project.description} />}
+                {project.instructions && <TextBlock label="Client Instructions" value={project.instructions} />}
+                {project.video_script && <TextBlock label="Video Script" value={project.video_script} />}
 
                 {/* Source files from client */}
                 {sourceFiles.length > 0 && (
-                  <div className="mt-5">
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Source Files from Client
-                    </h3>
-                    <div className="clay-card divide-y divide-border/50 overflow-hidden">
+                  <Section title="Source files from client" right={<span className="ds-count">{sourceFiles.length}</span>}>
+                    <div className="-mb-2.5">
                       {sourceFiles.map((f) => (
-                        <div key={f.id} className="flex items-center gap-3 px-4 py-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{f.file_name}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {f.file_size ? formatBytes(f.file_size) : '—'} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
-                            </p>
-                          </div>
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full ds-num bg-muted text-muted-foreground flex-shrink-0">
-                            {f.file_type === 'source_video' ? 'Main video' : 'Attachment'}
-                          </span>
-                          <FileRow name="" size={null} fileId={f.id} iconOnly />
-                        </div>
+                        <FileLine key={f.id} f={f}
+                          label={<span className="flex-shrink-0" style={{ fontSize: 12, color: 'var(--faint)' }}>{f.file_type === 'source_video' ? 'Main video' : 'Attachment'}</span>} />
                       ))}
                     </div>
-                  </div>
+                  </Section>
                 )}
               </div>
             )}
           </div>
+
+          {/* ── Side panels ── */}
+          <aside className="min-w-0 space-y-4">
+            {/* Team assignment */}
+            <Section title="Team">
+              {(assignments ?? []).length === 0 && (
+                <div className="flex items-center gap-2.5 mb-3" style={{ fontSize: 13, color: 'var(--faint)' }}><EditorAvatar name={null} />Unassigned</div>
+              )}
+              {(assignments ?? []).map((a) => {
+                const dl = deadlines.find((d) => d.assignment_id === a.id)
+                return (
+                  <div key={a.id} className="mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <EditorAvatar name={a.profiles.full_name} size={26} />
+                      <span className="flex-1 truncate" style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--strong)' }}>{a.profiles.full_name}</span>
+                      <button
+                        onClick={async () => {
+                          if (!id || !confirm(`Unassign ${a.profiles.full_name}?`)) return
+                          try {
+                            await apiFetch(`/api/projects/${id}/unassign`, { method: 'DELETE', body: JSON.stringify({ team_member_id: a.team_member_id }) })
+                            qc.invalidateQueries({ queryKey: ['project_assignments', id] })
+                            qc.invalidateQueries({ queryKey: ['project_deadlines', id] })
+                            qc.invalidateQueries({ queryKey: ['projects'] }); qc.invalidateQueries({ queryKey: ['admin-home'] })
+                            toast.success('Unassigned')
+                          } catch (err) { toast.error((err as Error).message) }
+                        }}
+                        className="ds-ibtn flex-shrink-0"
+                        style={{ width: 30, height: 30 }}
+                        title="Unassign"
+                      ><Icon name="close" size={16} /></button>
+                    </div>
+                    {dl && (
+                      <div className="ml-9 mt-1">
+                        <div className="flex items-center gap-x-2.5 gap-y-1 flex-wrap" style={{ fontSize: 12 }}>
+                          <span className={cn('ds-tag', dl.status === 'met' ? 'text-green-700' : dl.status === 'missed' ? 'text-red-700' : 'text-orange-700')}>
+                            {dl.status === 'met' ? 'Met' : dl.status === 'missed' ? 'Missed' : 'Pending'}
+                          </span>
+                          {editDeadlineId === dl.id ? (
+                            <div className="flex items-center gap-1.5 w-full mt-1">
+                              <input
+                                type="datetime-local"
+                                value={editDeadlineValue}
+                                onChange={(e) => setEditDeadlineValue(e.target.value)}
+                                className="ds-field flex-1 min-w-0"
+                                style={{ height: 34, fontSize: 12.5 }}
+                              />
+                              <button onClick={() => saveDeadlineEdit(dl.id)} className="ds-ghost-btn" style={{ height: 34, fontSize: 12.5 }}>Save</button>
+                              <button onClick={() => setEditDeadlineId(null)} className="ds-ibtn" style={{ width: 30, height: 30 }} aria-label="Cancel"><Icon name="close" size={16} /></button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setEditDeadlineId(dl.id); setEditDeadlineValue(dl.due_at.slice(0, 16)) }}
+                              className="inline-flex items-center gap-1 hover:underline"
+                              style={{ color: 'var(--faint)' }}
+                            >
+                              Due {new Date(dl.due_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} <Icon name="edit" size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {unassignedTeam.length > 0 && (
+                <div className="flex gap-2 mt-1">
+                  <select
+                    value={selectedTeamMember}
+                    onChange={(e) => setSelectedTeamMember(e.target.value)}
+                    className="ds-field flex-1 min-w-0"
+                    style={{ height: 38 }}
+                  >
+                    <option value="">Assign…</option>
+                    {unassignedTeam.map((m) => (
+                      <option key={m.id} value={m.id}>{m.full_name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={assignTeamMember}
+                    disabled={!selectedTeamMember}
+                    aria-label="Assign"
+                    className="ds-primary flex-none disabled:opacity-40"
+                    style={{ width: 38, padding: 0, justifyContent: 'center' }}
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+            </Section>
+
+            {/* Deliverables */}
+            <Section title="Deliverables" right={
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {!isCarousel && <DeliverableCounter used={deliverables.length} max={project.max_deliverables} />}
+                {!isCarousel && <button
+                  onClick={async () => {
+                    const input = prompt('Deliverable limit for this project (-1 for unlimited):', String(project.max_deliverables))
+                    if (input === null) return
+                    const value = Number(input)
+                    if (!Number.isInteger(value) || (value !== -1 && value < 1)) { toast.error('Enter -1 or a positive whole number'); return }
+                    try {
+                      await apiFetch(`/api/projects/${id}/limits`, { method: 'PATCH', body: JSON.stringify({ max_deliverables: value }) })
+                      qc.invalidateQueries({ queryKey: ['project', id] })
+                      qc.invalidateQueries({ queryKey: ['projects'] })
+                      toast.success('Deliverable limit updated')
+                    } catch (err) { toast.error((err as Error).message) }
+                  }}
+                  className="ds-ibtn"
+                  style={{ width: 28, height: 28 }}
+                  title="Change deliverable limit"
+                >
+                  <Icon name="edit" />
+                </button>}
+              </div>
+            }>
+              {isCarousel ? (
+                <SlideManager projectId={project.id} slides={slides} canEdit onChanged={() => qc.invalidateQueries({ queryKey: ['project_files', id] })} />
+              ) : (
+              <div className="-mx-2 space-y-0.5">
+                {deliverables.length === 0
+                  ? <p className="ds-empty px-2">None uploaded</p>
+                  : deliverables.map((f) => (
+                      <div key={f.id}>
+                        <FileRow name={f.file_name} size={f.file_size} fileId={f.id} />
+                        <ReviewCopyControl
+                          file={f}
+                          projectId={project.id}
+                          canEdit
+                          onChanged={() => qc.invalidateQueries({ queryKey: ['project_files', id] })}
+                        />
+                      </div>
+                    ))}
+              </div>
+              )}
+            </Section>
+
+          <Section title="Source files" right={sourceFiles.length > 0 ? <span className="ds-count">{sourceFiles.length}</span> : undefined}>
+            {sourceFiles.length === 0
+              ? <p className="ds-empty">None uploaded</p>
+              : <div className="-mx-2">{sourceFiles.map((f) => <FileRow key={f.id} name={f.file_name} size={f.file_size} fileId={f.id} />)}</div>}
+            <div className="mt-3">
+              <FileUploader
+                projectId={project.id}
+                fileType="attachment"
+                label="Add supporting files"
+                context={project.title}
+                onUploaded={() => qc.invalidateQueries({ queryKey: ['project_files', id] })}
+              />
+            </div>
+          </Section>
+
+            {/* C1: status transition history (populated once migration 003 runs) */}
+            {statusHistory.length > 0 && (
+              <Section title="Status history">
+                <ol className="space-y-2.5">
+                  {[...statusHistory].reverse().map((h) => (
+                    <li key={h.id} className="flex gap-2.5" style={{ fontSize: 12.5 }}>
+                      <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-none" style={{ background: 'var(--dash)' }} />
+                      <div className="min-w-0">
+                        <p className="capitalize" style={{ color: 'var(--text)' }}>
+                          {h.old_status && <span style={{ color: 'var(--faint)' }}>{h.old_status.replace(/_/g, ' ')} → </span>}
+                          <span style={{ fontWeight: 500 }}>{h.new_status.replace(/_/g, ' ')}</span>
+                        </p>
+                        <p style={{ color: 'var(--faint)' }}>{h.actor_name ?? 'system'} · {formatDistanceToNow(new Date(h.created_at), { addSuffix: true })}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </Section>
+            )}
+
+            {/* Inspiration URL */}
+            {project.inspiration_url && (
+              <Section title="Inspiration Video">
+                <a href={project.inspiration_url} target="_blank" rel="noopener noreferrer"
+                  className="ds-ghost-btn inline-flex items-center gap-2" style={{ textDecoration: 'none' }}>
+                  <Ms name="north_east" style={{ fontSize: 16, width: 16, color: 'inherit' }} />Open link
+                </a>
+              </Section>
+            )}
+
+            {/* Client */}
+            {client && (
+              <Section title="Client">
+                <div className="flex items-center gap-2.5">
+                  <ClientMark name={client.full_name ?? '?'} size={28} />
+                  <div className="min-w-0">
+                    <p className="truncate" style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--strong)' }}>{client.full_name}</p>
+                    {client.email && <p className="truncate" style={{ fontSize: 12, color: 'var(--faint)' }}>{client.email}</p>}
+                  </div>
+                </div>
+              </Section>
+            )}
+          </aside>
         </div>
-      </div>
+      </main>
     </AdminLayout>
   )
 }

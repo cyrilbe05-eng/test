@@ -318,3 +318,12 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 @keyframes ds-tip-in{from{opacity:0}to{opacity:1}}
 .ds-tip p+p{margin-top:2px}
 @media (prefers-reduced-motion: reduce){.ds-bar-grow,.ds-bar-x,.ds-ring-draw{animation:none}}
+
+.ds-danger:hover{color:var(--bad);background:var(--bad-b)}
+
+/* ── Video player (Plyr): black-and-white like the rest, no sky blue ── */
+.plyr{--plyr-color-main:#FFFFFF;--plyr-range-fill-background:#FFFFFF;--plyr-video-control-color-hover:#0E0E10;--plyr-badge-background:#16161A}
+.plyr__control--overlaid{color:#0E0E10 !important;background:rgba(255,255,255,.92) !important;box-shadow:0 8px 24px -8px rgba(0,0,0,.5)}
+.plyr__control--overlaid:hover{background:#FFFFFF !important}
+.plyr--video .plyr__control:hover{background:rgba(255,255,255,.9) !important;color:#0E0E10 !important}
+.plyr--full-ui input[type=range]{color:#FFFFFF !important}
