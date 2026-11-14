@@ -16,6 +16,7 @@ import { cn, sortByRecentActivity } from '@/lib/utils'
 import { type BoardProject } from '@/lib/board'
 import type { Profile } from '@/types'
 import { ProjectSearch } from '@/components/admin/ProjectSearch'
+import { useSheetClose } from '@/hooks/useSheetClose'
 
 type View = 'kanban' | 'list'
 
@@ -90,6 +91,7 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false)
   const [dragTarget, setDragTarget] = useState<'source' | 'attachment' | null>(null)
   const { enqueue } = useUploadManager()
+  const { closing, close } = useSheetClose(onClose)
 
   const { data: users = [] } = useQuery<Profile[]>({
     queryKey: ['users'],
@@ -141,11 +143,11 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="ds-veil" onClick={onClose} />
-      <section className="ds-sheet" role="dialog" aria-modal="true" aria-label="New project">
+      <div className={cn('ds-veil', closing && 'closing')} onClick={close} />
+      <section className={cn('ds-sheet', closing && 'closing')} role="dialog" aria-modal="true" aria-label="New project">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '26px 28px 0' }}>
           <h2 style={{ flex: 1, margin: 0, fontSize: 28, fontWeight: 650, letterSpacing: '-.03em', color: 'var(--strong)' }}>New project</h2>
-          <button type="button" className="ds-ibtn" aria-label="Close" onClick={onClose} style={{ width: 32, height: 32 }}>
+          <button type="button" className="ds-ibtn" aria-label="Close" onClick={close} style={{ width: 32, height: 32 }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
@@ -202,7 +204,7 @@ function CreateProjectModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
-            <button type="button" onClick={onClose} className="ds-ghost-btn">Cancel</button>
+            <button type="button" onClick={close} className="ds-ghost-btn">Cancel</button>
             <button type="submit" disabled={submitting} className="ds-primary" style={submitting ? { opacity: 0.6 } : undefined}>
               {submitting ? 'Creating…' : 'Create project'}
             </button>

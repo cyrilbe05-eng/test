@@ -10,7 +10,9 @@ export const STATUS_META: Record<ProjectStatus, { label: string; colors: [string
   admin_approved:     { label: 'Admin approved',     colors: ['#6CCB86', '#2E9E5B'] },
   client_reviewing:   { label: 'Client reviewing',   colors: ['#E89AC0', '#C2578A'] },
   revision_requested: { label: 'Revision requested', colors: ['#F2766B', '#E5584B'] },
-  client_approved:    { label: 'Client approved',    colors: ['#6FD3A2', '#1F8A57'] },
+  // Done: neutral ink (DESIGN.md has no colour for it; a second green next to
+  // Admin approved was indistinguishable).
+  client_approved:    { label: 'Client approved',    colors: ['#ECECEF', '#1A1A1E'] },
 }
 
 export const statusLabel = (s: ProjectStatus) => (STATUS_META[s] ?? { label: s }).label

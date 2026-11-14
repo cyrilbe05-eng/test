@@ -7,6 +7,7 @@ import type { ProjectStatus } from '@/types'
 import { isBackward } from '@/lib/statusFlow'
 import { COLUMNS, columnLabel, type BoardProject } from '@/lib/board'
 import { ClientMark, EditorAvatar, StatusDot } from '@/components/ds'
+import { useSheetClose } from '@/hooks/useSheetClose'
 
 // Admins can move a card to ANY column. Backwards (an earlier stage outside
 // the normal flow) asks first, and the API sends no notifications for it.
@@ -42,6 +43,28 @@ function untilt(e: React.MouseEvent<HTMLElement>) {
   if (el.__raf) { cancelAnimationFrame(el.__raf); el.__raf = 0 }
   el.style.setProperty('--rx', '0deg')
   el.style.setProperty('--ry', '0deg')
+}
+
+/** "Move back to …?" — asked before a card goes to an earlier column. */
+function MoveBack({ to, title, onClose, onConfirm }: { to: ProjectStatus; title: string; onClose: () => void; onConfirm: () => void }) {
+  const { closing, close } = useSheetClose(onClose)
+  return (
+    <>
+      <div className={cn('ds-veil', closing && 'closing')} onClick={close} />
+      <div role="dialog" aria-modal="true" aria-label="Move back" className={cn('ds-sheet', closing && 'closing')} style={{ width: 'min(380px, calc(100vw - 32px))' }}>
+        <div className="ds-sheet-in" style={{ padding: '22px 22px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 17, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--strong)' }}>Move back to {columnLabel(to)}?</p>
+            <p className="truncate" style={{ margin: '6px 0 0', fontSize: 13.5, color: 'var(--ds-muted)' }}>{title}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button type="button" className="ds-ghost-btn" onClick={close}>Cancel</button>
+            <button type="button" className="ds-primary" onClick={onConfirm}>Move back</button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
 }
 
 export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine }: Props) {
@@ -97,23 +120,7 @@ export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine
 
   return (
     <>
-      {back && (
-        <>
-          <div className="ds-veil" onClick={() => setBack(null)} />
-          <div role="dialog" aria-modal="true" aria-label="Move back" className="ds-sheet" style={{ width: 'min(380px, calc(100vw - 32px))' }}>
-            <div className="ds-sheet-in" style={{ padding: '22px 22px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <div>
-                <p style={{ margin: 0, fontSize: 17, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--strong)' }}>Move back to {columnLabel(back.to)}?</p>
-                <p className="truncate" style={{ margin: '6px 0 0', fontSize: 13.5, color: 'var(--ds-muted)' }}>{back.title}</p>
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" className="ds-ghost-btn" onClick={() => setBack(null)}>Cancel</button>
-                <button type="button" className="ds-primary" onClick={() => { const b = back; setBack(null); void move(b.id, b.to) }}>Move back</button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {back && <MoveBack to={back.to} title={back.title} onClose={() => setBack(null)} onConfirm={() => { const b = back; setBack(null); void move(b.id, b.to) }} />}
 
       <div className="ds-lanes" style={{ padding: '4px 20px 40px' }}>
         {COLUMNS.map((col, li) => {
