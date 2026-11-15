@@ -344,3 +344,13 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 .ds-cal-sheet label{font-size:12.5px !important;color:var(--faint) !important}
 .ds-form-title{position:sticky;top:0;z-index:2;padding:22px 24px 14px;font-size:22px;font-weight:650;letter-spacing:-.025em;color:var(--strong);background:linear-gradient(180deg,var(--sheet-a) 75%,transparent)}
 .ds-form-foot{position:sticky;bottom:0;z-index:2;display:flex;justify-content:flex-end;gap:10px;padding:14px 24px 20px;background:linear-gradient(0deg,var(--sheet-b) 75%,transparent)}
+
+/* ── Notifications panel ── */
+.ds-notif-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:50;width:min(380px,calc(100vw - 24px));border-radius:18px;background:linear-gradient(180deg,var(--sheet-a),var(--sheet-b));box-shadow:var(--sheet-sh);color:var(--text);transform-origin:top right;animation:ds-menu-in .3s var(--out) both;overflow:hidden}
+.ds-notif-list{max-height:min(460px,70vh);overflow-y:auto;padding:0 6px 8px}
+.ds-notif-group{padding:10px 10px 4px;font-size:12px;font-weight:600;color:var(--faint)}
+.ds-notif{position:relative;display:flex;align-items:flex-start;gap:11px;padding:10px;border-radius:12px;cursor:pointer;transition:background .2s}
+.ds-notif:hover{background:var(--hover)}
+.ds-notif-icon{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--panel-ring);color:var(--soft-text)}
+.ds-notif.unread .ds-notif-icon{background:var(--field);color:var(--strong)}
+@media (max-width:767px){.ds-notif-panel{position:fixed;top:60px;right:12px}}

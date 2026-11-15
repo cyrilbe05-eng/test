@@ -513,15 +513,17 @@ function FolderCard({
       onDrop={() => onDrop(folder.id)}
       onClick={() => onNavigate(folder.id)}
       className={cn(
-        'clay-card p-4 cursor-pointer select-none',
+        'clay-card flex items-center gap-3 px-3 py-2.5 pr-10 cursor-pointer select-none',
         isDragOver && 'ring-2 ring-[var(--drop-ring)] bg-[var(--drop)]'
       )}
     >
-      <span className="w-11 h-11 rounded-xl grid place-items-center mb-3" style={{ background: 'var(--panel)', boxShadow: 'inset 0 0 0 1px var(--panel-ring)' }}>
-        <Ms name="folder" style={{ fontSize: 24, width: 24, color: 'var(--soft-text)', fontVariationSettings: "'FILL' 1, 'wght' 400" }} />
+      <span className="w-10 h-10 rounded-[10px] grid place-items-center flex-none" style={{ background: 'var(--panel)', boxShadow: 'inset 0 0 0 1px var(--panel-ring)' }}>
+        <Ms name="folder" style={{ fontSize: 22, width: 22, color: 'var(--soft-text)', fontVariationSettings: "'FILL' 1, 'wght' 400" }} />
       </span>
-      <p className="truncate" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--strong)' }}>{folder.name}</p>
-      <p style={{ fontSize: 12, color: 'var(--faint)' }}>{fileCount} {fileCount === 1 ? 'file' : 'files'}</p>
+      <div className="min-w-0">
+        <p className="truncate" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--strong)' }}>{folder.name}</p>
+        <p style={{ fontSize: 12, color: 'var(--faint)' }}>{fileCount} {fileCount === 1 ? 'file' : 'files'}</p>
+      </div>
     </div>
   )
 }
@@ -975,7 +977,11 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
             </p>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(170px, 42vw), 1fr))' }}>
+          <div className="space-y-6">
+          {currentFolders.length > 0 && (
+          <section>
+            <h3 className="mb-2.5" style={{ fontSize: 13, fontWeight: 600, color: 'var(--faint)' }}>Folders</h3>
+          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))' }}>
             {currentFolders.map((folder) => (
               <div key={folder.id} className="group relative">
                 <FolderCard
@@ -991,7 +997,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 {!readOnly && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder) }}
-                    className="absolute top-2.5 right-2.5 z-10 w-7 h-7 rounded-lg ds-ibtn ds-danger opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-1/2 -translate-y-1/2 right-2 z-10 w-7 h-7 rounded-lg ds-ibtn ds-danger opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Delete folder"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1001,6 +1007,13 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 )}
               </div>
             ))}
+          </div>
+          </section>
+          )}
+          {currentFiles.length > 0 && (
+          <section>
+            <h3 className="mb-2.5" style={{ fontSize: 13, fontWeight: 600, color: 'var(--faint)' }}>Files</h3>
+          <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(170px, 42vw), 1fr))' }}>
             {currentFiles.map((file) => (
               <FileCard
                 key={file.id}
@@ -1018,6 +1031,9 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 onPreview={(f, url) => setPreviewFile({ file: f, url })}
               />
             ))}
+          </div>
+          </section>
+          )}
           </div>
         ) : (
           <div className="ds-panel" style={{ padding: 6 }}>

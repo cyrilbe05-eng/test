@@ -1018,7 +1018,7 @@ async function handleShareProject(req: VercelRequest, res: VercelResponse) {
     )
     if (recipients.length === 0) { res.status(400).json({ error: 'no valid recipients' }); return }
 
-    const note = typeof message === 'string' && message.trim() ? ` — “${message.trim().slice(0, 500)}”` : ''
+    const note = typeof message === 'string' && message.trim() ? `: “${message.trim().slice(0, 500)}”` : ''
     const shareMsg = `${profile.full_name} shared "${project.title}" with you${note}`
     const now = nowIso()
     // 'team_assigned' is the closest existing notification type; a dedicated
