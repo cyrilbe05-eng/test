@@ -1,4 +1,5 @@
-import { Icon } from '@/components/ds'
+import { Icon, Ms } from '@/components/ds'
+import { FrameTools } from '@/components/ds/Frame'
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -22,13 +23,6 @@ import { MarkPosted } from '@/components/project/MarkPosted'
 import { ScriptCard } from '@/components/project/ScriptCard'
 import { useQueryClient } from '@tanstack/react-query'
 
-function IconArrowLeft() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-    </svg>
-  )
-}
 function IconDownload() {
   return (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -45,15 +39,11 @@ function IconThumbUp() {
 }
 
 function StatusBanner({ color, children }: { color: string; children: React.ReactNode }) {
-  const c: Record<string, string> = {
-    amber:  'bg-amber-50 border-amber-200 text-amber-700',
-    blue:   'bg-zinc-50 border-zinc-200 text-zinc-700',
-    purple: 'bg-violet-50 border-violet-200 text-violet-700',
-    red:    'bg-red-50 border-red-200 text-red-700',
-  }
+  const dot: Record<string, string> = { amber: '#E09A2D', blue: 'var(--faint)', purple: '#8A62D0', red: '#E5584B' }
   return (
-    <div className={`px-4 py-3 rounded-xl border text-sm animate-slide-up ${c[color]}`}>
-      {children}
+    <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl animate-slide-up" style={{ fontSize: 13.5, color: 'var(--text)', background: 'var(--panel)', boxShadow: 'inset 0 0 0 1px var(--panel-ring)' }}>
+      <span className="w-2 h-2 rounded-full flex-none mt-1.5" style={{ background: dot[color] }} aria-hidden />
+      <span>{children}</span>
     </div>
   )
 }
@@ -280,36 +270,23 @@ export default function ClientProjectDetail() {
   )
 
   return (
-    <ClientLayout>
-      {/* Sticky breadcrumb */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-20" style={{ height: '52px' }}>
-        <div className="h-full flex items-center px-4 gap-3">
-          <Link
-            to="/workspace/videos"
-            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors"
-          >
-            <IconArrowLeft />
-            <span className="hidden sm:inline">Videos</span>
-          </Link>
-          <span className="text-border/60">/</span>
-          <span className="text-sm font-medium truncate max-w-xs">{project.title}</span>
-          <div className="ml-auto">
-            <ProjectStatusBadge status={project.status} />
+    <ClientLayout bare>
+      <main className={cn('mx-auto px-4 md:px-7 pb-10 transition-all duration-300', theater ? 'max-w-6xl' : 'max-w-4xl')}>
+        {/* Header */}
+        <header className="flex flex-wrap items-center gap-3 pt-5 pb-4">
+          <Link to="/workspace/videos" aria-label="Back to videos" className="ds-ibtn -ml-2 flex-none"><Ms name="arrow_back" /></Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate">{project.title}</h1>
+            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap mt-1" style={{ fontSize: 13 }}>
+              <ProjectStatusBadge status={project.status} />
+              <RevisionCounter
+                remaining={remaining === Infinity ? 0 : remaining}
+                unlimited={project.max_client_revisions === -1}
+              />
+            </div>
           </div>
-        </div>
-      </header>
-
-      <main className={cn('mx-auto px-4 py-6 transition-all duration-300', theater ? 'max-w-6xl' : 'max-w-4xl')}>
-        {/* Title + revisions row */}
-        <div className="flex items-start gap-3 flex-wrap mb-3 animate-slide-up">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-heading font-bold">{project.title}</h1>
-          </div>
-          <RevisionCounter
-            remaining={remaining === Infinity ? 0 : remaining}
-            unlimited={project.max_client_revisions === -1}
-          />
-        </div>
+          <div className="hidden md:block flex-none"><FrameTools /></div>
+        </header>
 
         {/* Status banners */}
         <div className="space-y-2 mb-4">

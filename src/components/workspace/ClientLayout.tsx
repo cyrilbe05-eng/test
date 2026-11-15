@@ -8,13 +8,15 @@ import type { Project } from '@/types'
 
 interface ClientLayoutProps {
   children: React.ReactNode
+  /** The page draws its own header. */
+  bare?: boolean
 }
 
 const count = (n: number) => n > 0
   ? <span className="tabular-nums" style={{ fontSize: 12, fontWeight: 600, color: 'var(--faint)' }}>{n}</span>
   : undefined
 
-export function ClientLayout({ children }: ClientLayoutProps) {
+export function ClientLayout({ children, bare }: ClientLayoutProps) {
   // Full-package clients record the scripts on their Home: no free "New video".
   const canCreate = useCanCreateVideo()
   const { profile } = useAuth()
@@ -56,6 +58,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       bottom={bottom}
       subtitle={profile?.email}
       viewingAs="client"
+      bare={bare}
       footer={canCreate ? (close) => (
         <Link to="/workspace/new" onClick={close} className="ds-primary justify-center" style={{ width: '100%' }}>
           <Ms name="add" style={{ color: 'inherit' }} />New video

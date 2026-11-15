@@ -108,16 +108,18 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
 
   return (
     <div className="ds-cal-veil">
-      <div className="ds-cal-sheet max-w-md p-6 space-y-4 overflow-y-auto" style={{ maxHeight: '90vh' }}>
-        <h2 className="font-heading font-semibold text-lg">New Event</h2>
-        <div className="space-y-3">
-          <div>
+      <div className="ds-cal-sheet ds-form max-w-xl overflow-y-auto" style={{ maxHeight: '90vh' }}>
+        <h2 className="ds-form-title">New Event</h2>
+        <div className="space-y-3.5 px-6 pb-2">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px]">
+            <div>
             <label className="text-xs text-muted-foreground mb-1 block">Title</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title…" className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" autoFocus />
-          </div>
-          <div>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title…" className="w-full" autoFocus />
+            </div>
+            <div>
             <label className="text-xs text-muted-foreground mb-1 block">Date</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full" />
+            </div>
           </div>
           {clients.length > 0 && (
             <div>
@@ -147,14 +149,14 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Content type</label>
-              <select value={contentType} onChange={(e) => setContentType(e.target.value as ContentType | '')} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
+              <select value={contentType} onChange={(e) => setContentType(e.target.value as ContentType | '')} className="w-full">
                 <option value="">None</option>
                 {CONTENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Status</label>
-              <select value={contentStatus} onChange={(e) => setContentStatus(e.target.value as ContentStatus | '')} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
+              <select value={contentStatus} onChange={(e) => setContentStatus(e.target.value as ContentStatus | '')} className="w-full">
                 <option value="">None</option>
                 {CONTENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -162,19 +164,19 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">Notes</label>
-            <textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Notes…" rows={2} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
+            <textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Notes…" rows={2} className="w-full resize-none" />
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">Inspiration URL</label>
-            <input value={inspirationUrl} onChange={(e) => setInspirationUrl(e.target.value)} placeholder="https://…" className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+            <input value={inspirationUrl} onChange={(e) => setInspirationUrl(e.target.value)} placeholder="https://…" className="w-full" />
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">Script</label>
-            <textarea value={script} onChange={(e) => setScript(e.target.value)} placeholder="Script…" rows={3} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
+            <textarea value={script} onChange={(e) => setScript(e.target.value)} placeholder="Script…" rows={3} className="w-full resize-none" />
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">Caption</label>
-            <textarea value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Caption…" rows={2} className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
+            <textarea value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Caption…" rows={2} className="w-full resize-none" />
           </div>
           <div className="flex items-center justify-between">
             <div>
@@ -185,14 +187,14 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
                 ))}
               </div>
             </div>
-            <button onClick={() => setDoubleDown(!doubleDown)} title="Double Down" className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border', doubleDown ? 'bg-orange-500 text-white border-orange-500' : 'bg-muted text-muted-foreground border-border hover:border-orange-400 hover:text-orange-500')}>
+            <button onClick={() => setDoubleDown(!doubleDown)} title="Double Down" aria-pressed={doubleDown} className={cn('ds-chip', doubleDown && 'text-white')}>
               <Icon name="local_fire_department" className="text-orange-500" /> Double Down
             </button>
           </div>
         </div>
-        <div className="flex gap-2 justify-end pt-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors">Cancel</button>
-          <button onClick={handleCreate} disabled={createEvent.isPending} className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl shadow-clay hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-40">Create</button>
+        <div className="ds-form-foot">
+          <button onClick={onClose} className="ds-ghost-btn">Cancel</button>
+          <button onClick={handleCreate} disabled={createEvent.isPending} className="ds-primary disabled:opacity-40">Create</button>
         </div>
       </div>
     </div>

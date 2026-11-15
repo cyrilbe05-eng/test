@@ -1,3 +1,6 @@
+import { ClientMark, Ms, StatusDot } from '@/components/ds'
+import { FrameTools } from '@/components/ds/Frame'
+import { statusLabel } from '@/lib/dsStatus'
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { TeamLayout } from '@/components/workspace/TeamLayout'
@@ -7,7 +10,6 @@ import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { useProject, useProjectFiles, useProjectAssignments, useTimelineComments, useUpdateProjectStatus } from '@/hooks/useProjects'
 import { useAuth } from '@/hooks/useAuth'
-import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { DeliverableCounter } from '@/components/project/DeliverableCounter'
 import { FileUploader } from '@/components/project/FileUploader'
 import { ReviewCopyControl } from '@/components/project/ReviewCopyControl'
@@ -271,61 +273,37 @@ export default function TeamProjectDetail() {
   const clientName = (project as any).profiles?.full_name
 
   return (
-    <TeamLayout>
-      {/* Breadcrumb */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-20" style={{ height: '52px' }}>
-        <div className="h-full px-6 flex items-center gap-3">
-          <Link to="/team" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span>Projects</span>
-          </Link>
-          <span className="text-border/60">/</span>
-          <span className="text-sm font-medium truncate max-w-xs">{project.title}</span>
-          <div className="ml-auto"><ProjectStatusBadge status={project.status} /></div>
-        </div>
-      </header>
+    <TeamLayout bare>
+      <main className="px-4 md:px-7 pb-10">
+        {/* Header */}
+        <header className="flex flex-wrap items-center gap-3 pt-5 pb-5">
+          <Link to="/team" aria-label="Back to projects" className="ds-ibtn -ml-2 flex-none"><Ms name="arrow_back" /></Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate">{project.title}</h1>
+            <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1" style={{ fontSize: 13 }}>
+              {clientName && <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--ds-muted)' }}><ClientMark name={clientName} /><span className="truncate">{clientName}</span></span>}
+              <span className="flex items-center gap-2" style={{ color: 'var(--soft-text)' }}><StatusDot status={project.status} size={7} />{statusLabel(project.status)}</span>
+              <ProjectInstagram projectId={project.id} />
+              {project.inspiration_url && (
+                <a href={project.inspiration_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:underline" style={{ color: 'var(--strong)' }}>
+                  <Ms name="north_east" style={{ fontSize: 15, width: 15, color: 'inherit' }} />Inspiration video
+                </a>
+              )}
+              <span style={{ color: 'var(--faint)' }}>{projectTimeLabel(project)}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-none">
+            <Link to={`/team/sops/${project.client_id}`} className="ds-ghost-btn ds-tap inline-flex items-center gap-2" style={{ textDecoration: 'none' }}>
+              <Ms name="menu_book" style={{ fontSize: 18, width: 18, color: 'inherit' }} /><span className="hidden sm:inline">Client SOPs</span>
+            </Link>
+            <div className="hidden md:block"><FrameTools /></div>
+          </div>
+        </header>
 
-      <main className="px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
           {/* ── Left: main content ── */}
           <div className="lg:col-span-2 space-y-4">
-
-            {/* Title + meta */}
-            <div className="clay-card p-5">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <h1 className="text-xl font-heading font-semibold tracking-tight">{project.title}</h1>
-                <Link to={`/team/sops/${project.client_id}`} className="min-h-[44px] px-3 inline-flex items-center rounded-lg border border-border text-sm font-medium hover:bg-muted whitespace-nowrap flex-shrink-0 -my-1.5">
-                  Client SOPs
-                </Link>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                {clientName && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-600 flex items-center justify-center text-[10px] font-bold">{clientName.charAt(0)}</span>
-                    {clientName}
-                  </span>
-                )}
-                <ProjectInstagram projectId={project.id} />
-                {project.inspiration_url && (
-                  <a
-                    href={project.inspiration_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-primary hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    Inspiration video
-                  </a>
-                )}
-                <span className="ml-auto">{projectTimeLabel(project)}</span>
-              </div>
-            </div>
 
             {/* Same player as the review screen: timeline + comment markers */}
             {isCarousel && slides.length > 0 && profile && (
