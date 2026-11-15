@@ -1,3 +1,4 @@
+import { ClientMark, Ms } from '@/components/ds'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
@@ -5,7 +6,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { useGalleryFiles } from '@/hooks/useGallery'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { Gallery } from '@/components/gallery/Gallery'
-import { cn } from '@/lib/utils'
 import type { Profile, Plan } from '@/types'
 
 
@@ -64,17 +64,15 @@ export default function AdminGallery() {
 
         <div className="flex flex-1 min-h-0">
           {/* Desktop sidebar */}
-          <aside className="hidden md:flex w-56 border-r border-border bg-background flex-col flex-shrink-0 overflow-y-auto">
+          <aside className="hidden md:flex w-60 flex-col flex-shrink-0 overflow-y-auto" style={{ borderRight: '1px solid var(--line)' }}>
             <div className="px-3 pt-4 pb-2">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">Filter by client</p>
+              <p className="px-2 mb-2" style={{ fontSize: 12.5, color: 'var(--faint)' }}>Filter by client</p>
               <button
                 onClick={() => setSelectedClientId(null)}
-                className={cn(
-                  'w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm transition-colors text-left',
-                  selectedClientId === null ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground hover:bg-muted',
-                )}
+                className="w-full flex items-center gap-2.5 h-10 px-2.5 rounded-[10px] transition-colors text-left"
+                style={{ background: selectedClientId === null ? 'var(--active)' : undefined, color: selectedClientId === null ? 'var(--strong)' : 'var(--nav)', fontSize: 13.5, fontWeight: selectedClientId === null ? 500 : 400 }}
               >
-                <span className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">All</span>
+                <Ms name="photo_library" style={{ fontSize: 18, width: 22, color: 'inherit' }} />
                 <span className="truncate flex-1">All Clients</span>
               </button>
             </div>
@@ -86,22 +84,15 @@ export default function AdminGallery() {
                   <button
                     key={client.id}
                     onClick={() => setSelectedClientId(client.id)}
-                    className={cn(
-                      'w-full flex items-start gap-2 px-2 py-2.5 rounded-lg text-sm transition-colors text-left',
-                      isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-muted',
-                    )}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] transition-colors text-left hover:bg-[var(--hover)]"
+                    style={{ background: isSelected ? 'var(--active)' : undefined }}
                   >
-                    <div className={cn(
-                      'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5',
-                      isSelected ? 'bg-primary text-white' : 'bg-muted text-foreground',
-                    )}>
-                      {client.full_name.charAt(0)}
-                    </div>
+                    <ClientMark name={client.full_name} size={22} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate leading-tight">{client.full_name}</p>
-                      {client.client_id_label && <p className="text-[10px] text-muted-foreground">{client.client_id_label}</p>}
-                      {isSelected && <p className="text-[10px] text-muted-foreground mt-0.5">{activeClientFiles.length} files</p>}
-                      {plan && <p className="text-[10px] text-muted-foreground">{plan.name}</p>}
+                      <p className="truncate" style={{ fontSize: 13.5, fontWeight: isSelected ? 500 : 400, color: isSelected ? 'var(--strong)' : 'var(--text)' }}>{client.full_name}</p>
+                      <p className="truncate" style={{ fontSize: 11.5, color: 'var(--faint)' }}>
+                        {[client.client_id_label, plan?.name, isSelected ? `${activeClientFiles.length} files` : null].filter(Boolean).join(' · ')}
+                      </p>
                     </div>
                   </button>
                 )
@@ -113,12 +104,9 @@ export default function AdminGallery() {
           {/* Gallery main */}
           <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
             <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-2 sm:pb-3 flex-shrink-0">
-              <h1 className="text-xl font-heading font-bold">
+              <h1>
                 {selectedClientId ? users.find((u) => u.id === selectedClientId)?.full_name ?? 'Client' : 'All Clients'}
               </h1>
-              <p className="text-muted-foreground text-sm mt-0.5 hidden sm:block">
-                {selectedClientId ? 'Files belonging to this client.' : 'All files across all clients and team members.'}
-              </p>
             </div>
             <div className="flex-1">
               {selectedClientId ? (

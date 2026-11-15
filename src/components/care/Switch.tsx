@@ -12,7 +12,7 @@ export function Switch({ checked, onChange, label, className, ariaLabel }: { che
       className={cn('min-h-[44px] inline-flex items-center gap-2 px-1 text-sm rounded-lg', className)}
     >
       <span className={cn('relative w-9 h-5 rounded-full transition-colors flex-shrink-0', checked ? 'bg-primary' : 'bg-muted-foreground/30')} aria-hidden>
-        <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', checked && 'translate-x-4')} />
+        <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full shadow transition-transform', checked ? 'translate-x-4 bg-primary-foreground' : 'bg-white')} />
       </span>
       <span className={checked ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
     </button>

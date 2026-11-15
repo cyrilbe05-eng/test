@@ -1,3 +1,4 @@
+import { ClientMark } from '@/components/ds'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -181,7 +182,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-heading font-bold">{user.full_name}</h2>
                 {user.client_id_label && (
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded ds-num font-semibold">{user.client_id_label}</span>
+                  <span className="text-xs ds-num font-semibold text-foreground">{user.client_id_label}</span>
                 )}
               </div>
               <p className="text-sm text-muted-foreground">{user.email}</p>
@@ -293,7 +294,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
               {/* Time saved */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Time Saved</p>
-                <p className="flex items-center gap-1.5 text-amber-600 font-semibold mb-2"><IconClock />{saved ? `${saved.total}h` : '—'}
+                <p className="flex items-center gap-1.5 font-semibold mb-2 text-foreground"><span className="text-muted-foreground"><IconClock /></span>{saved ? `${saved.total}h` : '—'}
                   {saved && <span className="text-xs font-normal text-muted-foreground">{saved.auto}h + {saved.extra}h</span>}
                 </p>
                 <p className="text-xs text-muted-foreground mb-1">Extra hours</p>
@@ -613,7 +614,7 @@ export default function AdminUserManagement() {
 
             {/* Existing connections */}
             <div>
-              <h2 className="font-heading font-semibold text-sm mb-3 text-muted-foreground uppercase tracking-wider">Active Connections ({connections.length})</h2>
+              <h2 className="mb-3" style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>Active Connections ({connections.length})</h2>
               {connections.length === 0 ? (
                 <div className="text-center py-12 border border-dashed border-border rounded-xl text-muted-foreground text-sm">No connections yet.</div>
               ) : (
@@ -700,7 +701,7 @@ export default function AdminUserManagement() {
             {/* Existing groups */}
             {groups.length > 0 && (
               <div>
-                <h2 className="font-heading font-semibold text-sm mb-3 text-muted-foreground uppercase tracking-wider">Group Chats ({groups.length})</h2>
+                <h2 className="mb-3" style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>Group Chats ({groups.length})</h2>
                 <div className="space-y-2">
                   {groups.map((g) => {
                     const members = (g.member_ids ?? []).map((id) => users.find((u) => u.id === id)).filter(Boolean) as UserRow[]
@@ -737,36 +738,36 @@ export default function AdminUserManagement() {
             {/* Clients */}
             <section className="mb-8 animate-slide-up stagger-1">
               <div className="flex items-center gap-2 mb-3">
-                <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Clients</h2>
-                <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full ds-num font-medium">{clients.length}</span>
+                <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>Clients</h2>
+                <span className="text-[13px] text-muted-foreground ds-num">{clients.length}</span>
               </div>
               <div className="clay-card overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border text-left bg-muted/40">
+                    <tr className="text-left" style={{ borderBottom: '1px solid var(--line)' }}>
                       {['Name', 'Client ID', 'Email', 'Plan', 'Storage', 'Time Saved', 'Status', 'Actions'].map((h) => (
                         <th key={h} className="px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/50">
+                  <tbody className="divide-y divide-[var(--line)]">
                     {clients.map((u) => {
                       const limitMb = u.plans?.storage_limit_mb ?? -1
                       const usedMb = (u.used_bytes ?? 0) / 1048576
                       const pct = limitMb !== -1 && limitMb > 0 ? Math.min(100, (usedMb / limitMb) * 100) : 0
                       const barColor = pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-400' : 'bg-primary'
                       return (
-                        <tr key={u.id} className={cn('hover:bg-muted/20 transition-colors group', u.disabled && 'opacity-50')}>
+                        <tr key={u.id} className={cn('hover:bg-[var(--hover)] transition-colors group', u.disabled && 'opacity-50')}>
                           <td className="px-4 py-3">
                             <button onClick={() => setProfileUser(u)} className="flex items-center gap-2.5 hover:text-primary transition-colors text-left">
-                              <div className="w-7 h-7 rounded-full bg-green-50 text-green-700 flex items-center justify-center text-xs font-bold flex-shrink-0">{u.full_name.charAt(0)}</div>
+                              <ClientMark name={u.full_name} size={26} />
                               <span className="font-medium">{u.full_name}</span>
                               <span className="opacity-0 group-hover:opacity-100 transition-opacity"><IconUser /></span>
                             </button>
                           </td>
                           <td className="px-4 py-3">
                             {u.client_id_label
-                              ? <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded ds-num font-semibold">{u.client_id_label}</span>
+                              ? <span className="text-xs ds-num font-semibold text-foreground">{u.client_id_label}</span>
                               : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
                           <td className="px-4 py-3 text-muted-foreground text-xs">{u.email}</td>
@@ -781,7 +782,7 @@ export default function AdminUserManagement() {
                           </td>
                           <td className="px-4 py-3">
                             {savedMap?.[u.id]
-                              ? <span className="flex items-center gap-1 text-amber-600 font-semibold text-xs"><IconClock />{savedMap[u.id].total}h</span>
+                              ? <span className="flex items-center gap-1.5 font-semibold text-xs text-foreground"><span className="text-muted-foreground"><IconClock /></span>{savedMap[u.id].total}h</span>
                               : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
                           <td className="px-4 py-3">
@@ -813,7 +814,7 @@ export default function AdminUserManagement() {
               <section className="mb-8">
                 <button onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived}
                   className="flex items-center gap-2 mb-3 min-h-[44px]">
-                  <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Archived</h2>
+                  <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>Archived</h2>
                   <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full ds-num font-medium">{archivedClients.length}</span>
                   <span className="text-muted-foreground text-xs">{showArchived ? '▾' : '▸'}</span>
                 </button>
@@ -841,21 +842,21 @@ export default function AdminUserManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <section className="animate-slide-up stagger-2">
                 <div className="flex items-center gap-2 mb-3">
-                  <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Team</h2>
-                  <span className="text-xs bg-zinc-50 text-zinc-700 border border-zinc-200 px-2 py-0.5 rounded-full ds-num font-medium">{team.length}</span>
+                  <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>Team</h2>
+                  <span className="text-[13px] text-muted-foreground ds-num">{team.length}</span>
                 </div>
                 <div className="clay-card overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-border text-left bg-muted/40">
+                      <tr className="text-left" style={{ borderBottom: '1px solid var(--line)' }}>
                         {['Name', 'Email', 'Status', 'Actions'].map((h) => (
                           <th key={h} className="px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wide">{h}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border/50">
+                    <tbody className="divide-y divide-[var(--line)]">
                       {team.map((u) => (
-                        <tr key={u.id} className={cn('hover:bg-muted/20 transition-colors group', u.disabled && 'opacity-50')}>
+                        <tr key={u.id} className={cn('hover:bg-[var(--hover)] transition-colors group', u.disabled && 'opacity-50')}>
                           <td className="px-4 py-3">
                             <button onClick={() => setProfileUser(u)} className="flex items-center gap-2.5 hover:text-primary transition-colors text-left">
                               <div className="w-7 h-7 rounded-full bg-zinc-50 text-zinc-700 flex items-center justify-center text-xs font-bold flex-shrink-0">{u.full_name.charAt(0)}</div>
@@ -886,19 +887,19 @@ export default function AdminUserManagement() {
 
               <section className="animate-slide-up stagger-3">
                 <div className="flex items-center gap-2 mb-3">
-                  <h2 className="font-heading font-semibold text-sm text-muted-foreground uppercase tracking-wider">Admins</h2>
-                  <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full ds-num font-medium">{admins.length}</span>
+                  <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>Admins</h2>
+                  <span className="text-[13px] text-muted-foreground ds-num">{admins.length}</span>
                 </div>
                 <div className="clay-card overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-border text-left bg-muted/40">
+                      <tr className="text-left" style={{ borderBottom: '1px solid var(--line)' }}>
                         {['Name', 'Email'].map((h) => (
                           <th key={h} className="px-4 py-3 text-muted-foreground font-medium text-xs uppercase tracking-wide">{h}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border/50">
+                    <tbody className="divide-y divide-[var(--line)]">
                       {admins.map((u) => (
                         <tr key={u.id} className="hover:bg-muted/20 transition-colors">
                           <td className="px-4 py-3">

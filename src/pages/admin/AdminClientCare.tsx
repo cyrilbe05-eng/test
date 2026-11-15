@@ -1,13 +1,14 @@
 import { useCallback, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { format, isToday } from 'date-fns'
-import { toast } from 'sonner'
+import { format } from 'date-fns'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { ClientCarePanel } from '@/components/care/ClientCarePanel'
 import { HealthBadge } from '@/components/care/HealthBadge'
 import { HEALTH_META } from '@/components/care/healthMeta'
 import { Switch } from '@/components/care/Switch'
-import { useCareOverview, useMarkContacted, useUndoContact } from '@/hooks/useCare'
+import { useCareOverview } from '@/hooks/useCare'
+import { QuickContacted } from '@/components/care/QuickContacted'
+import { ClientMark } from '@/components/ds'
 import { cn } from '@/lib/utils'
 import { shortReason, isAllClear } from '@/lib/careReasons'
 import type { CareOverview, Health, HealthCard } from '@/types/care'
@@ -43,28 +44,6 @@ function Section({ title, count, children, className, action }: { title: string;
 }
 
 // ── Text today ──────────────────────────────────────────────────────────────
-
-function QuickContacted({ item }: { item: CareOverview['text_today'][number] }) {
-  const mark = useMarkContacted()
-  const undo = useUndoContact()
-  const done = !!item.last_contact_at && isToday(new Date(item.last_contact_at))
-  const tick = () => mark.mutate(item.client_id, {
-    onSuccess: (detail) => toast.success(item.name, { action: { label: 'Undo', onClick: () => undo.mutate(detail.contacts[0].id) } }),
-    onError: (e) => toast.error((e as Error).message),
-  })
-  return (
-    <button
-      onClick={tick}
-      disabled={done || mark.isPending}
-      className={cn(
-        'min-h-[44px] px-3 rounded-xl text-sm font-medium whitespace-nowrap flex-shrink-0 transition-colors',
-        done ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border border-border hover:bg-muted disabled:opacity-60',
-      )}
-    >
-      {done ? '✓ Contacted' : 'Contacted'}
-    </button>
-  )
-}
 
 /** Reasons as quiet short tags; the full sentence on hover. */
 function Tags({ reasons, max }: { reasons: string[]; max?: number }) {
@@ -108,9 +87,10 @@ function ClientCard({ c, onOpen }: { c: HealthCard; onOpen: (id: string) => void
     <button
       onClick={() => onOpen(c.client_id)}
       title={c.health !== 'healthy' ? c.reasons.join('\n') : undefined}
-      className="w-full text-left rounded-lg border border-border bg-background px-3 py-2 min-h-[44px] hover:border-primary/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="clay-card w-full text-left flex items-center gap-2.5 px-3.5 py-3 min-h-[48px] focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--focus)]"
     >
-      <span className="block text-sm font-semibold truncate">{c.name}</span>
+      <ClientMark name={c.name} />
+      <span className="flex-1 truncate" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--strong)' }}>{c.name}</span>
     </button>
   )
 }
@@ -128,7 +108,7 @@ function HealthBoard({ board, onOpen }: { board: CareOverview['health_board']; o
           </div>
           {board[h].length === 0
             ? <p className="text-sm text-muted-foreground">—</p>
-            : <div className="space-y-1.5">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
+            : <div className="space-y-2">{board[h].map((c) => <ClientCard key={c.client_id} c={c} onOpen={onOpen} />)}</div>}
         </div>
       ))}
     </div>

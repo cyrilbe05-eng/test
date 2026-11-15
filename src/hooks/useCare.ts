@@ -22,10 +22,11 @@ export function useEditorPerformanceRange(query: string) {
   })
 }
 
-export function useCareOverview() {
+export function useCareOverview(enabled = true) {
   const apiFetch = useApiFetch()
   return useQuery({
     queryKey: ['care', 'overview'],
+    enabled,
     refetchInterval: 60_000,
     retry: false,
     queryFn: () => apiFetch<CareOverview>('/api/admin/care/overview'),

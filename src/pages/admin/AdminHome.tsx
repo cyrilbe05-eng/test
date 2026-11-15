@@ -7,6 +7,9 @@ import { ClientMark, EditorAvatar } from '@/components/ds'
 import { useApiFetch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useUrgentRequests } from '@/hooks/useUrgentRequests'
+import { useCareOverview } from '@/hooks/useCare'
+import { QuickContacted } from '@/components/care/QuickContacted'
+import { shortReason, isAllClear } from '@/lib/careReasons'
 import { cn } from '@/lib/utils'
 
 // Admin home: what needs an admin now — editors' urgent requests, videos to
@@ -103,6 +106,10 @@ export default function AdminHome() {
   const { data, isLoading, error } = useQuery({ queryKey: ['admin-home'], queryFn: () => apiFetch<Home>('/api/admin/home'), refetchInterval: 30_000 })
   const urgent = useUrgentRequests(true)
   const pending = (urgent.data ?? []).filter((r) => r.status === 'pending')
+  // Clients to text today (Client Care) — full admins only, like Client Care.
+  const fullAdmin = profile?.admin_role !== 'manager'
+  const care = useCareOverview(fullAdmin)
+  const textToday = care.data?.text_today ?? []
 
   const decide = (id: string, decision: 'approve' | 'decline') => urgent.decide.mutate({ id, decision }, {
     onSuccess: () => {
@@ -130,6 +137,29 @@ export default function AdminHome() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
             <div className="space-y-4 min-w-0">
+              {fullAdmin && care.data && (
+                <Panel title="Text today" count={textToday.filter((t) => !(t.last_contact_at && new Date(t.last_contact_at).toDateString() === new Date().toDateString())).length} tone="warn">
+                  {textToday.length ? (
+                    <ul>
+                      {textToday.map((t) => {
+                        const reasons = t.reasons.filter((r) => !isAllClear(r)).map(shortReason).map((r) => r.label)
+                        return (
+                          <li key={t.client_id} className="flex items-center gap-2">
+                            <Link to={`/admin/care?client=${t.client_id}`} className="ds-hrow flex-1 min-w-0" style={{ margin: '0 0 0 -10px' }}>
+                              <ClientMark name={t.name} size={26} />
+                              <div className="flex-1 min-w-0">
+                                <p className="ds-t">{t.name}</p>
+                                {reasons.length > 0 && <p className="ds-s">{reasons.join(' · ')}</p>}
+                              </div>
+                            </Link>
+                            <QuickContacted item={t} />
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  ) : empty}
+                </Panel>
+              )}
               <Panel title="Requests" count={pending.length} tone="warn">
                 {pending.length ? (
                   <ul>

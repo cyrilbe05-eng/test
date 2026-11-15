@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ds'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AdminLayout } from '@/components/admin/AdminLayout'
@@ -75,7 +76,7 @@ function QuestionForm({ initial, sections, saving, onSave, onCancel }: { initial
   )
 }
 
-const chip = 'text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground whitespace-nowrap'
+const chip = 'text-[12px] text-muted-foreground whitespace-nowrap'
 
 export default function AdminOnboardingQuestions() {
   const { data, isLoading, error } = useOnboardingQuestions()
@@ -95,9 +96,9 @@ export default function AdminOnboardingQuestions() {
     <AdminLayout>
       <main className="px-4 md:px-6 py-5 md:py-6 space-y-4 max-w-4xl">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-heading font-semibold tracking-tight">Onboarding questions</h2>
+          <h1>Onboarding questions</h1>
           {editing !== 'new' && (
-            <button onClick={() => setEditing('new')} className="min-h-[44px] px-4 rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 whitespace-nowrap">+ New question</button>
+            <button onClick={() => setEditing('new')} className="ds-primary ds-tap whitespace-nowrap">+ New question</button>
           )}
         </div>
         {editing === 'new' && (
@@ -115,7 +116,7 @@ export default function AdminOnboardingQuestions() {
             {list.map((q, i) => (
               <li key={q.id} className={cn(!q.active && 'opacity-50')}>
                 {(i === 0 || list[i - 1].section !== q.section) && (
-                  <p className="pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{q.section}</p>
+                  <p className="pt-4 pb-1" style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--strong)' }}>{q.section}</p>
                 )}
                 {editing === q.id ? (
                   <QuestionForm initial={toForm(q)} sections={sections} saving={update.isPending} onCancel={() => setEditing(null)}
@@ -134,8 +135,8 @@ export default function AdminOnboardingQuestions() {
                     </button>
                     <Switch label="" ariaLabel="Active" checked={q.active} onChange={(active) => update.mutate({ id: q.id, active }, onErr)} className="flex-shrink-0" />
                     <span className="flex flex-shrink-0">
-                      <button className="w-11 h-11 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30" aria-label="Move up" disabled={i === 0 || reorder.isPending} onClick={() => move(i, -1)}>↑</button>
-                      <button className="w-11 h-11 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30" aria-label="Move down" disabled={i === list.length - 1 || reorder.isPending} onClick={() => move(i, 1)}>↓</button>
+                      <button className="w-11 h-11 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30" aria-label="Move up" disabled={i === 0 || reorder.isPending} onClick={() => move(i, -1)}><Icon name="arrow_upward" size={18} /></button>
+                      <button className="w-11 h-11 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30" aria-label="Move down" disabled={i === list.length - 1 || reorder.isPending} onClick={() => move(i, 1)}><Icon name="arrow_downward" size={18} /></button>
                     </span>
                   </div>
                 )}

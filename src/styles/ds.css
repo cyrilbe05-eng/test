@@ -331,3 +331,6 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 .ds-side-scroll{scrollbar-width:thin}
 .ds-side-scroll::-webkit-scrollbar{width:6px}
 .ds-side-scroll::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:6px}
+
+/* ── No all-caps labels anywhere in the app (DESIGN.md §2) ── */
+.ds .uppercase{text-transform:none !important;letter-spacing:normal !important}
