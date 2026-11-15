@@ -1,4 +1,4 @@
-import { Icon, Ms } from '@/components/ds'
+import { Icon, Ms, Segmented } from '@/components/ds'
 import { FrameTools } from '@/components/ds/Frame'
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
@@ -296,22 +296,10 @@ export default function ClientProjectDetail() {
           {project.status === 'revision_requested' && <StatusBanner color="red">Your feedback has been submitted. The team is working on the revisions.</StatusBanner>}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-5 border-b border-border">
-          {(['review', 'storage'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={cn(
-                'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                activeTab === tab
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <Icon size={16} className="mr-1.5" name={tab === 'review' ? (isCarousel ? 'photo_library' : 'smart_display') : 'folder'} />{tab === 'review' ? (isCarousel ? 'My Carousel' : 'My Video') : 'Files'}
-            </button>
-          ))}
+        {/* Tabs: same segmented switch as the admin page */}
+        <div className="mb-5">
+          <Segmented label="View" width={110} value={activeTab} onChange={setActiveTab}
+            options={[{ value: 'review', label: isCarousel ? 'My Carousel' : 'My Video' }, { value: 'storage', label: 'Files' }]} />
         </div>
 
         {/* Storage tab */}

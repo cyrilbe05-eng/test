@@ -91,7 +91,7 @@ export default function AdminGallery() {
                     <div className="flex-1 min-w-0">
                       <p className="truncate" style={{ fontSize: 13.5, fontWeight: isSelected ? 500 : 400, color: isSelected ? 'var(--strong)' : 'var(--text)' }}>{client.full_name}</p>
                       <p className="truncate" style={{ fontSize: 11.5, color: 'var(--faint)' }}>
-                        {[client.client_id_label, plan?.name, isSelected ? `${activeClientFiles.length} files` : null].filter(Boolean).join(' · ')}
+                        {[plan?.name, isSelected ? `${activeClientFiles.length} files` : null].filter(Boolean).join(' · ')}
                       </p>
                     </div>
                   </button>

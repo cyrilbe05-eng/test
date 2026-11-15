@@ -2,10 +2,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
+import { installToastText } from './lib/toastText'
 import App from './App'
 import { ThemeProvider } from './lib/theme'
 import './index.css'
 import './styles/ds.css'
+
+installToastText()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,7 +32,7 @@ createRoot(document.getElementById('root')!).render(
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <App />
-        <Toaster position="top-right" richColors />
+        <Toaster position="top-right" toastOptions={{ className: 'pingu-toast' }} />
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,
