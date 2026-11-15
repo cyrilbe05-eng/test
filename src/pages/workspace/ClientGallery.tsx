@@ -95,7 +95,6 @@ export default function ClientGallery() {
               <h1 className="text-xl sm:text-2xl font-heading font-bold flex items-center gap-2">
                 <IconFolder /> My Gallery
               </h1>
-              <p className="text-muted-foreground text-sm mt-0.5 hidden sm:block">Your personal file storage — organize into folders, upload assets.</p>
             </div>
             <div className="flex-1">
               <Gallery

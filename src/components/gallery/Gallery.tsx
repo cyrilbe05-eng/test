@@ -997,7 +997,8 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
                 {!readOnly && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder) }}
-                    className="absolute top-1/2 -translate-y-1/2 right-2 z-10 w-7 h-7 rounded-lg ds-ibtn ds-danger opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="z-10 rounded-lg ds-ibtn ds-danger opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ position: 'absolute', top: '50%', right: 8, width: 28, height: 28, transform: 'translateY(-50%)' }}
                     title="Delete folder"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
