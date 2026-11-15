@@ -22,6 +22,8 @@ interface Props {
   label?: string
   /** Context line shown in the upload dock, e.g. the project title. */
   context?: string
+  /** One slim row (icon + label) instead of the big drop area. */
+  compact?: boolean
 }
 
 /** Dropzone that hands files to the app-level upload queue.
@@ -29,7 +31,7 @@ interface Props {
  *  Progress is NOT rendered here: uploads keep running when the user leaves
  *  the page, so the floating UploadDock owns all progress UI. This component
  *  is purely the drop target + file picker. */
-export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, onUploaded, disabled, label, context }: Props) {
+export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, onUploaded, disabled, label, context, compact }: Props) {
   const storageAdapter = useStorageAdapter()
   const { enqueue } = useUploadManager()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -55,6 +57,26 @@ export function FileUploader({ projectId, fileType, accept, maxSizeMb = 50000, o
       },
     })))
     toast.success(accepted.length > 1 ? `${accepted.length} files added to the upload queue` : `${accepted[0].name} added to the upload queue`)
+  }
+
+  if (compact) {
+    return (
+      <div
+        className={cn('flex items-center gap-2.5 h-11 px-3 rounded-xl border border-dashed cursor-pointer transition-colors', dragging ? 'border-[var(--focus)] bg-[var(--drop)]' : 'border-[var(--slot)] hover:border-[var(--focus)]', disabled && 'opacity-50 pointer-events-none')}
+        style={{ fontSize: 13 }}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
+        onClick={() => inputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
+      >
+        <input ref={inputRef} type="file" accept={accept} multiple className="hidden" onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }} />
+        <svg className="w-4 h-4 flex-none" style={{ color: 'var(--faint)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+        <span className="truncate" style={{ color: 'var(--text)' }}>{dragging ? 'Release to upload here' : (label ?? 'Drop files here')}</span>
+      </div>
+    )
   }
 
   return (

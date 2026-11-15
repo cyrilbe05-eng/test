@@ -327,3 +327,7 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 .plyr__control--overlaid:hover{background:#FFFFFF !important}
 .plyr--video .plyr__control:hover{background:rgba(255,255,255,.9) !important;color:#0E0E10 !important}
 .plyr--full-ui input[type=range]{color:#FFFFFF !important}
+
+.ds-side-scroll{scrollbar-width:thin}
+.ds-side-scroll::-webkit-scrollbar{width:6px}
+.ds-side-scroll::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:6px}

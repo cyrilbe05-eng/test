@@ -58,31 +58,28 @@ function Section({ title, children, className, right }: { title: string; childre
   )
 }
 
-function TextBlock({ label, value }: { label: string; value: string }) {
+/** One part of the brief: label, then the text (long text folds). */
+function BriefRow({ label, value, link }: { label: string; value?: string | null; link?: boolean }) {
   const [expanded, setExpanded] = useState(false)
-  const isLong = value.length > 300
+  const isLong = !!value && value.length > 300
   return (
-    <section className="ds-panel" style={{ padding: '16px 18px' }}>
-      <div className="ds-panel-head" style={{ marginBottom: 8 }}>
-        <h2>{label}</h2>
-        {isLong && (
-          <button onClick={() => setExpanded((e) => !e)} className="flex-shrink-0 hover:underline" style={{ fontSize: 12.5, color: 'var(--faint)' }}>
-            {expanded ? 'Show less' : 'Show more'}
-          </button>
+    <div className="py-3" style={{ borderTop: '1px solid var(--line)' }}>
+      <p className="mb-1" style={{ fontSize: 12.5, color: 'var(--faint)' }}>{label}</p>
+      {!value ? <p style={{ fontSize: 13.5, color: 'var(--faint)' }}>—</p>
+        : link ? (
+          <a href={value} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 hover:underline break-all" style={{ fontSize: 13.5, color: 'var(--strong)' }}>
+            <Ms name="north_east" style={{ fontSize: 15, width: 15, color: 'inherit' }} />{value}
+          </a>
+        ) : (
+          <>
+            <div className={cn('whitespace-pre-wrap overflow-hidden', !expanded && isLong ? 'max-h-24' : 'max-h-none')}
+              style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)', ...(!expanded && isLong ? { WebkitMaskImage: 'linear-gradient(to bottom, black 55%, transparent 100%)' } : {}) }}>
+              {value}
+            </div>
+            {isLong && <button onClick={() => setExpanded((e) => !e)} className="mt-1 hover:underline" style={{ fontSize: 12.5, color: 'var(--faint)' }}>{expanded ? 'Show less' : 'Read full text'}</button>}
+          </>
         )}
-      </div>
-      <div
-        className={cn('whitespace-pre-wrap overflow-hidden transition-all', !expanded && isLong ? 'max-h-32' : 'max-h-none')}
-        style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)', ...(!expanded && isLong ? { WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)' } : {}) }}
-      >
-        {value}
-      </div>
-      {!expanded && isLong && (
-        <button onClick={() => setExpanded(true)} className="mt-2 hover:underline" style={{ fontSize: 12.5, color: 'var(--faint)' }}>
-          Read full text
-        </button>
-      )}
-    </section>
+    </div>
   )
 }
 
@@ -170,6 +167,7 @@ export default function AdminProjectDetail() {
   // C2: forward-as-FYI state
   const [theater, setTheater] = useState(false)
   const [activeTab, setActiveTab] = useState<'review' | 'storage'>('review')
+  const [historyAll, setHistoryAll] = useState(false)
   const [editDeadlineId, setEditDeadlineId] = useState<string | null>(null)
   const [editDeadlineValue, setEditDeadlineValue] = useState('')
 
@@ -290,7 +288,7 @@ export default function AdminProjectDetail() {
           <div className="min-w-0 flex-1">
             <h1 className="truncate">{project.title}</h1>
             <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1" style={{ fontSize: 13 }}>
-              {client && <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--ds-muted)' }}><ClientMark name={client.full_name ?? '?'} /><span className="truncate">{client.full_name}</span></span>}
+              {client && <span className="flex items-center gap-2 min-w-0" style={{ color: 'var(--ds-muted)' }}><ClientMark name={client.full_name ?? '?'} /><span className="truncate">{client.full_name}</span>{client.email && <span className="hidden md:inline truncate" style={{ color: 'var(--faint)' }}>· {client.email}</span>}</span>}
               <span className="flex items-center gap-2" style={{ color: 'var(--soft-text)' }}><StatusDot status={project.status} size={7} />{statusLabel(project.status)}</span>
             </div>
           </div>
@@ -367,7 +365,7 @@ export default function AdminProjectDetail() {
                   />
                   </div>
                 ) : (
-                  <div className="aspect-video rounded-2xl grid place-items-center" style={{ background: 'var(--panel)', boxShadow: 'inset 0 0 0 1px var(--panel-ring)' }}>
+                  <div className="rounded-2xl grid place-items-center" style={{ height: 'clamp(180px, 30vh, 300px)', background: 'var(--panel)', boxShadow: 'inset 0 0 0 1px var(--panel-ring)' }}>
                     <div className="text-center">
                       <Ms name="movie" style={{ fontSize: 28, width: 28 }} />
                       <p className="mt-2" style={{ fontSize: 13.5, color: 'var(--faint)' }}>No deliverable uploaded yet</p>
@@ -385,28 +383,21 @@ export default function AdminProjectDetail() {
                   </div>
                 )}
 
-                {/* Description / script / instructions — below the video */}
-                {project.description && <TextBlock label="Description" value={project.description} />}
-                {project.instructions && <TextBlock label="Client Instructions" value={project.instructions} />}
-                {project.video_script && <TextBlock label="Video Script" value={project.video_script} />}
-
-                {/* Source files from client */}
-                {sourceFiles.length > 0 && (
-                  <Section title="Source files from client" right={<span className="ds-count">{sourceFiles.length}</span>}>
-                    <div className="-mb-2.5">
-                      {sourceFiles.map((f) => (
-                        <FileLine key={f.id} f={f}
-                          label={<span className="flex-shrink-0" style={{ fontSize: 12, color: 'var(--faint)' }}>{f.file_type === 'source_video' ? 'Main video' : 'Attachment'}</span>} />
-                      ))}
-                    </div>
-                  </Section>
-                )}
+                {/* The brief: always shown, so each part has a fixed place. */}
+                <Section title="Brief">
+                  <div className="-mb-3">
+                    <BriefRow label="Inspiration Video" value={project.inspiration_url} link />
+                    <BriefRow label="Client Instructions" value={project.instructions} />
+                    <BriefRow label="Video Script" value={project.video_script} />
+                    {project.description && <BriefRow label="Description" value={project.description} />}
+                  </div>
+                </Section>
               </div>
             )}
           </div>
 
           {/* ── Side panels ── */}
-          <aside className="min-w-0 space-y-4">
+          <aside className="min-w-0 space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pb-2 ds-side-scroll">
             {/* Team assignment */}
             <Section title="Team">
               {(assignments ?? []).length === 0 && (
@@ -550,6 +541,7 @@ export default function AdminProjectDetail() {
                 fileType="attachment"
                 label="Add supporting files"
                 context={project.title}
+                compact
                 onUploaded={() => qc.invalidateQueries({ queryKey: ['project_files', id] })}
               />
             </div>
@@ -559,7 +551,7 @@ export default function AdminProjectDetail() {
             {statusHistory.length > 0 && (
               <Section title="Status history">
                 <ol className="space-y-2.5">
-                  {[...statusHistory].reverse().map((h) => (
+                  {[...statusHistory].reverse().slice(0, historyAll ? undefined : 3).map((h) => (
                     <li key={h.id} className="flex gap-2.5" style={{ fontSize: 12.5 }}>
                       <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-none" style={{ background: 'var(--dash)' }} />
                       <div className="min-w-0">
@@ -572,31 +564,14 @@ export default function AdminProjectDetail() {
                     </li>
                   ))}
                 </ol>
+                {statusHistory.length > 3 && (
+                  <button onClick={() => setHistoryAll((a) => !a)} className="mt-2 hover:underline" style={{ fontSize: 12.5, color: 'var(--faint)' }}>
+                    {historyAll ? 'Show fewer' : `Show all ${statusHistory.length}`}
+                  </button>
+                )}
               </Section>
             )}
 
-            {/* Inspiration URL */}
-            {project.inspiration_url && (
-              <Section title="Inspiration Video">
-                <a href={project.inspiration_url} target="_blank" rel="noopener noreferrer"
-                  className="ds-ghost-btn inline-flex items-center gap-2" style={{ textDecoration: 'none' }}>
-                  <Ms name="north_east" style={{ fontSize: 16, width: 16, color: 'inherit' }} />Open link
-                </a>
-              </Section>
-            )}
-
-            {/* Client */}
-            {client && (
-              <Section title="Client">
-                <div className="flex items-center gap-2.5">
-                  <ClientMark name={client.full_name ?? '?'} size={28} />
-                  <div className="min-w-0">
-                    <p className="truncate" style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--strong)' }}>{client.full_name}</p>
-                    {client.email && <p className="truncate" style={{ fontSize: 12, color: 'var(--faint)' }}>{client.email}</p>}
-                  </div>
-                </div>
-              </Section>
-            )}
           </aside>
         </div>
       </main>
