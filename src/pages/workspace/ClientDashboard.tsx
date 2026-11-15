@@ -31,20 +31,17 @@ function Card({ title, children, className }: { title?: string; children: React.
   )
 }
 
+/** The contract, small, next to the Miro board: "Day 172 of 366", a thin
+ *  bar and "194 days left" (contract number on hover). */
 function Timeline({ c }: { c: NonNullable<Dashboard['contract']> }) {
   return (
-    <Card>
-      <div className="flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">Contract {c.number}</p>
-          <p className="text-lg font-heading font-semibold tabular-nums">Day {c.day} of {c.total_days}</p>
-        </div>
-        <p className="text-sm tabular-nums text-muted-foreground whitespace-nowrap">{c.days_left} days left</p>
-      </div>
-      <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={c.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Contract">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${c.progress}%` }} />
-      </div>
-    </Card>
+    <div className="ds-ghost-btn inline-flex items-center gap-3 cursor-default" style={{ height: 38 }} title={`Contract ${c.number}`}>
+      <span className="tabular-nums whitespace-nowrap" style={{ fontSize: 13, fontWeight: 600, color: 'var(--strong)' }}>Day {c.day} of {c.total_days}</span>
+      <span className="ds-track hidden sm:block" style={{ width: 64 }} role="progressbar" aria-valuenow={c.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Contract">
+        <i style={{ width: `${c.progress}%`, background: 'var(--ink-bar)' }} />
+      </span>
+      <span className="tabular-nums whitespace-nowrap hidden md:inline" style={{ fontSize: 12.5, color: 'var(--faint)', fontWeight: 400 }}>{c.days_left} days left</span>
+    </div>
   )
 }
 
@@ -172,6 +169,7 @@ export default function ClientDashboard() {
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-heading font-semibold tracking-tight truncate">{data?.name ?? ''}</h1>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {data?.contract && <Timeline c={data.contract} />}
             {data?.miro_url && (
               <a href={data.miro_url} target="_blank" rel="noreferrer" aria-label="Miro board" className="ds-ghost-btn ds-tap inline-flex items-center gap-2" style={{ textDecoration: 'none' }}>
                 <Ms name="dashboard" style={{ fontSize: 18, width: 18, color: 'inherit' }} /><span className="hidden sm:inline">Miro board</span><Ms name="north_east" className="hidden sm:inline-block" style={{ fontSize: 15, width: 15, color: 'var(--faint)' }} />
@@ -189,14 +187,14 @@ export default function ClientDashboard() {
         ) : data ? (
           <>
             <ClientStats projects={(projects ?? []) as Project[]} />
-            {data.contract && <Timeline c={data.contract} />}
-            {data.plan.length > 0 && <Plan steps={data.plan} />}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-start">
               <div className="space-y-4 min-w-0">
                 <Videos items={data.needs} scripts={data.scripts ?? []} toPost={toPost} inWorks={inWorks} />
               </div>
               <ClientBrief brief={data} noStyle noMiro />
             </div>
+            {/* The plan below the videos, so new / active videos come first. */}
+            {data.plan.length > 0 && <Plan steps={data.plan} />}
           </>
         ) : null}
       </main>
