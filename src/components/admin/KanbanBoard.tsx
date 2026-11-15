@@ -122,7 +122,7 @@ export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine
     <>
       {back && <MoveBack to={back.to} title={back.title} onClose={() => setBack(null)} onConfirm={() => { const b = back; setBack(null); void move(b.id, b.to) }} />}
 
-      <div className="ds-lanes" style={{ padding: '4px 20px 40px' }}>
+      <div className="ds-lanes" style={{ padding: '2px 20px 32px' }}>
         {COLUMNS.map((col, li) => {
           const cards = shown.filter((p) => col.statuses.includes(p.status))
           const fromHere = !!dragging && col.statuses.includes(dragging.fromStatus)
@@ -169,7 +169,7 @@ export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine
                   >
                     <Link to={`${base}/${project.id}`} className="ds-hit" aria-label={`Open ${project.title}`} draggable={false} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <ClientMark name={client} />
+                      <ClientMark name={client} size={18} />
                       <span className="truncate" style={{ flex: 1, fontSize: 12.5, color: 'var(--ds-muted)' }}>{client}</span>
                       {mine?.(project) && (
                         <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--soft-text)', padding: '3px 8px', borderRadius: 999, background: 'var(--pill)' }}>Mine</span>
@@ -178,9 +178,9 @@ export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine
                         <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--car-t)', padding: '3px 8px', borderRadius: 999, background: 'var(--car-b)' }}>Carousel</span>
                       )}
                     </div>
-                    <span style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, letterSpacing: '-.015em', color: 'var(--strong)' }}>{project.title}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3, letterSpacing: '-.015em', color: 'var(--strong)' }}>{project.title}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <EditorAvatar name={first || null} />
+                      <EditorAvatar name={first || null} size={20} />
                       <span className="truncate" style={{ flex: 1, fontSize: 12.5, color: first ? 'var(--soft-text)' : 'var(--faint)' }}>{first ? editors : 'Unassigned'}</span>
                       <span className="whitespace-nowrap" style={{ fontSize: 12, color: 'var(--faint)' }}>{projectTimeLabel(project)}</span>
                     </div>
