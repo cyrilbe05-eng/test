@@ -145,7 +145,7 @@ export default function AdminHome() {
                         const reasons = t.reasons.filter((r) => !isAllClear(r)).map(shortReason).map((r) => r.label)
                         return (
                           <li key={t.client_id} className="flex items-center gap-2">
-                            <Link to={`/admin/care?client=${t.client_id}`} className="ds-hrow flex-1 min-w-0" style={{ margin: '0 0 0 -10px' }}>
+                            <Link to={`/admin/care?client=${t.client_id}`} className="ds-hrow" style={{ margin: '0 0 0 -10px', flex: '1 1 0%', minWidth: 0 }}>
                               <ClientMark name={t.name} size={26} />
                               <div className="flex-1 min-w-0">
                                 <p className="ds-t">{t.name}</p>
