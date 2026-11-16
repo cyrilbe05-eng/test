@@ -811,35 +811,6 @@ export default function AdminUserManagement() {
               </div>
             </section>
 
-            {/* Archived clients: hidden everywhere else; restore or delete permanently */}
-            {archivedClients.length > 0 && (
-              <section className="mb-8">
-                <button onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived}
-                  className="flex items-center gap-2 mb-3 min-h-[44px]">
-                  <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>Archived</h2>
-                  <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full ds-num font-medium">{archivedClients.length}</span>
-                  <span className="text-muted-foreground text-xs">{showArchived ? '▾' : '▸'}</span>
-                </button>
-                {showArchived && (
-                  <ul className="clay-card divide-y divide-border/50">
-                    {archivedClients.map((u) => (
-                      <li key={u.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
-                        <div className="flex-1 min-w-[10rem]">
-                          <p className="text-sm font-medium">{u.full_name}</p>
-                          <p className="text-xs text-muted-foreground">{u.email} · {new Date(u.archived_at!).toLocaleDateString()}</p>
-                        </div>
-                        <button onClick={() => archiveClient(u.id, u.full_name, true)}
-                          className="min-h-[44px] px-3 rounded-lg border border-border text-sm hover:bg-muted">Restore</button>
-                        {!isManagerViewer && (
-                          <button onClick={() => setDeleting(u)} className="min-h-[44px] px-3 rounded-lg text-sm text-destructive hover:bg-destructive/10">Delete permanently</button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            )}
-
             {/* Team + Admins */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <section className="animate-slide-up stagger-2">
@@ -918,6 +889,36 @@ export default function AdminUserManagement() {
                 </div>
               </section>
             </div>
+
+            {/* Archived clients (at the bottom): hidden everywhere else; restore or delete permanently */}
+            {archivedClients.length > 0 && (
+              <section className="mt-8">
+                <button onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived}
+                  className="flex items-center gap-2 mb-3 min-h-[44px]">
+                  <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--strong)' }}>Archived</h2>
+                  <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full ds-num font-medium">{archivedClients.length}</span>
+                  <span className="text-muted-foreground text-xs">{showArchived ? '▾' : '▸'}</span>
+                </button>
+                {showArchived && (
+                  <ul className="clay-card divide-y divide-border/50">
+                    {archivedClients.map((u) => (
+                      <li key={u.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
+                        <div className="flex-1 min-w-[10rem]">
+                          <p className="text-sm font-medium">{u.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{u.email} · {new Date(u.archived_at!).toLocaleDateString()}</p>
+                        </div>
+                        <button onClick={() => archiveClient(u.id, u.full_name, true)}
+                          className="min-h-[44px] px-3 rounded-lg border border-border text-sm hover:bg-muted">Restore</button>
+                        {!isManagerViewer && (
+                          <button onClick={() => setDeleting(u)} className="min-h-[44px] px-3 rounded-lg text-sm text-destructive hover:bg-destructive/10">Delete permanently</button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
+
           </>)
         )}
       </main>
