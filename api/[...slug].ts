@@ -32,6 +32,7 @@ import { handleFileOrder } from './_helpers/care/carousel.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleScoreboardRoute } from './_helpers/scoreboard/routes.js'
+import { handleScriptsRoute } from './_helpers/scripts/routes.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
 import { isValidAvatar } from './_helpers/avatar.js'
 import { attemptKeys, isLocked, recordFailure, clearFailures, endSessions } from './_helpers/login-guard.js'
@@ -3063,6 +3064,9 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
         inspiration_url: m.inspiration_url ?? null,
         script: m.script ?? null,
         caption: m.caption ?? null,
+        // Pushed from Scripts (migration 024): staff only — clients never
+        // see editor notes.
+        ...(profile.role !== 'client' ? { editor_notes: (m as any).editor_notes ?? null, script_id: (m as any).script_id ?? null } : {}),
         assigned_client_ids: manualParticipants.filter((p) => p.event_id === m.id && p.role === 'client').map((p) => p.profile_id),
         assigned_team_ids: manualParticipants.filter((p) => p.event_id === m.id && p.role === 'team').map((p) => p.profile_id),
         created_at: m.created_at,
@@ -3081,6 +3085,13 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })
   }
+}
+
+/** A calendar row as a client may see it: editor notes and the link to the
+ *  internal script (migration 024) are for the team only. */
+function clientSafeEvent<T extends Record<string, unknown>>(e: T): Omit<T, 'editor_notes' | 'script_id'> {
+  const { editor_notes: _n, script_id: _s, ...rest } = e
+  return rest
 }
 
 async function handleCalendarEvents(req: VercelRequest, res: VercelResponse) {
@@ -3121,7 +3132,7 @@ async function handleCalendarEvents(req: VercelRequest, res: VercelResponse) {
         : []
 
       const enriched = (events as Record<string, unknown>[]).map((e) => ({
-        ...e,
+        ...(role === 'client' ? clientSafeEvent(e) : e),
         double_down: Boolean(e.double_down),
         assigned_client_ids: participants.filter((p) => p.event_id === e.id && p.role === 'client').map((p) => p.profile_id),
         assigned_team_ids:   participants.filter((p) => p.event_id === e.id && p.role === 'team').map((p) => p.profile_id),
@@ -3325,11 +3336,13 @@ async function handleCalendarEvent(req: VercelRequest, res: VercelResponse) {
       }
 
       const [updated] = await dbQuery<Record<string, unknown>>('SELECT * FROM calendar_events WHERE id = ?', [id])
-      return ok(res, { ...updated, double_down: Boolean(updated.double_down) })
+      return ok(res, { ...(profile.role === 'client' ? clientSafeEvent(updated) : updated), double_down: Boolean(updated.double_down) })
     }
 
     if (req.method === 'DELETE') {
       await dbExecute('DELETE FROM calendar_events WHERE id = ?', [id])
+      // A script pushed to this entry goes back to Approved, ready to push again.
+      try { await dbExecute("UPDATE scripts SET status = 'approved', calendar_event_id = NULL WHERE calendar_event_id = ?", [id]) } catch { /* pre-migration-024 */ }
       return ok(res, { deleted: true })
     }
 
@@ -4833,6 +4846,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleEditorLimit(req, res)
   }
   // Client time saved (automatic) — see api/_helpers/care/time-saved.ts
+  // Script-writing workspace — see api/_helpers/scripts/routes.ts
+  if (slug[0] === 'scripts') {
+    return handleScriptsRoute(req, res, slug.slice(1))
+  }
   // Editor leaderboard + monthly bonus — see api/_helpers/scoreboard/routes.ts
   if (slug[0] === 'scoreboard') {
     return handleScoreboardRoute(req, res, slug.slice(1))
