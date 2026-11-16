@@ -415,3 +415,9 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 .ds-stoggle+.ds-stoggle{margin-top:8px}
 .ds-stype{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:var(--pill);color:var(--soft-text);font-size:11.5px;font-weight:600;flex:none}
 .ds-rich.compact{min-height:64px}
+.ds-comment-draft{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;padding:10px 12px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--panel-ring)}
+.ds-rich mark.on{background:var(--hl,rgba(242,179,91,.28));border-bottom:2px solid var(--hl-line,#E09A2D);border-radius:2px}
+.ds-rich mark.on.active{background:var(--hl-active,rgba(242,179,91,.55))}
+.ds-cmt{padding:10px 12px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--panel-ring);cursor:pointer;transition:box-shadow .2s}
+.ds-cmt.active{box-shadow:inset 0 0 0 1.5px var(--focus)}
+.ds-cmt.resolved{opacity:.6}

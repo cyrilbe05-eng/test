@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import { Ms } from '@/components/ds'
 import { FieldEditor } from '@/components/scripts/RichEditor'
+import { ScriptComments } from '@/components/scripts/ScriptComments'
 import { SCRIPT_STATUS, SCRIPT_TYPES } from '@/lib/scriptStatus'
 import type { useScriptActions } from '@/hooks/useScripts'
-import type { Script, ScriptField, ScriptType } from '@/types/scripts'
+import type { Script, ScriptComment, ScriptField, ScriptType } from '@/types/scripts'
 
 // One script, as a collapsible toggle (V1, V2…): title, type, status; open,
 // it shows the Script / Editor notes tabs, inspo links and who edited last.
@@ -60,20 +61,32 @@ function Links({ script, actions, canEdit }: { script: Script; actions: Actions;
   )
 }
 
-export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpen, renderFieldExtras, footerExtras }: {
+export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpen, renderFieldExtras, footerExtras, comments, me, focus }: {
   script: Script
   actions: Actions
   isAdmin: boolean
   first: boolean
   last: boolean
   defaultOpen?: boolean
-  /** Admin review / comments (stage 3) plug in here. */
+  /** Extra per-section controls (kept for later additions). */
   renderFieldExtras?: (field: ScriptField) => { toolbarRight?: React.ReactNode; onAreaSelect?: () => void; below?: React.ReactNode }
   footerExtras?: React.ReactNode
+  /** This script's comments (and replies). */
+  comments: ScriptComment[]
+  /** Current user, for deleting own comments. */
+  me: string
+  /** Opened from a link (Script Review): scroll to it. */
+  focus?: boolean
 }) {
-  const [open, setOpen] = useState(!!defaultOpen)
+  const [open, setOpen] = useState(!!defaultOpen || !!focus)
   // A just-created script opens (the signal can arrive after it appears).
   useEffect(() => { if (defaultOpen) setOpen(true) }, [defaultOpen])
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (focus) { setOpen(true); window.setTimeout(() => box.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150) } }, [focus])
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const openIds = comments.filter((c) => !c.parentId && !c.resolvedAt).map((c) => c.id)
+  // Highlights for open comments only (ids are letters/digits only).
+  const markCss = openIds.map((id) => `.ds-stoggle mark[data-c="${id}"]{background:rgba(242,179,91,${id === activeId ? '.55' : '.28'});border-bottom:2px solid #E09A2D;border-radius:2px;cursor:pointer}`).join('')
   const [renaming, setRenaming] = useState(false)
   const [title, setTitle] = useState(script.title)
   const canEdit = true // copywriter (own clients) and admins can both edit
@@ -89,7 +102,8 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
   }
 
   return (
-    <div className="ds-stoggle">
+    <div className="ds-stoggle" ref={box}>
+      {markCss && <style>{markCss}</style>}
       <div className="flex items-center gap-2 pl-2 pr-2.5 min-h-[52px]">
         <button type="button" aria-expanded={open} aria-label={open ? 'Collapse' : 'Expand'} onClick={() => setOpen((o) => !o)} className="ds-ibtn flex-none" style={{ width: 36, height: 36 }}>
           <Ms name="chevron_right" style={{ fontSize: 20, width: 20, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .25s' }} />
@@ -99,6 +113,11 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
             aria-label="Script title" className="ds-field flex-1 min-w-0" style={{ height: 34 }} />
         ) : (
           <button type="button" onClick={() => setOpen((o) => !o)} onDoubleClick={() => setRenaming(true)} className="flex-1 min-w-0 text-left truncate py-2" style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--strong)' }}>{script.title}</button>
+        )}
+        {openIds.length > 0 && (
+          <span className="inline-flex items-center gap-1 flex-none" style={{ fontSize: 12, fontWeight: 600, color: 'var(--car-t)' }} title="Open comments">
+            <Ms name="chat_bubble" style={{ fontSize: 15, width: 15, color: 'inherit' }} />{openIds.length}
+          </span>
         )}
         <span className="ds-stype">{script.type}</span>
         <span className="hidden sm:inline-flex"><StatusDot status={script.status} /></span>
@@ -120,19 +139,36 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
               onClick={() => { if (confirm(`Delete "${script.title}"?`)) actions.deleteScript.mutate(script.id, onErr) }}><Ms name="delete" style={{ fontSize: 17, width: 17, color: 'inherit' }} /></button>
           </div>
 
-          {/* All four in one view, each autosaving on its own. */}
-          <div className="space-y-5">
-            {SECTIONS.map(({ value: f, label }) => {
-              const extras = renderFieldExtras?.(f)
-              return (
-                <div key={f}>
-                  <FieldEditor script={script} field={f} label={label} compact={f !== 'script'} canEdit={canEdit} save={saveField(f)}
-                    toolbarRight={extras?.toolbarRight} onAreaSelect={extras?.onAreaSelect} />
-                  {extras?.below}
-                  {f === 'script' && <Links script={script} actions={actions} canEdit={canEdit} />}
-                </div>
-              )
-            })}
+          <div className={comments.some((c) => !c.parentId) ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_270px] lg:gap-5 items-start' : ''}>
+            {/* All four in one view, each autosaving on its own. Clicking
+                highlighted text selects its comment. */}
+            <div className="space-y-5 min-w-0" onClick={(e) => {
+              const m = (e.target as HTMLElement).closest('mark[data-c]') as HTMLElement | null
+              if (m?.dataset.c && openIds.includes(m.dataset.c)) setActiveId(m.dataset.c)
+            }}>
+              {SECTIONS.map(({ value: f, label }) => {
+                const extras = renderFieldExtras?.(f)
+                return (
+                  <div key={f}>
+                    <FieldEditor script={script} field={f} label={label} compact={f !== 'script'} canEdit={canEdit} save={saveField(f)}
+                      toolbarRight={extras?.toolbarRight} onAreaSelect={extras?.onAreaSelect}
+                      onComment={isAdmin ? async (c) => {
+                        await actions.addComment.mutateAsync({ scriptId: script.id, field: f, id: c.id, quote: c.quote, body: c.body })
+                        setActiveId(c.id)
+                      } : undefined} />
+                    {extras?.below}
+                    {f === 'script' && <Links script={script} actions={actions} canEdit={canEdit} />}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-5 lg:mt-0 lg:sticky lg:top-4">
+              <ScriptComments comments={comments} actions={actions} me={me} isAdmin={isAdmin} activeId={activeId}
+                onPick={(id) => {
+                  setActiveId(id)
+                  box.current?.querySelector(`mark[data-c="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }} />
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 mt-4 pt-3" style={{ borderTop: '1px solid var(--line)' }}>

@@ -4,7 +4,7 @@ import { Ms } from '@/components/ds'
 import { ScriptToggle } from '@/components/scripts/ScriptToggle'
 import { SCRIPT_TYPES } from '@/lib/scriptStatus'
 import { useScriptActions } from '@/hooks/useScripts'
-import type { Script, ScriptField, ScriptGroup, ScriptPage, ScriptType } from '@/types/scripts'
+import type { Script, ScriptComment, ScriptField, ScriptGroup, ScriptPage, ScriptType } from '@/types/scripts'
 
 // A client's script page: groups ("M1", "M2"…), each with its script
 // toggles. Shared by the copywriter's Scripts and the admin's Script Review.
@@ -43,8 +43,9 @@ function NewScript({ groupId, actions, onCreated }: { groupId: string; actions: 
   )
 }
 
-function Group({ group, index, count, actions, isAdmin, justAdded, setJustAdded, renderFieldExtras, renderFooter }: {
+function Group({ group, index, count, actions, isAdmin, justAdded, setJustAdded, renderFieldExtras, renderFooter, comments, me, focusId }: {
   group: ScriptGroup; index: number; count: number; actions: ReturnType<typeof useScriptActions>; isAdmin: boolean
+  comments: ScriptComment[]; me: string; focusId?: string | null
   justAdded: string | null; setJustAdded: (t: string | null) => void
   renderFieldExtras?: (script: Script, field: ScriptField) => { toolbarRight?: React.ReactNode; onAreaSelect?: () => void; below?: React.ReactNode }
   renderFooter?: (script: Script) => React.ReactNode
@@ -81,16 +82,19 @@ function Group({ group, index, count, actions, isAdmin, justAdded, setJustAdded,
         <ScriptToggle key={s.id} script={s} actions={actions} isAdmin={isAdmin} first={i === 0} last={i === group.scripts.length - 1}
           defaultOpen={justAdded === s.title && i === group.scripts.length - 1}
           renderFieldExtras={renderFieldExtras ? (f) => renderFieldExtras(s, f) : undefined}
-          footerExtras={renderFooter?.(s)} />
+          footerExtras={renderFooter?.(s)} comments={comments.filter((c) => c.scriptId === s.id)} me={me} focus={focusId === s.id} />
       ))}
       <NewScript groupId={group.id} actions={actions} onCreated={setJustAdded} />
     </section>
   )
 }
 
-export function ScriptPageView({ page, isAdmin, renderFieldExtras, renderFooter }: {
+export function ScriptPageView({ page, isAdmin, renderFieldExtras, renderFooter, me, focusId }: {
   page: ScriptPage
   isAdmin: boolean
+  me: string
+  /** Open and scroll to this script (links from Script Review). */
+  focusId?: string | null
   renderFieldExtras?: (script: Script, field: ScriptField) => { toolbarRight?: React.ReactNode; onAreaSelect?: () => void; below?: React.ReactNode }
   renderFooter?: (script: Script) => React.ReactNode
 }) {
@@ -106,7 +110,8 @@ export function ScriptPageView({ page, isAdmin, renderFieldExtras, renderFooter 
     <div className="space-y-7">
       {page.groups.map((g, i) => (
         <Group key={g.id} group={g} index={i} count={page.groups.length} actions={actions} isAdmin={isAdmin}
-          justAdded={justAdded} setJustAdded={setJustAdded} renderFieldExtras={renderFieldExtras} renderFooter={renderFooter} />
+          justAdded={justAdded} setJustAdded={setJustAdded} renderFieldExtras={renderFieldExtras} renderFooter={renderFooter}
+          comments={page.comments} me={me} focusId={focusId} />
       ))}
       <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); addGroup() }}>
         <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder={page.groups.length ? `M${page.groups.length + 1}` : 'M1'} aria-label="New group name" className="ds-field" style={{ maxWidth: 220, height: 38 }} />

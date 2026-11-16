@@ -1,41 +1,16 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link, useParams } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
-import { toast } from 'sonner'
 import { TeamLayout } from '@/components/workspace/TeamLayout'
 import { ClientMark, Ms } from '@/components/ds'
 import { ScriptPageView } from '@/components/scripts/ScriptPageView'
+import { NewPage } from '@/components/scripts/NewPage'
 import { useScriptPage, useScriptsOverview } from '@/hooks/useScripts'
-import { useApiFetch } from '@/lib/api'
-import type { ScriptPage } from '@/types/scripts'
+import { useAuth } from '@/hooks/useAuth'
 
 // Copywriters: Scripts — a page per client (their assigned clients), with
 // groups and script toggles.
 
 const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
-
-function NewPage({ available }: { available: { id: string; name: string }[] }) {
-  const apiFetch = useApiFetch()
-  const qc = useQueryClient()
-  const navigate = useNavigate()
-  const [clientId, setClientId] = useState('')
-  const create = useMutation({
-    mutationFn: (id: string) => apiFetch<ScriptPage>('/api/scripts/pages', { method: 'POST', body: JSON.stringify({ clientId: id }) }),
-    onSuccess: (p) => { qc.setQueryData(['scripts', 'page', p.client.id], p); qc.invalidateQueries({ queryKey: ['scripts'], exact: true }); navigate(`/team/scripts/${p.client.id}`) },
-    onError: (e) => toast.error(errMsg(e)),
-  })
-  if (!available.length) return null
-  return (
-    <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (clientId) create.mutate(clientId) }}>
-      <select value={clientId} onChange={(e) => setClientId(e.target.value)} aria-label="Client" className="ds-tool pr-8" style={{ maxWidth: 220 }}>
-        <option value="">New page for…</option>
-        {available.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-      </select>
-      <button type="submit" className="ds-primary" disabled={!clientId || create.isPending}><Ms name="add" style={{ fontSize: 18, width: 18, color: 'inherit' }} />Create</button>
-    </form>
-  )
-}
 
 function PagesList() {
   const { data, isLoading, error } = useScriptsOverview()
@@ -43,7 +18,7 @@ function PagesList() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <h1 style={{ fontSize: 24, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--strong)' }}>Scripts</h1>
-        {data && <NewPage available={data.available} />}
+        {data && <NewPage available={data.available} base="/team/scripts" />}
       </div>
       {isLoading ? (
         <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
@@ -76,6 +51,7 @@ function PagesList() {
 
 function ClientPage({ clientId }: { clientId: string }) {
   const { data, isLoading, error } = useScriptPage(clientId)
+  const { profile } = useAuth()
   return (
     <>
       <div className="flex items-center gap-2 mb-5">
@@ -88,7 +64,7 @@ function ClientPage({ clientId }: { clientId: string }) {
       ) : error || !data ? (
         <div className="ds-panel p-6" style={{ fontSize: 13.5 }}>{errMsg(error)}</div>
       ) : (
-        <ScriptPageView page={data} isAdmin={false} />
+        <ScriptPageView page={data} isAdmin={false} me={profile?.id ?? ''} />
       )}
     </>
   )

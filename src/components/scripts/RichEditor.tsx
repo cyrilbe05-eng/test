@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
+import { toast } from 'sonner'
 import { Ms } from '@/components/ds'
 import { cn } from '@/lib/utils'
 import type { SaveResult } from '@/hooks/useScripts'
@@ -70,7 +71,7 @@ const PLACEHOLDER: Record<ScriptField, string> = {
 }
 const same = (a: Value, b: Value) => JSON.stringify(a) === JSON.stringify(b)
 
-export function FieldEditor({ script, field, canEdit, save, toolbarRight, onAreaSelect, label, compact }: {
+export function FieldEditor({ script, field, canEdit, save, toolbarRight, onAreaSelect, label, compact, onComment }: {
   script: Script
   field: ScriptField
   /** Section heading shown left of the toolbar ("Caption", …). */
@@ -83,6 +84,9 @@ export function FieldEditor({ script, field, canEdit, save, toolbarRight, onArea
   toolbarRight?: React.ReactNode
   /** Selection changed inside an area (comments use it). */
   onAreaSelect?: () => void
+  /** Commenting (Script Review): creates the comment; the selected text is
+   *  then wrapped in its highlight and saved. */
+  onComment?: (c: { id: string; quote: string; body: string }) => Promise<void>
 }) {
   const carousel = field === 'script' && script.type === 'Carousel'
   const value = useRef<Value>(valueOf(script, field, carousel))
@@ -97,6 +101,11 @@ export function FieldEditor({ script, field, canEdit, save, toolbarRight, onArea
   // Read inside timers/async code, so it must always be current.
   const conflictRef = useRef<Script | null>(null)
   const setConflict = (c: Script | null) => { conflictRef.current = c; setConflictState(c) }
+  // Comments: the selected text (kept while the comment is typed).
+  const areas = useRef<(HTMLDivElement | null)[]>([])
+  const [draft, setDraft] = useState<{ range: Range; quote: string; index: number } | null>(null)
+  const [draftText, setDraftText] = useState('')
+  const [posting, setPosting] = useState(false)
 
   const apply = useCallback((v: Value, version: number) => {
     value.current = v
@@ -164,6 +173,40 @@ export function FieldEditor({ script, field, canEdit, save, toolbarRight, onArea
     setRevision((r) => r + 1)
   }
 
+  const startComment = () => {
+    const sel = window.getSelection()
+    const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null
+    const index = range ? areas.current.findIndex((el) => !!el && el.contains(range.commonAncestorContainer)) : -1
+    const quote = sel?.toString().trim() ?? ''
+    if (!range || range.collapsed || index === -1 || !quote) { toast('Select some text first'); return }
+    setDraft({ range: range.cloneRange(), quote: quote.slice(0, 500), index })
+    setDraftText('')
+  }
+  const postComment = async () => {
+    if (!draft || !onComment || !draftText.trim()) return
+    setPosting(true)
+    try {
+      const id = 'c' + Array.from(crypto.getRandomValues(new Uint8Array(12)), (n) => (n % 36).toString(36)).join('')
+      await onComment({ id, quote: draft.quote, body: draftText.trim() })
+      // Highlight the commented text and save it with the script.
+      const el = areas.current[draft.index]
+      if (el && el.contains(draft.range.commonAncestorContainer)) {
+        const mark = document.createElement('mark')
+        mark.dataset.c = id
+        mark.appendChild(draft.range.extractContents())
+        draft.range.insertNode(mark)
+        if (Array.isArray(value.current)) setSlide(draft.index, el.innerHTML)
+        else changed(el.innerHTML)
+        void flush()
+      }
+      setDraft(null)
+    } catch (e) {
+      toast.error((e as Error)?.message ?? 'Comment not saved')
+    } finally {
+      setPosting(false)
+    }
+  }
+
   const slides = Array.isArray(value.current) ? (value.current as string[]) : null
   return (
     <div>
@@ -175,8 +218,27 @@ export function FieldEditor({ script, field, canEdit, save, toolbarRight, onArea
           </span>
           <div className="flex-1" />
           {toolbarRight}
+          {onComment && (
+            <button type="button" className="ds-rich-btn" aria-label="Comment on the selected text" title="Comment on the selected text"
+              onMouseDown={(e) => { e.preventDefault(); startComment() }}>
+              <Ms name="add_comment" style={{ fontSize: 18, width: 18, color: 'inherit' }} />
+            </button>
+          )}
           {canEdit && <Toolbar />}
         </div>
+      )}
+
+      {draft && (
+        <form className="ds-comment-draft" onSubmit={(e) => { e.preventDefault(); void postComment() }}>
+          <p className="line-clamp-2" style={{ fontSize: 12.5, color: 'var(--faint)' }}>“{draft.quote}”</p>
+          <textarea autoFocus value={draftText} onChange={(e) => setDraftText(e.target.value)} rows={2} placeholder="Comment…" aria-label="Comment"
+            className="ds-field" style={{ height: 'auto', padding: '8px 12px', resize: 'vertical' }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void postComment(); if (e.key === 'Escape') setDraft(null) }} />
+          <div className="flex justify-end gap-2">
+            <button type="button" className="ds-ghost-btn" style={{ height: 34 }} onClick={() => setDraft(null)}>Cancel</button>
+            <button type="submit" className="ds-primary" style={{ height: 34, paddingLeft: 14 }} disabled={!draftText.trim() || posting}>Comment</button>
+          </div>
+        </form>
       )}
 
       {conflict && (
@@ -199,7 +261,7 @@ export function FieldEditor({ script, field, canEdit, save, toolbarRight, onArea
                   </button>
                 )}
               </div>
-              <RichArea html={slides[i] ?? ''} revision={revision} readOnly={!canEdit} onInput={(h) => setSlide(i, h)} onSelect={onAreaSelect} />
+              <RichArea html={slides[i] ?? ''} revision={revision} readOnly={!canEdit} onInput={(h) => setSlide(i, h)} onSelect={onAreaSelect} areaRef={(el) => { areas.current[i] = el }} />
             </div>
           ))}
           {canEdit && (
@@ -210,7 +272,7 @@ export function FieldEditor({ script, field, canEdit, save, toolbarRight, onArea
         </div>
       ) : (
         <RichArea html={value.current as string} revision={revision} readOnly={!canEdit} onInput={(h) => changed(h)} onSelect={onAreaSelect}
-          placeholder={PLACEHOLDER[field]} compact={compact} />
+          placeholder={PLACEHOLDER[field]} compact={compact} areaRef={(el) => { areas.current = [el] }} />
       )}
       <span className={cn('sr-only')} aria-live="polite">{state === 'saved' ? 'Saved' : ''}</span>
     </div>

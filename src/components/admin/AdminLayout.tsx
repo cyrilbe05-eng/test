@@ -35,6 +35,7 @@ const GROUPS: Item[][] = [
   ],
   [
     { to: '/admin/sops', label: 'SOPs', icon: 'menu_book', match: (p) => p.startsWith('/admin/sops') },
+    { to: '/admin/scripts', label: 'Script Review', icon: 'rate_review', match: (p) => p.startsWith('/admin/scripts') },
     { to: '/admin/care', label: 'Client Care', icon: 'favorite', match: (p) => p.startsWith('/admin/care'), fullAdminOnly: true },
     { to: '/admin/onboarding-questions', label: 'Questions', icon: 'help', match: (p) => p.startsWith('/admin/onboarding-questions'), fullAdminOnly: true },
   ],
