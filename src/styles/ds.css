@@ -401,3 +401,16 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 @media (max-width:767px){.ds-lb-pop{top:auto;bottom:140px;right:16px;left:16px;width:auto}}
 @keyframes ds-lb-in{from{opacity:0;transform:translateY(-10px) scale(.97)}}
 @media (prefers-reduced-motion:reduce){.ds-lb-pop{animation:none}}
+
+/* ── Scripts workspace (components/scripts) ── */
+.ds-rich{min-height:120px;padding:12px 14px;border-radius:12px;background:var(--field);box-shadow:inset 0 0 0 1px var(--ds-ring);color:var(--text);font-size:14px;line-height:1.6;outline:0;white-space:pre-wrap;word-break:break-word;transition:box-shadow .25s}
+.ds-rich:focus{box-shadow:inset 0 0 0 1px var(--focus),0 0 0 4px var(--drop)}
+.ds-rich:empty::before{content:attr(data-placeholder);color:var(--faint);pointer-events:none}
+.ds-rich[contenteditable=false]{background:transparent;box-shadow:none;padding-left:0;padding-right:0;min-height:0}
+.ds-rich mark{background:transparent;color:inherit}
+.ds-rich-btn{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:9px;background:var(--ghost);color:var(--soft-text);cursor:pointer;transition:background .2s}
+.ds-rich-btn:hover{background:var(--ghost-h)}
+.ds-rich-conflict{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px 8px 14px;border-radius:12px;background:var(--car-b);color:var(--car-t);font-size:13px;font-weight:500}
+.ds-stoggle{border-radius:14px;background:linear-gradient(180deg,var(--card-a),var(--card-b));box-shadow:var(--card-sh)}
+.ds-stoggle+.ds-stoggle{margin-top:8px}
+.ds-stype{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:var(--pill);color:var(--soft-text);font-size:11.5px;font-weight:600;flex:none}

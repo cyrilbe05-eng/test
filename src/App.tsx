@@ -64,6 +64,7 @@ import TeamMessages from '@/pages/team/TeamMessages'
 import TeamCalendar from '@/pages/team/TeamCalendar'
 import TeamStats from '@/pages/team/TeamStats'
 import TeamLeaderboard from '@/pages/team/TeamLeaderboard'
+import TeamScripts from '@/pages/team/TeamScripts'
 import ClientGallery from '@/pages/workspace/ClientGallery'
 import ClientMessages from '@/pages/workspace/ClientMessages'
 import ClientCalendar from '@/pages/workspace/ClientCalendar'
@@ -186,6 +187,8 @@ function ProductionApp() {
           <Route path="/team/calendar" element={<ProtectedRoute allowedRoles={['team']}><TeamCalendar /></ProtectedRoute>} />
           <Route path="/team/stats" element={<ProtectedRoute allowedRoles={['team']}><TeamStats /></ProtectedRoute>} />
           <Route path="/team/leaderboard" element={<ProtectedRoute allowedRoles={['team']}><TeamLeaderboard /></ProtectedRoute>} />
+          <Route path="/team/scripts" element={<ProtectedRoute allowedRoles={['team']}><TeamScripts /></ProtectedRoute>} />
+          <Route path="/team/scripts/:clientId" element={<ProtectedRoute allowedRoles={['team']}><TeamScripts /></ProtectedRoute>} />
           <Route path="/team/plans" element={<ProtectedRoute allowedRoles={['team']}><TeamPlans /></ProtectedRoute>} />
           <Route path="/team/plans/:contractId" element={<ProtectedRoute allowedRoles={['team']}><TeamPlan /></ProtectedRoute>} />
           <Route path="/team/sops" element={<ProtectedRoute allowedRoles={['team']}><ClientSops /></ProtectedRoute>} />

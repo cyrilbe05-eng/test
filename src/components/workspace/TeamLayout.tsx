@@ -15,6 +15,7 @@ const NAV_LINKS: Link[] = [
 // Copywriters only (production plans of their assigned clients). Appended so
 // editors' menus are unchanged.
 const PLANS_LINK: Link = { to: '/team/plans', label: 'Plans', icon: 'receipt_long' }
+const SCRIPTS_LINK: Link = { to: '/team/scripts', label: 'Scripts', icon: 'edit_note' }
 const SOPS_LINK: Link = { to: '/team/sops', label: 'SOPs', icon: 'menu_book' }
 const ALL_PROJECTS_LINK: Link = { to: '/team/all', label: 'All projects', icon: 'view_kanban', exact: true }
 // Editors only: the monthly leaderboard (copywriters aren't scored).
@@ -31,7 +32,7 @@ export function TeamLayout({ children, bare }: TeamLayoutProps) {
   const { pathname } = useLocation()
   // Editors: "Home" (their videos + limit) and the full board under "All projects".
   const links = profile?.team_role === 'copywriter'
-    ? [...NAV_LINKS, PLANS_LINK]
+    ? [...NAV_LINKS, PLANS_LINK, SCRIPTS_LINK]
     : [{ ...NAV_LINKS[0], label: 'Home' }, ALL_PROJECTS_LINK, ...NAV_LINKS.slice(1)]
 
   const item = (l: Link): FrameItem => ({ ...l, on: l.exact ? pathname === l.to : pathname.startsWith(l.to) })

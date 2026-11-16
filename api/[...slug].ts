@@ -3001,12 +3001,17 @@ async function handleGetCalendar(req: VercelRequest, res: VercelResponse) {
       posted: number | null
       created_at: string
     }>(
-      `SELECT DISTINCT e.*
+      // Admins see every entry (copywriters' plans and pushed scripts
+      // included); the admin calendar's client picker narrows it down.
+      // Everyone else: their own entries and the ones they're on.
+      profile.role === 'admin'
+        ? 'SELECT e.* FROM calendar_events e ORDER BY e.date ASC'
+        : `SELECT DISTINCT e.*
        FROM calendar_events e
        LEFT JOIN calendar_event_participants p ON p.event_id = e.id AND p.profile_id = ?
        WHERE e.owner_id = ? OR p.profile_id = ?
        ORDER BY e.date ASC`,
-      [clerkUserId, clerkUserId, clerkUserId]
+      profile.role === 'admin' ? [] : [clerkUserId, clerkUserId, clerkUserId]
     )
 
     const manualEventIds = manualRows.map((m) => m.id)
