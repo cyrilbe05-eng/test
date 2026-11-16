@@ -20,14 +20,14 @@ const inputCls = 'w-full min-h-[44px] rounded-lg border border-border bg-backgro
 const btn = 'min-h-[44px] px-3 rounded-lg border border-border text-sm hover:bg-muted disabled:opacity-50'
 const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
 
-type Form = { section: string; text: string; type: QuestionType; options: string; packages: QuestionPackages; required: boolean; admin_only: boolean }
+type Form = { section: string; text: string; type: QuestionType; options: string[]; packages: QuestionPackages; required: boolean; admin_only: boolean }
 const toForm = (q?: Question, section = ''): Form => ({
-  section: q?.section ?? section, text: q?.text ?? '', type: q?.type ?? 'text', options: (q?.options ?? []).join('\n'),
+  section: q?.section ?? section, text: q?.text ?? '', type: q?.type ?? 'text', options: q?.options?.length ? q.options : ['', ''],
   packages: q?.packages ?? 'both', required: q?.required ?? true, admin_only: q?.admin_only ?? false,
 })
 const toBody = (f: Form): QuestionBody => ({
   section: f.section.trim(), text: f.text.trim(), type: f.type, packages: f.packages, required: f.required, admin_only: f.admin_only,
-  ...(f.type === 'choice' ? { options: f.options.split('\n').map((o) => o.trim()).filter(Boolean) } : {}),
+  ...(f.type === 'choice' ? { options: f.options.map((o) => o.trim()).filter(Boolean) } : {}),
 })
 
 function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
@@ -45,7 +45,7 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
 
 function QuestionForm({ initial, sections, saving, onSave, onCancel }: { initial: Form; sections: string[]; saving: boolean; onSave: (f: Form) => void; onCancel: () => void }) {
   const [f, setF] = useState(initial)
-  const ok = f.section.trim() && f.text.trim() && (f.type !== 'choice' || f.options.trim())
+  const ok = f.section.trim() && f.text.trim() && (f.type !== 'choice' || f.options.some((o) => o.trim()))
   return (
     <form className="space-y-3 py-3" onSubmit={(e) => { e.preventDefault(); if (ok) onSave(f) }}>
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
@@ -59,9 +59,21 @@ function QuestionForm({ initial, sections, saving, onSave, onCancel }: { initial
       <datalist id="onb-sections">{sections.map((s) => <option key={s} value={s} />)}</datalist>
       <Segmented label="Type" value={f.type} options={TYPES} onChange={(type) => setF({ ...f, type })} />
       {f.type === 'choice' && (
-        <label className="block text-xs text-muted-foreground">Options
-          <textarea className={cn(inputCls, 'mt-1 py-2 text-foreground')} rows={4} value={f.options} onChange={(e) => setF({ ...f, options: e.target.value })} />
-        </label>
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Options</p>
+          {f.options.map((o, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input className={cn(inputCls, 'text-foreground')} value={o} placeholder={`Option ${i + 1}`} aria-label={`Option ${i + 1}`}
+                onChange={(e) => setF({ ...f, options: f.options.map((x, j) => (j === i ? e.target.value : x)) })} />
+              <button type="button" aria-label="Remove option" disabled={f.options.length <= 1}
+                className="w-11 h-11 flex-none rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30"
+                onClick={() => setF({ ...f, options: f.options.filter((_, j) => j !== i) })}><Icon name="close" size={18} /></button>
+            </div>
+          ))}
+          <button type="button" className={btn} onClick={() => setF({ ...f, options: [...f.options, ''] })}>
+            <span className="inline-flex items-center gap-1.5"><Icon name="add" size={18} />Add option</span>
+          </button>
+        </div>
       )}
       <Segmented label="Package" value={f.packages} options={PACKAGES} onChange={(packages) => setF({ ...f, packages })} />
       <div className="flex flex-wrap gap-x-4">

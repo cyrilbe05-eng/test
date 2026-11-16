@@ -185,15 +185,6 @@ export default function AdminPlans() {
             </div>
           ))}
         </div>
-
-        {/* Usage hint */}
-        <div className="mt-8 clay-card p-5 text-sm text-muted-foreground space-y-1.5">
-          <p className="font-semibold text-foreground text-xs uppercase tracking-wide mb-2">Field reference</p>
-          <p><span className="text-foreground font-medium">Deliverables</span> — videos a client can receive per project. <code className="bg-muted px-1.5 py-0.5 rounded-lg text-xs">-1</code> = unlimited.</p>
-          <p><span className="text-foreground font-medium">Revisions</span> — revision rounds the client can request. <code className="bg-muted px-1.5 py-0.5 rounded-lg text-xs">-1</code> = unlimited.</p>
-          <p><span className="text-foreground font-medium">Storage</span> — total MB across all projects. <code className="bg-muted px-1.5 py-0.5 rounded-lg text-xs">-1</code> = unlimited. (1 GB = 1024 MB)</p>
-          <p><span className="text-foreground font-medium">Active Projects</span> — max simultaneous open projects a client can have. <code className="bg-muted px-1.5 py-0.5 rounded-lg text-xs">-1</code> = unlimited.</p>
-        </div>
       </main>
     </AdminLayout>
   )
