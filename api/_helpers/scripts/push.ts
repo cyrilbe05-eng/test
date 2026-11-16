@@ -4,6 +4,9 @@
 //                    ("Slide 1", "Slide 2"…); inspo links after the first are
 //                    listed under it.
 //   inspiration_url  the first inspo link.
+//   caption          the caption (the client sees it).
+//   comments         the client notes — the calendar entry's "Notes" (the
+//                    client sees them).
 //   editor_notes     the editor notes as plain text, kept apart (never sent
 //                    to clients).
 
@@ -20,7 +23,7 @@ export function parseSlides(raw: string | null | undefined): string[] {
   } catch { return [] }
 }
 
-export function calendarEntryFor(s: { type: string; body_html: string; slides: string | null; notes_html: string; links: string[] }) {
+export function calendarEntryFor(s: { type: string; body_html: string; slides: string | null; caption_html?: string | null; client_notes_html?: string | null; notes_html: string; links: string[] }) {
   const text = s.type === 'Carousel'
     ? parseSlides(s.slides)
         .map((html, i) => ({ i, text: richTextToPlain(html) }))
@@ -34,6 +37,8 @@ export function calendarEntryFor(s: { type: string; body_html: string; slides: s
   return {
     script: script || null,
     inspiration_url: s.links[0] ?? null,
+    caption: richTextToPlain(s.caption_html ?? '') || null,
+    comments: richTextToPlain(s.client_notes_html ?? '') || null,
     editor_notes: notes || null,
   }
 }

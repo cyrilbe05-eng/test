@@ -11,7 +11,28 @@ import type { Script, ScriptField, ScriptType } from '@/types/scripts'
 // it shows the Script / Editor notes tabs, inspo links and who edited last.
 
 type Actions = ReturnType<typeof useScriptActions>
+// Script, caption and client notes go to the client's calendar; editor notes
+// only to the team.
+const TABS: { value: ScriptField; label: string }[] = [
+  { value: 'script', label: 'Script' },
+  { value: 'caption', label: 'Caption' },
+  { value: 'client_notes', label: 'Client notes' },
+  { value: 'notes', label: 'Editor notes' },
+]
 const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
+
+/** Phones: the four tabs get narrower so they all fit. */
+function useNarrow() {
+  const q = '(max-width: 640px)'
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches)
+  useEffect(() => {
+    const m = window.matchMedia(q)
+    const on = () => setNarrow(m.matches)
+    m.addEventListener('change', on)
+    return () => m.removeEventListener('change', on)
+  }, [])
+  return narrow
+}
 
 export function StatusDot({ status }: { status: Script['status'] }) {
   const [d, l] = SCRIPT_STATUS[status].colors
@@ -67,6 +88,7 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
   // A just-created script opens (the signal can arrive after it appears).
   useEffect(() => { if (defaultOpen) setOpen(true) }, [defaultOpen])
   const [tab, setTab] = useState<ScriptField>('script')
+  const narrow = useNarrow()
   const [renaming, setRenaming] = useState(false)
   const [title, setTitle] = useState(script.title)
   const canEdit = true // copywriter (own clients) and admins can both edit
@@ -102,7 +124,7 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
         <div className="px-3.5 sm:px-4 pb-4 animate-fade-in">
           <div className="flex flex-wrap items-center gap-2 pb-3">
             <span className="sm:hidden"><StatusDot status={script.status} /></span>
-            <Segmented label="Section" width={110} value={tab} onChange={setTab} options={[{ value: 'script', label: 'Script' }, { value: 'notes', label: 'Editor notes' }]} />
+            <div className="max-w-full overflow-x-auto"><Segmented label="Section" width={narrow ? 78 : 106} value={tab} onChange={setTab} options={TABS} /></div>
             <div className="flex-1" />
             <select value={script.type} aria-label="Type" className="ds-tool pr-8" style={{ height: 36 }}
               onChange={(e) => actions.updateScript.mutate({ id: script.id, type: e.target.value as ScriptType }, onErr)}>
@@ -115,15 +137,13 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
               onClick={() => { if (confirm(`Delete "${script.title}"?`)) actions.deleteScript.mutate(script.id, onErr) }}><Ms name="delete" style={{ fontSize: 17, width: 17, color: 'inherit' }} /></button>
           </div>
 
-          {/* Both editors stay mounted, so switching tabs never loses a pending save. */}
-          <div hidden={tab !== 'script'}>
-            <FieldEditor script={script} field="script" canEdit={canEdit} save={saveField('script')}
-              toolbarRight={tab === 'script' ? extras?.toolbarRight : undefined} onAreaSelect={tab === 'script' ? extras?.onAreaSelect : undefined} />
-          </div>
-          <div hidden={tab !== 'notes'}>
-            <FieldEditor script={script} field="notes" canEdit={canEdit} save={saveField('notes')}
-              toolbarRight={tab === 'notes' ? extras?.toolbarRight : undefined} onAreaSelect={tab === 'notes' ? extras?.onAreaSelect : undefined} />
-          </div>
+          {/* Every tab's editor stays mounted, so switching never loses a pending save. */}
+          {TABS.map(({ value: f }) => (
+            <div key={f} hidden={tab !== f}>
+              <FieldEditor script={script} field={f} canEdit={canEdit} save={saveField(f)}
+                toolbarRight={tab === f ? extras?.toolbarRight : undefined} onAreaSelect={tab === f ? extras?.onAreaSelect : undefined} />
+            </div>
+          ))}
           {extras?.below}
 
           {tab === 'script' && <Links script={script} actions={actions} canEdit={canEdit} />}

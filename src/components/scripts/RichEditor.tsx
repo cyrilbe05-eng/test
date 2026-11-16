@@ -56,8 +56,18 @@ function Toolbar() {
 
 type Value = string | string[]
 const valueOf = (s: Script, field: ScriptField, carousel: boolean): Value =>
-  field === 'notes' ? s.notesHtml : carousel ? (s.slides?.length ? s.slides : ['']) : s.bodyHtml
-const versionOf = (s: Script, field: ScriptField) => (field === 'notes' ? s.notesVersion : s.bodyVersion)
+  field === 'notes' ? s.notesHtml
+    : field === 'caption' ? s.captionHtml
+    : field === 'client_notes' ? s.clientNotesHtml
+    : carousel ? (s.slides?.length ? s.slides : ['']) : s.bodyHtml
+const versionOf = (s: Script, field: ScriptField) =>
+  ({ script: s.bodyVersion, caption: s.captionVersion, client_notes: s.clientNotesVersion, notes: s.notesVersion })[field]
+const PLACEHOLDER: Record<ScriptField, string> = {
+  script: 'Write the script…',
+  caption: 'Caption…',
+  client_notes: 'Notes for the client…',
+  notes: 'B-roll, captions, pacing…',
+}
 const same = (a: Value, b: Value) => JSON.stringify(a) === JSON.stringify(b)
 
 export function FieldEditor({ script, field, canEdit, save, toolbarRight, onAreaSelect }: {
@@ -195,7 +205,7 @@ export function FieldEditor({ script, field, canEdit, save, toolbarRight, onArea
         </div>
       ) : (
         <RichArea html={value.current as string} revision={revision} readOnly={!canEdit} onInput={(h) => changed(h)} onSelect={onAreaSelect}
-          placeholder={field === 'notes' ? 'B-roll, captions, pacing…' : 'Write the script…'} />
+          placeholder={PLACEHOLDER[field]} />
       )}
       <span className={cn('sr-only')} aria-live="polite">{state === 'saved' ? 'Saved' : ''}</span>
     </div>

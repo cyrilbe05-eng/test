@@ -2,7 +2,7 @@
 
 export type ScriptType = 'Reel' | 'Carousel' | 'Story' | 'Post'
 export type ScriptStatus = 'draft' | 'in_review' | 'needs_changes' | 'approved' | 'scheduled'
-export type ScriptField = 'script' | 'notes'
+export type ScriptField = 'script' | 'caption' | 'client_notes' | 'notes'
 
 export interface Script {
   id: string
@@ -13,11 +13,17 @@ export interface Script {
   bodyHtml: string
   /** Carousel only: slide HTML, in order. */
   slides: string[] | null
+  captionHtml: string
+  /** Client notes: the calendar entry's "Notes" (the client sees them). */
+  clientNotesHtml: string
+  /** Editor notes: never shown to clients. */
   notesHtml: string
   links: string[]
   status: ScriptStatus
   sortOrder: number
   bodyVersion: number
+  captionVersion: number
+  clientNotesVersion: number
   notesVersion: number
   inReviewAt: string | null
   calendarEventId: string | null

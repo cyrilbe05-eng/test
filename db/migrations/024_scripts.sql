@@ -8,9 +8,10 @@
 -- script_pages      one page per client (the copywriter opens it).
 -- script_groups     sections on a page ("M1", "M2"…), ordered.
 -- scripts           one script (a toggle): title, type, script text (or
---                   carousel slides), editor notes, inspo links, status.
---                   body_version / notes_version go up on every save, so a
---                   save based on an older version is caught, not lost.
+--                   carousel slides), caption, client notes, editor notes,
+--                   inspo links, status. Each text has its own *_version that
+--                   goes up on every save, so a save based on an older
+--                   version is caught, not lost.
 -- script_comments   comments on highlighted text (script or editor notes),
 --                   with replies and resolve. Never shown to clients.
 -- calendar_events.script_id     the script a calendar entry was pushed from.
@@ -40,12 +41,16 @@ CREATE TABLE IF NOT EXISTS scripts (
   type               TEXT NOT NULL DEFAULT 'Reel' CHECK (type IN ('Reel', 'Carousel', 'Story', 'Post')),
   body_html          TEXT NOT NULL DEFAULT '',
   slides             TEXT,                        -- Carousel: JSON array of slide HTML, in order
+  caption_html       TEXT NOT NULL DEFAULT '',
+  client_notes_html  TEXT NOT NULL DEFAULT '',
   notes_html         TEXT NOT NULL DEFAULT '',
   links              TEXT NOT NULL DEFAULT '[]',  -- JSON array of URLs
   status             TEXT NOT NULL DEFAULT 'draft'
                      CHECK (status IN ('draft', 'in_review', 'needs_changes', 'approved', 'scheduled')),
   sort_order         INTEGER NOT NULL DEFAULT 0,
   body_version       INTEGER NOT NULL DEFAULT 0,
+  caption_version    INTEGER NOT NULL DEFAULT 0,
+  client_notes_version INTEGER NOT NULL DEFAULT 0,
   notes_version      INTEGER NOT NULL DEFAULT 0,
   in_review_at       TEXT,
   calendar_event_id  TEXT,
@@ -61,7 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_scripts_status ON scripts(status);
 CREATE TABLE IF NOT EXISTS script_comments (
   id           TEXT PRIMARY KEY,
   script_id    TEXT NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
-  field        TEXT NOT NULL DEFAULT 'script' CHECK (field IN ('script', 'notes')),
+  field        TEXT NOT NULL DEFAULT 'script' CHECK (field IN ('script', 'caption', 'client_notes', 'notes')),
   parent_id    TEXT REFERENCES script_comments(id) ON DELETE CASCADE,
   quote        TEXT,
   body         TEXT NOT NULL,

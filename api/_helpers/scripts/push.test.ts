@@ -7,6 +7,15 @@ describe('calendarEntryFor', () => {
     expect(e.inspiration_url).toBe('https://a.example/')
     expect(e.script).toBe('Hook\nBody\n\nInspo:\nhttps://b.example/\nhttps://c.example/')
     expect(e.editor_notes).toBe('Fast cuts')
+    expect(e.caption).toBeNull()
+    expect(e.comments).toBeNull()
+  })
+
+  it('carries the caption and the client notes', () => {
+    const e = calendarEntryFor({ type: 'Reel', body_html: '<div>Hook</div>', slides: null, caption_html: '<div><b>New drop</b> 🔥</div><div>#skincare</div>', client_notes_html: '<div>Film near a window</div>', notes_html: '', links: [] })
+    expect(e.caption).toBe('New drop 🔥\n#skincare')
+    expect(e.comments).toBe('Film near a window')
+    expect(e.editor_notes).toBeNull()
   })
 
   it('writes carousel slides in order, skipping empty ones', () => {

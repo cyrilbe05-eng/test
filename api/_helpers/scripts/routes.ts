@@ -14,7 +14,7 @@
 //   POST   /api/scripts/groups/:id/move          { direction: 'up' | 'down' }
 //   POST   /api/scripts/groups/:id/scripts       { title, type }
 //   PATCH  /api/scripts/script/:id               { title?, type?, links? }
-//   PUT    /api/scripts/script/:id/content       { field: 'script'|'notes', html? | slides?, baseVersion, force? }
+//   PUT    /api/scripts/script/:id/content       { field: 'script'|'caption'|'client_notes'|'notes', html? | slides?, baseVersion, force? }
 //   POST   /api/scripts/script/:id/status        { status }
 //   POST   /api/scripts/script/:id/move          { direction }
 //   DELETE /api/scripts/script/:id
@@ -38,6 +38,16 @@ const STATUSES: Status[] = ['draft', 'in_review', 'needs_changes', 'approved', '
 const COMMENT_ID = /^[A-Za-z0-9_-]{8,64}$/
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const MAX_SLIDES = 30
+
+// The four texts of a script: column and version column per field.
+const FIELDS = {
+  script: { col: 'body_html', version: 'body_version' },
+  caption: { col: 'caption_html', version: 'caption_version' },
+  client_notes: { col: 'client_notes_html', version: 'client_notes_version' },
+  notes: { col: 'notes_html', version: 'notes_version' },
+} as const
+type Field = keyof typeof FIELDS
+const asField = (v: unknown): Field => (typeof v === 'string' && v in FIELDS ? (v as Field) : 'script')
 
 async function caller(req: VercelRequest): Promise<Caller> {
   const { profile } = await requireAuth(req)
@@ -78,9 +88,11 @@ async function notify(recipients: string[], message: string) {
 function shapeScript(s: any) {
   return {
     id: s.id, groupId: s.group_id, clientId: s.client_id, title: s.title, type: s.type,
-    bodyHtml: s.body_html, slides: s.type === 'Carousel' ? parseSlides(s.slides) : null, notesHtml: s.notes_html,
+    bodyHtml: s.body_html, slides: s.type === 'Carousel' ? parseSlides(s.slides) : null,
+    captionHtml: s.caption_html ?? '', clientNotesHtml: s.client_notes_html ?? '', notesHtml: s.notes_html,
     links: (() => { try { return JSON.parse(s.links) } catch { return [] } })(),
-    status: s.status, sortOrder: s.sort_order, bodyVersion: s.body_version, notesVersion: s.notes_version,
+    status: s.status, sortOrder: s.sort_order, bodyVersion: s.body_version, captionVersion: s.caption_version ?? 0,
+    clientNotesVersion: s.client_notes_version ?? 0, notesVersion: s.notes_version,
     inReviewAt: s.in_review_at, calendarEventId: s.calendar_event_id,
     updatedAt: s.updated_at, updatedBy: s.updated_by ? { id: s.updated_by, name: s.updated_by_name ?? null } : null,
   }
@@ -258,9 +270,9 @@ export async function handleScriptsRoute(req: VercelRequest, res: VercelResponse
     }
 
     if (sub === 'content' && req.method === 'PUT') {
-      const field = body.field === 'notes' ? 'notes' : 'script'
-      const versionCol = field === 'notes' ? 'notes_version' : 'body_version'
-      const current = field === 'notes' ? s.notes_version : s.body_version
+      const field = asField(body.field)
+      const versionCol = FIELDS[field].version
+      const current: number = s[versionCol]
       const base = Number(body.baseVersion)
       // Someone saved since this editor loaded it: say so instead of
       // silently overwriting (the editor can then load theirs or keep mine).
@@ -268,7 +280,7 @@ export async function handleScriptsRoute(req: VercelRequest, res: VercelResponse
         res.status(409).json({ error: 'conflict', script: await fresh() }); return
       }
       let col: string; let value: string
-      if (field === 'notes') { col = 'notes_html'; value = sanitizeRichText(body.html) }
+      if (field !== 'script') { col = FIELDS[field].col; value = sanitizeRichText(body.html) }
       else if (s.type === 'Carousel') {
         const slides = Array.isArray(body.slides) ? body.slides.slice(0, MAX_SLIDES).map(sanitizeRichText) : null
         if (!slides) throw fail(400, 'slides must be a list')
@@ -279,7 +291,7 @@ export async function handleScriptsRoute(req: VercelRequest, res: VercelResponse
         `UPDATE scripts SET ${col} = ?, ${versionCol} = ${versionCol} + 1, updated_by = ?, updated_at = ? WHERE id = ?${body.force === true ? '' : ` AND ${versionCol} = ?`}`,
         body.force === true ? [value, c.id, now, id] : [value, c.id, now, id, current])
       const after = await fresh()
-      const v = field === 'notes' ? after.notesVersion : after.bodyVersion
+      const v = { script: after.bodyVersion, caption: after.captionVersion, client_notes: after.clientNotesVersion, notes: after.notesVersion }[field]
       if (body.force !== true && v !== current + 1) { res.status(409).json({ error: 'conflict', script: after }); return }
       res.json(after); return
     }
@@ -322,7 +334,7 @@ export async function handleScriptsRoute(req: VercelRequest, res: VercelResponse
       const cid = typeof body.id === 'string' && COMMENT_ID.test(body.id) ? body.id : newId().replace(/-/g, '')
       await dbExecute(
         'INSERT INTO script_comments (id, script_id, field, parent_id, quote, body, author_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [cid, id, body.field === 'notes' ? 'notes' : 'script', parentId, parentId ? null : text(body.quote, 500, 'Quote', false) || null, commentBody, c.id, now])
+        [cid, id, asField(body.field), parentId, parentId ? null : text(body.quote, 500, 'Quote', false) || null, commentBody, c.id, now])
       res.status(201).json(await commentsFor('c.script_id = ?', [id])); return
     }
 
@@ -332,12 +344,12 @@ export async function handleScriptsRoute(req: VercelRequest, res: VercelResponse
       if (!DATE.test(date) || Number.isNaN(Date.parse(date))) throw fail(400, 'Pick a date')
       const type = SCRIPT_TYPES.includes(body.type) ? body.type : s.type
       const links: string[] = (() => { try { return JSON.parse(s.links) } catch { return [] } })()
-      const entry = calendarEntryFor({ type: s.type, body_html: s.body_html, slides: s.slides, notes_html: s.notes_html, links })
+      const entry = calendarEntryFor({ type: s.type, body_html: s.body_html, slides: s.slides, caption_html: s.caption_html, client_notes_html: s.client_notes_html, notes_html: s.notes_html, links })
       const eventId = newId()
       await dbExecute(
-        `INSERT INTO calendar_events (id, owner_id, title, date, content_type, content_status, inspiration_url, script, editor_notes, script_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'Scheduled', ?, ?, ?, ?, ?, ?)`,
-        [eventId, c.id, s.title, date, type, entry.inspiration_url, entry.script, entry.editor_notes, id, now, now])
+        `INSERT INTO calendar_events (id, owner_id, title, date, content_type, content_status, inspiration_url, script, caption, comments, editor_notes, script_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'Scheduled', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [eventId, c.id, s.title, date, type, entry.inspiration_url, entry.script, entry.caption, entry.comments, entry.editor_notes, id, now, now])
       // On the client's calendar; the copywriter who wrote it sees it too.
       await dbExecute("INSERT OR IGNORE INTO calendar_event_participants (event_id, profile_id, role) VALUES (?, ?, 'client')", [eventId, s.client_id])
       if (s.created_by && s.created_by !== c.id) {
