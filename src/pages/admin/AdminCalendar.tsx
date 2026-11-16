@@ -505,6 +505,7 @@ export default function AdminCalendar() {
   const [dayDetail, setDayDetail] = useState<Date | null>(null)
   const [filterType, setFilterType] = useState<ContentType | 'all'>('all')
   const [filterStatus, setFilterStatus] = useState<ContentStatus | 'all'>('all')
+  const [filterClient, setFilterClient] = useState('')
 
   const from = format(startOfWeek(startOfMonth(viewDate)), 'yyyy-MM-dd')
   const to = format(endOfWeek(endOfMonth(viewDate)), 'yyyy-MM-dd')
@@ -519,7 +520,14 @@ export default function AdminCalendar() {
     queryFn: () => apiFetch<Profile[]>('/api/users/team'),
   })
 
+  // Per client view (same rule as the copywriter's picker): the client's
+  // videos and deadlines, entries assigned to them, and entries linked to
+  // one of their projects.
+  const projectClient = new Map((allEvents ?? []).filter((e) => e.client_id && e.project_id).map((e) => [e.project_id!, e.client_id!]))
+  const forClient = (e: CalendarEvent) =>
+    e.client_id === filterClient || !!e.assigned_client_ids?.includes(filterClient) || (!!e.project_id && projectClient.get(e.project_id) === filterClient)
   const events = (allEvents ?? []).filter((e) => {
+    if (filterClient && !forClient(e)) return false
     if (filterType !== 'all' && e.type === 'manual' && e.content_type !== filterType) return false
     if (filterStatus !== 'all' && e.type === 'manual' && e.content_status !== filterStatus) return false
     return true
@@ -540,7 +548,15 @@ export default function AdminCalendar() {
       <main className="px-4 md:px-7 pb-10">
         <MonthView viewDate={viewDate} onMonth={setViewDate} days={days} eventsForDay={eventsForDay}
           onCreate={setCreateDay} onSelect={setSelectedEvent} onMore={setDayDetail}
-          type={filterType} onType={setFilterType} status={filterStatus} onStatus={setFilterStatus} />
+          type={filterType} onType={setFilterType} status={filterStatus} onStatus={setFilterStatus}
+          extra={clients.length > 0 ? (
+            <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} aria-label="Client" className="ds-tool pr-8">
+              <option value="">All clients</option>
+              {[...clients].sort((a, b) => a.full_name.localeCompare(b.full_name)).map((c) => (
+                <option key={c.id} value={c.id}>{c.full_name}</option>
+              ))}
+            </select>
+          ) : undefined} />
       </main>
 
       {createDay && (
