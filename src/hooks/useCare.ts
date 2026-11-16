@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
 import type { CareOverview, CarePatchBody, ClientCareDetail, ContractBody, RevisionCategory } from '@/types/care'
 import type { EditorPerformance, PerformancePeriod } from '@/types/editors'
@@ -18,6 +18,10 @@ export function useEditorPerformanceRange(query: string) {
   return useQuery({
     queryKey: ['editors', 'performance', query],
     retry: false,
+    // Switching period keeps the current numbers on screen until the new
+    // ones arrive, so the charts move straight to them instead of emptying
+    // first (only periods not yet loaded used to do that).
+    placeholderData: keepPreviousData,
     queryFn: () => apiFetch<EditorPerformance>(`/api/admin/editors/performance?${query}`),
   })
 }
