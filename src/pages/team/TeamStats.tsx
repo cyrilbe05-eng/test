@@ -1,16 +1,21 @@
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { eachMonthOfInterval, format, parseISO, subMonths } from 'date-fns'
+import { differenceInCalendarDays, eachDayOfInterval, eachMonthOfInterval, eachWeekOfInterval, format, parseISO, startOfDay, startOfMonth, startOfWeek } from 'date-fns'
 import { useProjects } from '@/hooks/useProjects'
 import { useApiFetch } from '@/lib/api'
 import { TeamLayout } from '@/components/workspace/TeamLayout'
 import { BarChart, ChartCard, HBars, Ring, StatTile } from '@/components/charts/Charts'
+import { PeriodBar } from '@/components/charts/PeriodBar'
 import { StatusDot } from '@/components/ds'
+import { inRange, isPeriodKey, periodRange, type PeriodKey } from '@/lib/period'
 import { cn } from '@/lib/utils'
 import type { Project, ProjectStatus, TimelineComment } from '@/types'
 
-// Editor's own stats: tiles, deadlines per month (met / missed), on-time
-// ring, where their videos are, revision history and their projects.
+// Editor's own stats for a chosen period (same period bar as admin
+// Analytics): tiles incl. first-time rate, deadlines (met / missed) over the
+// period, on-time ring, where their videos are, revision history and their
+// projects.
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   pending_assignment: 'Pending',
@@ -33,12 +38,29 @@ interface Deadline {
   project_title: string
 }
 
+type Comment = TimelineComment & { profiles: { full_name: string; avatar_url: string | null } }
+
 export default function TeamStats() {
   const { data: projects, isLoading } = useProjects()
   const apiFetch = useApiFetch()
 
-  // Only show projects this team member is assigned to
-  const allProjects = ((projects ?? []) as (Project & { is_assigned?: boolean })[]).filter((p) => p.is_assigned)
+  // Period (in the address, like admin Analytics).
+  const [params, setParams] = useSearchParams()
+  const period: PeriodKey = isPeriodKey(params.get('period')) ? (params.get('period') as PeriodKey) : 'this_month'
+  const from = params.get('from') ?? format(startOfMonth(new Date()), 'yyyy-MM-dd')
+  const to = params.get('to') ?? format(new Date(), 'yyyy-MM-dd')
+  const [now] = useState(() => new Date())
+  const range = useMemo(() => periodRange(period, now, { from, to }), [period, now, from, to])
+  const setPeriod = (n: { period: PeriodKey; from?: string; to?: string }) => {
+    const next = new URLSearchParams(params)
+    next.set('period', n.period)
+    if (n.period === 'custom') { next.set('from', n.from ?? from); next.set('to', n.to ?? to) } else { next.delete('from'); next.delete('to') }
+    setParams(next, { replace: true })
+  }
+
+  // My projects; "in the period" = created or worked on (last update) in it.
+  const mine = ((projects ?? []) as (Project & { is_assigned?: boolean })[]).filter((p) => p.is_assigned)
+  const allProjects = mine.filter((p) => inRange(p.created_at, range) || inRange(p.updated_at, range))
   const active = allProjects.filter((p) => p.status !== 'client_approved')
   const completed = allProjects.filter((p) => p.status === 'client_approved')
 
@@ -46,45 +68,60 @@ export default function TeamStats() {
   const currentlyInRevision = allProjects.filter((p) => p.status === 'revision_requested').length
   const projectsWithRevisions = allProjects.filter((p) => p.client_revision_count > 0)
 
-  // Deadlines
-  const { data: deadlines = [] } = useQuery<Deadline[]>({
+  // Deadlines due in the period.
+  const { data: allDeadlines = [] } = useQuery<Deadline[]>({
     queryKey: ['my_deadlines'],
     queryFn: () => apiFetch<Deadline[]>('/api/deadlines/my'),
   })
+  const deadlines = allDeadlines.filter((d) => inRange(d.due_at, range))
   const deadlineMet = deadlines.filter((d) => d.status === 'met').length
   const deadlineMissed = deadlines.filter((d) => d.status === 'missed').length
   const deadlinePending = deadlines.filter((d) => d.status === 'pending').length
   const totalResolved = deadlineMet + deadlineMissed
   const metRate = totalResolved > 0 ? Math.round((deadlineMet / totalResolved) * 100) : null
 
-  // Deadlines per month, last 6 months (by due date).
-  const months = eachMonthOfInterval({ start: subMonths(new Date(), 5), end: new Date() })
-  const sameMonth = (iso: string, m: Date) => { const d = parseISO(iso); return d.getFullYear() === m.getFullYear() && d.getMonth() === m.getMonth() }
-  const perMonth = months.map((m) => ({
-    label: format(m, 'MMM'),
-    title: format(m, 'MMMM yyyy'),
+  // Deadlines over the period: days for a week, weeks up to ~2 months,
+  // months beyond — this chart spaces bars evenly, so it stays readable
+  // with a handful of bars, not dozens.
+  const earliest = allDeadlines.reduce<Date>((m, d) => { const t = parseISO(d.due_at); return t < m ? t : m }, now)
+  const start = range.from ?? earliest
+  const span = differenceInCalendarDays(range.to, start)
+  const bucket: 'day' | 'week' | 'month' = span <= 8 ? 'day' : span <= 62 ? 'week' : 'month'
+  const slots = bucket === 'day' ? eachDayOfInterval({ start, end: range.to })
+    : bucket === 'week' ? eachWeekOfInterval({ start, end: range.to }, { weekStartsOn: 1 })
+    : eachMonthOfInterval({ start, end: range.to })
+  const slotOf = (iso: string) => {
+    const d = parseISO(iso)
+    return (bucket === 'day' ? startOfDay(d) : bucket === 'week' ? startOfWeek(d, { weekStartsOn: 1 }) : startOfMonth(d)).getTime()
+  }
+  const perSlot = slots.map((s) => ({
+    // Short labels so many bars still fit; the hover shows the full date.
+    label: format(s, bucket === 'month' ? 'MMM' : bucket === 'week' ? 'd MMM' : 'EEE d'),
+    title: format(s, bucket === 'month' ? 'MMMM yyyy' : bucket === 'week' ? "'Week of' d MMM" : 'EEE d MMM'),
     values: [
-      deadlines.filter((d) => d.status === 'met' && sameMonth(d.due_at, m)).length,
-      deadlines.filter((d) => d.status === 'missed' && sameMonth(d.due_at, m)).length,
+      deadlines.filter((d) => d.status === 'met' && slotOf(d.due_at) === s.getTime()).length,
+      deadlines.filter((d) => d.status === 'missed' && slotOf(d.due_at) === s.getTime()).length,
     ],
   }))
 
-  // Revision comments on my projects from clients/admin
-  const myProjectIds = allProjects.map((p) => p.id)
-  const { data: allComments = [] } = useQuery<(TimelineComment & { profiles: { full_name: string; avatar_url: string | null } })[]>({
+  // Notes from clients/admin on my projects.
+  const myProjectIds = mine.map((p) => p.id)
+  const { data: allComments = [] } = useQuery<Comment[]>({
     queryKey: ['revision_comments', myProjectIds.join(',')],
     queryFn: async () => {
       if (myProjectIds.length === 0) return []
-      const results = await Promise.all(
-        myProjectIds.map((id) =>
-          apiFetch<(TimelineComment & { profiles: { full_name: string; avatar_url: string | null } })[]>(`/api/timeline-comments/${id}`)
-        )
-      )
+      const results = await Promise.all(myProjectIds.map((id) => apiFetch<Comment[]>(`/api/timeline-comments/${id}`)))
       return results.flat()
     },
     enabled: myProjectIds.length > 0,
   })
   const revisionComments = allComments.filter((c) => c.author_role !== 'team')
+
+  // First-time rate: finished videos in the period with no revision notes at
+  // all (client or admin) — the same rule as the leaderboard's first-try rate.
+  const finishedInPeriod = mine.filter((p) => p.status === 'client_approved' && inRange(p.updated_at, range))
+  const firstTime = finishedInPeriod.filter((p) => !revisionComments.some((c) => c.project_id === p.id))
+  const firstTimeRate = finishedInPeriod.length ? Math.round((firstTime.length / finishedInPeriod.length) * 100) : null
 
   const byStatus = FLOW.map((s) => ({ key: s, label: STATUS_LABELS[s], value: allProjects.filter((p) => p.status === s).length, dot: <StatusDot status={s} size={7} /> }))
     .filter((r) => r.value > 0)
@@ -92,23 +129,28 @@ export default function TeamStats() {
   return (
     <TeamLayout>
       <main className="px-4 md:px-7 pb-10" style={{ maxWidth: 1240 }}>
-        <header className="pt-5 pb-5"><h1>My Stats</h1></header>
+        <header className="pt-5 pb-3"><h1>My Stats</h1></header>
+        <div className="pb-4"><PeriodBar value={period} from={from} to={to} onChange={setPeriod} /></div>
 
         {isLoading ? (
           <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--ds-accent)', borderTopColor: 'transparent' }} /></div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <StatTile i={0} label="Assigned" value={allProjects.length} sub={`${active.length} active · ${completed.length} done`} />
               <StatTile i={1} label="Deadlines met" value={deadlineMet} sub={`${deadlineMissed} missed · ${deadlinePending} pending`} />
               <StatTile i={2} label="On-time rate" value={metRate !== null ? `${metRate}%` : '—'} sub={totalResolved > 0 ? `from ${totalResolved} resolved` : 'no resolved deadlines'} />
               <StatTile i={3} label="Revisions received" value={totalRevisions}
                 sub={currentlyInRevision > 0 ? `${currentlyInRevision} project${currentlyInRevision > 1 ? 's' : ''} pending revision` : 'no active revisions'} />
+              <div className="col-span-2 lg:col-span-1 min-w-0">
+                <StatTile i={4} label="First-time rate" value={firstTimeRate !== null ? `${firstTimeRate}%` : '—'}
+                  sub={finishedInPeriod.length ? `${firstTime.length} of ${finishedInPeriod.length} with no revisions` : 'no finished videos'} />
+              </div>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
               <ChartCard title="Deadlines" delay={80}>
-                <BarChart data={perMonth} ariaLabel="Deadlines met and missed per month, last 6 months"
+                <BarChart data={perSlot} ariaLabel="Deadlines met and missed over the period"
                   series={[{ name: 'Met', color: 'var(--ink-bar)' }, { name: 'Missed', color: 'var(--bad-bar)' }]} />
               </ChartCard>
               <ChartCard title="On time" delay={120}>
@@ -159,12 +201,12 @@ export default function TeamStats() {
             </div>
 
             {allProjects.length === 0 ? (
-              <p className="ds-empty" style={{ padding: '40px 0' }}>No projects assigned yet. Check back soon!</p>
+              <p className="ds-empty" style={{ padding: '40px 0' }}>{mine.length ? 'No projects in this period.' : 'No projects assigned yet. Check back soon!'}</p>
             ) : (
               <ChartCard title="My Projects" right={<span className="ds-count">{allProjects.length}</span>} delay={240}>
                 <ul className="-mx-2">
                   {allProjects.map((p) => {
-                    const deadline = deadlines.find((d) => d.project_id === p.id)
+                    const deadline = allDeadlines.find((d) => d.project_id === p.id)
                     return (
                       <li key={p.id}>
                         <Link to={`/team/projects/${p.id}`} className="ds-hrow" style={{ margin: 0 }}>
