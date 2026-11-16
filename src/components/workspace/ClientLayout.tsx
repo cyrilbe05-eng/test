@@ -21,19 +21,17 @@ export function ClientLayout({ children, bare }: ClientLayoutProps) {
   const canCreate = useCanCreateVideo()
   const { profile } = useAuth()
   const { data: projects = [] } = useProjects()
-  const { pathname, search } = useLocation()
+  const { pathname } = useLocation()
 
   const active = (projects as Project[]).filter((p) => p.status !== 'client_approved')
-  const completed = (projects as Project[]).filter((p) => p.status === 'client_approved')
   const at = (to: string, exact = false) => exact ? pathname === to : pathname.startsWith(to)
-  const completedOn = pathname === '/workspace/videos' && new URLSearchParams(search).get('tab') === 'completed'
 
   const groups: FrameItem[][] = [
     [
       // Home is also the Active list.
       { to: '/workspace', label: 'Home', icon: 'home', on: at('/workspace', true), badge: count(active.length) },
       { to: '/workspace/onboarding', label: 'Onboarding', icon: 'assignment', on: at('/workspace/onboarding') },
-      { to: '/workspace/videos?tab=completed', label: 'Completed', icon: 'task_alt', on: completedOn, badge: count(completed.length) },
+      { to: '/workspace/videos', label: 'Videos', icon: 'movie', on: at('/workspace/videos') },
     ],
     [
       { to: '/workspace/gallery', label: 'My Gallery', icon: 'photo_library', on: at('/workspace/gallery') },
