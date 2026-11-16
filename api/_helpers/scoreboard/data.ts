@@ -51,6 +51,8 @@ export interface Scoreboard {
   months: string[]
   rules: { minFinalScore: number; minVideos: number; minVideosForRanking: number }
   bonus: { amount: number; currency: string } | null
+  /** Link to the scoring rulebook PDF, set by an admin. */
+  rulebookUrl: string | null
   winnerEditorId: string | null
   board: BoardRow[]
   /** Editors with no delivered video this month. */
@@ -156,13 +158,17 @@ export async function loadScoreboard(requestedMonth?: string | null): Promise<Sc
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  const [bonusRow] = await optional(dbQuery<{ amount: number; currency: string }>('SELECT amount, currency FROM scoreboard_bonus WHERE month = ?', [month]))
+  const [[bonusRow], [rulebook]] = await Promise.all([
+    optional(dbQuery<{ amount: number; currency: string }>('SELECT amount, currency FROM scoreboard_bonus WHERE month = ?', [month])),
+    optional(dbQuery<{ value: string }>("SELECT value FROM scoreboard_config WHERE key = 'rulebook_url'")),
+  ])
 
   return {
     month,
     months,
     rules: { minFinalScore: DEFAULT_SCORING_CONSTANTS.ELIGIBILITY_MIN_FINAL_SCORE, minVideos: DEFAULT_SCORING_CONSTANTS.ELIGIBILITY_MIN_VIDEOS, minVideosForRanking: MIN_VIDEOS_FOR_RANKING },
     bonus: bonusRow ? { amount: bonusRow.amount, currency: bonusRow.currency } : null,
+    rulebookUrl: rulebook?.value ?? null,
     winnerEditorId: summary?.winnerEditorId ?? null,
     board,
     notStarted,

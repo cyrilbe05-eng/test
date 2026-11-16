@@ -11,44 +11,47 @@ import type { Scoreboard, ScoredVideo, ScoreCategory } from '@/types/scoreboard'
 const pts = (n: number) => Math.round(n).toLocaleString('en-GB')
 const signed = (n: number) => `${n > 0 ? '+' : ''}${Math.round(n * 10) / 10}`
 
+const BAR_MAX = 220 // px, the leader's column
+
+/** The board as rising columns: lowest on the left, #1 tallest on the right
+ *  with a crown. Each column's height follows the editor's points. */
 export function BoardList({ data, selected, onSelect }: { data: Scoreboard; selected?: string | null; onSelect?: (editorId: string) => void }) {
   const top = data.board[0]?.totalPoints || 1
+  const cols = [...data.board].reverse()
   return (
-    <div className="space-y-2">
-      {data.board.map((r, i) => {
-        const s = standing(r, data.rules)
-        const mine = data.me === r.editorId
-        const on = selected === r.editorId
-        return (
-          <button key={r.editorId} type="button" onClick={() => onSelect?.(r.editorId)} disabled={!onSelect}
-            className={cn('clay-card w-full text-left flex items-center gap-3 sm:gap-4 px-3.5 sm:px-4 py-3 animate-slide-up', onSelect && 'cursor-pointer')}
-            style={{ animationDelay: `${i * 40}ms`, boxShadow: on || mine ? 'var(--card-sh), 0 0 0 1.5px var(--focus)' : undefined }}>
-            <span className="w-6 text-center tabular-nums flex-none" style={{ fontSize: 15, fontWeight: 650, color: r.rank === 1 ? 'var(--strong)' : 'var(--faint)' }}>{r.rank}</span>
-            <EditorAvatar name={r.name} size={34} />
-            <span className="flex-1 min-w-0">
-              <span className="flex items-center gap-1.5">
-                <span className="truncate" style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--strong)' }}>{r.name}{mine ? ' (you)' : ''}</span>
-                {r.isWinner && <Ms name="workspace_premium" style={{ fontSize: 17, width: 17, color: 'var(--warn)' }} />}
-              </span>
-              <span className="flex items-center gap-2 mt-1">
-                <span className="ds-track flex-1 max-w-[180px]" aria-hidden><i style={{ width: `${Math.max(3, (r.totalPoints / top) * 100)}%` }} /></span>
-                <span className="truncate" style={{ fontSize: 12, color: s.tone === 'todo' ? 'var(--faint)' : 'var(--strong)', fontWeight: s.tone === 'todo' ? 400 : 600 }}>{s.text}</span>
-              </span>
-            </span>
-            <span className="text-right flex-none">
-              <span className="block tabular-nums" style={{ fontSize: 18, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--strong)' }}>{pts(r.totalPoints)}</span>
-              <span className="block tabular-nums" style={{ fontSize: 11.5, color: 'var(--faint)' }}>{r.videoCount} videos{r.finalScore !== null ? ` · avg ${Math.round(r.finalScore)}` : ''}</span>
-            </span>
-          </button>
-        )
-      })}
-      {data.board.length === 0 && (
-        <div className="ds-panel text-center py-10"><p style={{ fontSize: 13.5, color: 'var(--faint)' }}>No videos delivered yet this month</p></div>
+    <section className="ds-panel" style={{ padding: '18px 16px 14px' }}>
+      {data.board.length === 0 ? (
+        <p className="text-center py-10" style={{ fontSize: 13.5, color: 'var(--faint)' }}>No videos delivered yet this month</p>
+      ) : (
+        <div className="ds-podiums" role="list">
+          {cols.map((r, i) => {
+            const s = standing(r, data.rules)
+            const first = r.rank === 1
+            const on = selected === r.editorId || data.me === r.editorId
+            return (
+              <button key={r.editorId} type="button" role="listitem" onClick={() => onSelect?.(r.editorId)} disabled={!onSelect}
+                aria-label={`${r.rank}. ${r.name}, ${pts(r.totalPoints)} points`} className={cn('ds-podium-col', onSelect && 'cursor-pointer')}>
+                {first && <Ms name="crown" className="ds-crown" style={{ fontSize: 30, width: 30 }} />}
+                <span className="tabular-nums" style={{ fontSize: first ? 20 : 15, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--strong)' }}>{pts(r.totalPoints)}</span>
+                <span className={cn('ds-podium', first && 'first', on && 'on')}
+                  style={{ height: Math.max(36, (r.totalPoints / top) * BAR_MAX), animationDelay: `${i * 70}ms` }}>
+                  <span className="tabular-nums" style={{ fontSize: first ? 22 : 16, fontWeight: 700 }}>{r.rank}</span>
+                </span>
+                <span className="flex flex-col items-center gap-1 w-full min-w-0 pt-1">
+                  <EditorAvatar name={r.name} size={first ? 36 : 30} />
+                  <span className="truncate max-w-full" style={{ fontSize: 13, fontWeight: 600, color: 'var(--strong)' }}>{r.name.split(' ')[0]}{data.me === r.editorId ? ' (you)' : ''}</span>
+                  <span className="text-center leading-tight" style={{ fontSize: 11.5, color: s.tone === 'todo' ? 'var(--faint)' : 'var(--strong)', fontWeight: s.tone === 'todo' ? 400 : 600 }}>{s.text}</span>
+                  <span className="tabular-nums" style={{ fontSize: 11, color: 'var(--faint)' }}>{r.videoCount} videos{r.finalScore !== null ? ` · avg ${Math.round(r.finalScore)}` : ''}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
       )}
       {data.notStarted.length > 0 && (
-        <p className="px-1 pt-1" style={{ fontSize: 12.5, color: 'var(--faint)' }}>Not started: {data.notStarted.map((n) => n.name).join(', ')}</p>
+        <p className="pt-3" style={{ fontSize: 12.5, color: 'var(--faint)', borderTop: '1px solid var(--line)', marginTop: 12 }}>Not started: {data.notStarted.map((n) => n.name).join(', ')}</p>
       )}
-    </div>
+    </section>
   )
 }
 

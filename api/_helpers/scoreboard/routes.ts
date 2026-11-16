@@ -8,6 +8,8 @@
 //   DELETE /api/scoreboard/adjustments/:projectId
 //   PUT    /api/scoreboard/bonus/:month         { amount }
 //   DELETE /api/scoreboard/bonus/:month
+//   PUT    /api/scoreboard/rulebook             { url }   the rulebook PDF link
+//   DELETE /api/scoreboard/rulebook
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAuth } from '../auth.js'
@@ -54,6 +56,24 @@ export async function handleScoreboardRoute(req: VercelRequest, res: VercelRespo
     }
 
     if (!admin) throw fail(403, 'Only full admins can change the scoreboard')
+
+    // The scoring rulebook (a link to a PDF), shown to editors.
+    if (rest.length === 1 && rest[0] === 'rulebook') {
+      if (req.method === 'DELETE') {
+        await save("DELETE FROM scoreboard_config WHERE key = 'rulebook_url'", [])
+      } else if (req.method === 'PUT') {
+        const raw = typeof req.body?.url === 'string' ? req.body.url.trim() : ''
+        let url: URL
+        try { url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`) } catch { throw fail(400, 'Enter a link, e.g. https://…') }
+        if ((url.protocol !== 'https:' && url.protocol !== 'http:') || !url.hostname.includes('.')) throw fail(400, 'Enter a link, e.g. https://…')
+        await save(
+          `INSERT INTO scoreboard_config (key, value, updated_at, updated_by) VALUES ('rulebook_url', ?, ?, ?)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+          [url.toString(), nowIso(), profile.id])
+      } else { res.status(405).json({ error: 'Method not allowed' }); return }
+      res.json({ ok: true }); return
+    }
+
     const [kind, key] = rest
     if (!key || rest.length !== 2) { res.status(404).json({ error: 'Not found' }); return }
     const by = profile.id
@@ -98,8 +118,8 @@ export async function handleScoreboardRoute(req: VercelRequest, res: VercelRespo
       } else if (req.method === 'PUT') {
         const amount = num(req.body?.amount, 0, 1_000_000, 'Bonus')
         await save(
-          `INSERT INTO scoreboard_bonus (month, amount, updated_at, updated_by) VALUES (?, ?, ?, ?)
-           ON CONFLICT(month) DO UPDATE SET amount = excluded.amount, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+          `INSERT INTO scoreboard_bonus (month, amount, currency, updated_at, updated_by) VALUES (?, ?, 'USD', ?, ?)
+           ON CONFLICT(month) DO UPDATE SET amount = excluded.amount, currency = 'USD', updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
           [key, amount, nowIso(), by])
       } else { res.status(405).json({ error: 'Method not allowed' }); return }
       res.json({ ok: true }); return

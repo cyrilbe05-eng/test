@@ -11,6 +11,8 @@
 -- scoreboard_adjustments      admin points added to / removed from one
 --                             video, with a reason the editor can see.
 -- scoreboard_bonus            the winner's bonus amount for a month.
+-- scoreboard_config           single settings, e.g. 'rulebook_url' (the
+--                             scoring rulebook PDF editors can open).
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS scoreboard_client_settings (
@@ -32,7 +34,14 @@ CREATE TABLE IF NOT EXISTS scoreboard_adjustments (
 CREATE TABLE IF NOT EXISTS scoreboard_bonus (
   month       TEXT PRIMARY KEY,          -- 'YYYY-MM'
   amount      REAL NOT NULL,
-  currency    TEXT NOT NULL DEFAULT 'EUR',
+  currency    TEXT NOT NULL DEFAULT 'USD',
+  updated_at  TEXT NOT NULL,
+  updated_by  TEXT REFERENCES profiles(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS scoreboard_config (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
   updated_by  TEXT REFERENCES profiles(id) ON DELETE SET NULL
 );

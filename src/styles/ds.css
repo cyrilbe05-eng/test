@@ -383,3 +383,16 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 .ds-msheet input:focus,.ds-msheet select:focus{box-shadow:inset 0 0 0 1px var(--focus),0 0 0 4px var(--drop)}
 .ds-cal-veil.closing{animation:ds-veil-out .26s ease-in both}
 .ds-cal-sheet.closing{animation:ds-shrink .26s ease-in both}
+
+/* ── Leaderboard columns (components/scoreboard) ── */
+.ds-podiums{display:flex;align-items:flex-end;justify-content:center;gap:12px;overflow-x:auto;padding-top:8px}
+.ds-podium-col{all:unset;box-sizing:border-box;flex:1 1 0;min-width:76px;max-width:170px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;border-radius:14px}
+.ds-podium-col:focus-visible{outline:2px solid var(--focus);outline-offset:4px}
+.ds-podium{width:100%;display:flex;justify-content:center;padding-top:10px;border-radius:14px 14px 6px 6px;background:linear-gradient(180deg,var(--card-a),var(--card-b));box-shadow:var(--card-sh);color:var(--faint);transform-origin:bottom;animation:ds-rise .8s var(--spring) backwards;transition:height .6s var(--spring),box-shadow .25s,transform .35s var(--spring)}
+.ds-podium.first{background:var(--ds-accent);color:var(--accent-fg);box-shadow:0 1px 2px rgba(0,0,0,.25),0 18px 34px -18px rgba(0,0,0,.55)}
+.ds-podium.on{box-shadow:var(--card-sh),0 0 0 1.5px var(--focus)}
+.ds-podium.first.on{box-shadow:0 0 0 1.5px var(--focus),0 18px 34px -18px rgba(0,0,0,.55)}
+.ds-podium-col:hover .ds-podium{transform:translateY(-3px)}
+.ds-crown{color:var(--warn);margin-bottom:-6px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.25))}
+@keyframes ds-rise{from{transform:scaleY(0);opacity:0}}
+@media (prefers-reduced-motion:reduce){.ds-podium{animation:none;transition:none}}

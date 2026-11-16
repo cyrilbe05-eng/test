@@ -31,7 +31,7 @@ function BonusTile({ data }: { data: Scoreboard }) {
       <div className="clay-card p-4 min-w-0">
         <p style={{ fontSize: 12.5, color: 'var(--faint)' }}>Bonus</p>
         <form className="flex items-center gap-2 mt-1.5" onSubmit={(e) => { e.preventDefault(); save() }}>
-          <input autoFocus inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder="€" aria-label="Bonus amount" className="ds-field" style={{ height: 36 }} />
+          <input autoFocus inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder="$" aria-label="Bonus amount" className="ds-field" style={{ height: 36 }} />
           <button type="submit" className="ds-primary" style={{ height: 36, paddingLeft: 14 }} disabled={saveBonus.isPending || removeBonus.isPending}>Save</button>
         </form>
       </div>
@@ -41,7 +41,7 @@ function BonusTile({ data }: { data: Scoreboard }) {
     <button type="button" onClick={start} className="clay-card p-4 min-w-0 text-left cursor-pointer">
       <span className="flex items-center justify-between" style={{ fontSize: 12.5, color: 'var(--faint)' }}>Bonus <Ms name="edit" style={{ fontSize: 15, width: 15 }} /></span>
       <span className="block tabular-nums mt-1" style={{ fontSize: 28, fontWeight: 650, letterSpacing: '-.03em', color: 'var(--strong)', lineHeight: 1.15 }}>
-        {data.bonus ? money(data.bonus.amount, data.bonus.currency) : '—'}
+        {data.bonus ? money(data.bonus.amount) : '—'}
       </span>
     </button>
   )
@@ -99,9 +99,30 @@ function ClientRow({ c }: { c: ClientScoreSetting }) {
   )
 }
 
+/** Link to the scoring rulebook PDF; editors get it as a "Rulebook" button. */
+function RulebookTab({ url }: { url: string | null }) {
+  const { saveRulebook, removeRulebook } = useScoreboardActions()
+  const [value, setValue] = useState(url ?? '')
+  useEffect(() => { setValue(url ?? '') }, [url])
+  const done = (msg: string) => ({ onSuccess: () => toast.success(msg), onError: (e: unknown) => toast.error(errMsg(e)) })
+  return (
+    <section className="ds-panel max-w-2xl" style={{ padding: '18px 18px 16px' }}>
+      <div className="ds-panel-head"><h2>Rulebook</h2>
+        {url && <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1" style={{ fontSize: 13, fontWeight: 500, color: 'var(--soft-text)' }}>Open <Ms name="open_in_new" style={{ fontSize: 15, width: 15, color: 'inherit' }} /></a>}
+      </div>
+      <form className="flex flex-wrap items-center gap-2 mt-2" onSubmit={(e) => { e.preventDefault(); if (value.trim()) saveRulebook.mutate(value.trim(), done('Rulebook link saved')) }}>
+        <input type="text" inputMode="url" value={value} onChange={(e) => setValue(e.target.value)} placeholder="https://…/rulebook.pdf" aria-label="Rulebook link" className="ds-field flex-1" style={{ minWidth: 220 }} />
+        <button type="submit" className="ds-primary" style={{ paddingLeft: 16 }} disabled={!value.trim() || value.trim() === url || saveRulebook.isPending}>Save</button>
+        {url && <button type="button" className="ds-ghost-btn" disabled={removeRulebook.isPending} onClick={() => removeRulebook.mutate(undefined, done('Rulebook link removed'))}>Remove</button>}
+      </form>
+    </section>
+  )
+}
+
 export default function AdminLeaderboard() {
   const [params, setParams] = useSearchParams()
-  const tab = params.get('tab') === 'clients' ? 'clients' : 'board'
+  const t = params.get('tab')
+  const tab = t === 'clients' || t === 'rulebook' ? t : 'board'
   const { data, isLoading, error } = useScoreboard(params.get('month') ?? '')
   const [selected, setSelected] = useState<string | null>(null)
   const set = (k: string, v: string | null) => { const n = new URLSearchParams(params); if (v) n.set(k, v); else n.delete(k); setParams(n, { replace: true }) }
@@ -122,7 +143,7 @@ export default function AdminLeaderboard() {
               </select>
             )}
             <Segmented label="View" width={84} value={tab} onChange={(t) => set('tab', t === 'board' ? null : t)}
-              options={[{ value: 'board', label: 'Board' }, { value: 'clients', label: 'Clients' }]} />
+              options={[{ value: 'board', label: 'Board' }, { value: 'clients', label: 'Clients' }, { value: 'rulebook', label: 'Rulebook' }]} />
           </div>
         </div>
 
@@ -130,6 +151,8 @@ export default function AdminLeaderboard() {
           <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
         ) : error || !data ? (
           <div className="ds-panel p-6" style={{ fontSize: 13.5 }}>{errMsg(error)}</div>
+        ) : tab === 'rulebook' ? (
+          <RulebookTab url={data.rulebookUrl} />
         ) : tab === 'clients' ? (
           <section className="ds-panel" style={{ padding: '8px 18px' }}>
             <div className="flex items-center gap-3 py-2" style={{ fontSize: 12.5, color: 'var(--faint)' }}>
@@ -146,8 +169,8 @@ export default function AdminLeaderboard() {
               <StatTile label="Videos" value={data.videos.length} sub={monthLabel(data.month)} />
               <StatTile label="Eligible" value={`${data.board.filter((b) => b.eligible).length} of ${data.board.length}`} sub={`${data.rules.minVideos}+ videos, average ${data.rules.minFinalScore}+`} />
             </div>
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start">
-              <BoardList data={data} selected={editorId} onSelect={setSelected} />
+            <BoardList data={data} selected={editorId} onSelect={setSelected} />
+            <div>
               {editor && (
                 <section className="ds-panel" style={{ padding: '14px 18px 8px' }}>
                   <div className="ds-panel-head"><h2>{editor.name}</h2><span className="ds-count">{editor.videoCount} videos</span></div>

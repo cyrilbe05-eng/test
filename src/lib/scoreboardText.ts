@@ -1,8 +1,9 @@
 import { format } from 'date-fns'
 import type { BoardRow, Scoreboard } from '@/types/scoreboard'
 
-export const money = (amount: number, currency = 'EUR') =>
-  new Intl.NumberFormat('en-GB', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
+// Bonuses are paid in US dollars.
+export const money = (amount: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount)
 
 export const monthLabel = (m: string) => format(new Date(`${m}-01T12:00:00`), 'MMMM yyyy')
 

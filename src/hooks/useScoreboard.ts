@@ -29,5 +29,7 @@ export function useScoreboardActions() {
     removeAdjustment: useMutation({ mutationFn: (projectId: string) => send(`adjustments/${projectId}`, 'DELETE'), ...done }),
     saveBonus: useMutation({ mutationFn: ({ month, amount }: { month: string; amount: number }) => send(`bonus/${month}`, 'PUT', { amount }), ...done }),
     removeBonus: useMutation({ mutationFn: (month: string) => send(`bonus/${month}`, 'DELETE'), ...done }),
+    saveRulebook: useMutation({ mutationFn: (url: string) => send('rulebook', 'PUT', { url }), ...done }),
+    removeRulebook: useMutation({ mutationFn: () => send('rulebook', 'DELETE'), ...done }),
   }
 }

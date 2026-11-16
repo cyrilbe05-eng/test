@@ -46,6 +46,8 @@ export interface Scoreboard {
   months: string[]
   rules: { minFinalScore: number; minVideos: number; minVideosForRanking: number }
   bonus: { amount: number; currency: string } | null
+  /** Link to the scoring rulebook PDF, set by an admin. */
+  rulebookUrl: string | null
   winnerEditorId: string | null
   board: BoardRow[]
   notStarted: { editorId: string; name: string }[]
