@@ -93,7 +93,7 @@ export interface Project {
   /** Set once the client has published it (migration 009). */
   posted_at?: string | null
   /** Single-project GET only: the calendar script it was created from. */
-  script_entry?: { script: string | null; caption: string | null; comments: string | null; inspiration_url: string | null } | null
+  script_entry?: { script: string | null; caption: string | null; comments: string | null; inspiration_url: string | null; editor_notes?: string | null } | null
 }
 
 /** Team sub-type (migration 006): copywriters are team members who can also
@@ -217,6 +217,10 @@ export interface CalendarEvent {
   assigned_team_ids?: string[]
   /** Project's client (project and deadline entries). */
   client_id?: string
+  /** Pushed from Scripts (staff only): instructions for editors, and the
+   *  script it came from. Never sent to clients. */
+  editor_notes?: string | null
+  script_id?: string | null
   created_at: string
 }
 

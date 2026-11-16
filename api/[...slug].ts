@@ -722,6 +722,15 @@ async function handleGetProject(req: VercelRequest, res: VercelResponse) {
       )
       script_entry = e ?? null
     } catch { /* pre-migration */ }
+    // Editor notes from a pushed script (migration 024): the team and
+    // admins only, never the client.
+    if (script_entry && profile.role !== 'client') {
+      try {
+        const [n] = await dbQuery<{ editor_notes: string | null }>(
+          'SELECT editor_notes FROM calendar_events WHERE project_id = ? ORDER BY created_at LIMIT 1', [projectId])
+        script_entry = { ...script_entry, editor_notes: n?.editor_notes ?? null }
+      } catch { /* pre-migration-024 */ }
+    }
     res.json({
       ...project,
       script_entry,

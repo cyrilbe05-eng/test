@@ -23,6 +23,7 @@ import { useApiFetch } from '@/lib/api'
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
 import { ProjectEntryModal } from '@/components/calendar/ProjectEntryModal'
 import { MonthView } from '@/components/calendar/MonthView'
+import { PushedScriptInfo } from '@/components/calendar/PushedScriptInfo'
 import { Icon } from '@/components/ds'
 import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
@@ -451,6 +452,7 @@ function EventModal({
                 <p className="text-xs text-muted-foreground mb-1.5">Caption</p>
                 <textarea value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Caption…" rows={2} className="w-full bg-muted/50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none" />
               </div>
+              <PushedScriptInfo event={event} scriptsBase="/admin/scripts" />
             </div>
           )}
           {!isManual && event.comments && (

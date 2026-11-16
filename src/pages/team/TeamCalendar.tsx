@@ -23,6 +23,7 @@ import {
 import { EventCommentThread } from '@/components/calendar/EventCommentThread'
 import { ProjectEntryModal } from '@/components/calendar/ProjectEntryModal'
 import { MonthView } from '@/components/calendar/MonthView'
+import { PushedScriptInfo } from '@/components/calendar/PushedScriptInfo'
 import { Icon } from '@/components/ds'
 import { PostedToggle } from '@/components/calendar/PostedToggle'
 import { DayEventsModal } from '@/components/calendar/DayEventsModal'
@@ -203,6 +204,7 @@ function CreateEventModal({ defaultDate, onClose, clients, defaultClientId }: { 
 
 // ─── Event detail/edit modal ──────────────────────────────────────────────────
 function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; onClose: () => void; currentUserId: string }) {
+  const { profile } = useAuth()
   const [title, setTitle] = useState(event.title)
   const [date, setDate] = useState(event.date)
   const [color, setColor] = useState(event.color ?? EVENT_COLORS[0].value)
@@ -393,6 +395,7 @@ function EventModal({ event, onClose, currentUserId }: { event: CalendarEvent; o
                 : event.caption ? <p className="text-sm text-muted-foreground bg-muted/50 rounded-xl px-3 py-2">{event.caption}</p> : <span className="text-xs text-muted-foreground">—</span>
               }
             </div>
+            <PushedScriptInfo event={event} scriptsBase={profile?.team_role === 'copywriter' ? '/team/scripts' : null} />
           </div>
 
           {/* Comment thread */}

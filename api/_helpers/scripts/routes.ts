@@ -94,12 +94,13 @@ function shapeScript(s: any) {
     links: (() => { try { return JSON.parse(s.links) } catch { return [] } })(),
     status: s.status, sortOrder: s.sort_order, bodyVersion: s.body_version, captionVersion: s.caption_version ?? 0,
     clientNotesVersion: s.client_notes_version ?? 0, notesVersion: s.notes_version,
-    inReviewAt: s.in_review_at, calendarEventId: s.calendar_event_id,
+    inReviewAt: s.in_review_at, calendarEventId: s.calendar_event_id, calendarDate: s.calendar_date ?? null,
     updatedAt: s.updated_at, updatedBy: s.updated_by ? { id: s.updated_by, name: s.updated_by_name ?? null } : null,
   }
 }
 
-const SCRIPT_SELECT = `SELECT s.*, u.full_name AS updated_by_name FROM scripts s LEFT JOIN profiles u ON u.id = s.updated_by`
+const SCRIPT_SELECT = `SELECT s.*, u.full_name AS updated_by_name, ce.date AS calendar_date FROM scripts s
+  LEFT JOIN profiles u ON u.id = s.updated_by LEFT JOIN calendar_events ce ON ce.id = s.calendar_event_id`
 
 async function commentsFor(where: string, params: unknown[]) {
   const rows = await dbQuery<any>(

@@ -27,6 +27,8 @@ export interface Script {
   notesVersion: number
   inReviewAt: string | null
   calendarEventId: string | null
+  /** The calendar date once pushed (YYYY-MM-DD). */
+  calendarDate: string | null
   updatedAt: string
   updatedBy: { id: string; name: string | null } | null
 }

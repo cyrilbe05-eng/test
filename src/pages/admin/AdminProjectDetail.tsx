@@ -389,6 +389,7 @@ export default function AdminProjectDetail() {
                     <BriefRow label="Inspiration Video" value={project.inspiration_url} link />
                     <BriefRow label="Client Instructions" value={project.instructions} />
                     <BriefRow label="Video Script" value={project.video_script} />
+                    {project.script_entry?.editor_notes && <BriefRow label="Editor notes" value={project.script_entry.editor_notes} />}
                     {project.description && <BriefRow label="Description" value={project.description} />}
                   </div>
                 </Section>

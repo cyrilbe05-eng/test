@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Ms } from '@/components/ds'
 import { FieldEditor } from '@/components/scripts/RichEditor'
 import { ScriptComments } from '@/components/scripts/ScriptComments'
+import { PushToCalendar } from '@/components/scripts/PushToCalendar'
 import { SCRIPT_STATUS, SCRIPT_TYPES } from '@/lib/scriptStatus'
 import type { useScriptActions } from '@/hooks/useScripts'
 import type { Script, ScriptComment, ScriptField, ScriptType } from '@/types/scripts'
@@ -182,6 +183,7 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
               </button>
             )}
             {footerExtras}
+            <PushToCalendar script={script} actions={actions} />
           </div>
         </div>
       )}

@@ -441,6 +441,7 @@ export default function TeamProjectDetail() {
             {project.description && <TextBlock label="Description" value={project.description} />}
             {project.instructions && <TextBlock label="Client Instructions" value={project.instructions} />}
             {project.video_script && <TextBlock label="Video Script" value={project.video_script} />}
+            {project.script_entry?.editor_notes && <TextBlock label="Editor notes" value={project.script_entry.editor_notes} />}
           </div>
 
           {/* ── Right: sidebar ── */}
