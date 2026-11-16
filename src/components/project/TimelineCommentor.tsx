@@ -186,6 +186,16 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
         setRangeStartTs(t)
       }
     })
+    // Moving the play bar while paused moves a one-moment comment with it:
+    // pause, drag to the exact spot, write — the comment lands where the bar
+    // is, not where the video was first paused. (Section points stay pinned by
+    // their own buttons.)
+    player.on('seeked', () => {
+      if (!composeOpenRef.current || !player.paused) return
+      const t = player.currentTime
+      setPlayheadTs(t)
+      if (composeModeRef.current === 'moment') setRangeStartTs(t)
+    })
     // Playing does NOT close the composer — users play the video to find a
     // section's end point. Only Cancel/submit dismiss it.
     player.on('timeupdate', () => {
@@ -500,7 +510,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
               >
                 {formatTimestamp(rangeStartTs)}
               </button>
-              {' '}— pause the video somewhere else to change the time.
+              . Move the play bar to change it.
             </p>
           ) : (
             <div className="space-y-2.5 bg-muted/30 border border-border/60 rounded-xl p-3">
