@@ -30,6 +30,7 @@ const GROUPS: Item[][] = [
   [
     { to: '/admin/users', label: 'Users', icon: 'group', match: (p) => p.startsWith('/admin/users') },
     { to: '/admin/analytics', label: 'Analytics', icon: 'monitoring', match: (p) => p.startsWith('/admin/analytics') },
+    { to: '/admin/leaderboard', label: 'Leaderboard', icon: 'leaderboard', match: (p) => p.startsWith('/admin/leaderboard'), fullAdminOnly: true },
     { to: '/admin/plans', label: 'Plans', icon: 'receipt_long', match: (p) => p.startsWith('/admin/plans') },
   ],
   [

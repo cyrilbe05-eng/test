@@ -31,6 +31,7 @@ import { handleGalleryThumbnail, handleGalleryThumbnails } from './_helpers/care
 import { handleFileOrder } from './_helpers/care/carousel.js'
 import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
+import { handleScoreboardRoute } from './_helpers/scoreboard/routes.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
 import { isValidAvatar } from './_helpers/avatar.js'
 import { attemptKeys, isLocked, recordFailure, clearFailures, endSessions } from './_helpers/login-guard.js'
@@ -4832,6 +4833,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleEditorLimit(req, res)
   }
   // Client time saved (automatic) — see api/_helpers/care/time-saved.ts
+  // Editor leaderboard + monthly bonus — see api/_helpers/scoreboard/routes.ts
+  if (slug[0] === 'scoreboard') {
+    return handleScoreboardRoute(req, res, slug.slice(1))
+  }
   if (slug[0] === 'time-saved' && slug.length === 1) {
     return handleTimeSaved(req, res)
   }
