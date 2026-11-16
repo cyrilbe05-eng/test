@@ -365,3 +365,21 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 .plyr__progress .compose-range::before{left:0}
 .plyr__progress .compose-range::after{left:100%}
 .plyr__progress .comment-marker{position:absolute;top:50%;z-index:10;width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.35);transform:translate(-50%,-50%);pointer-events:none}
+
+/* ── Messages (components/chat/MessagesUI) ── */
+.ds-msg-side{border-right:1px solid var(--line)}
+.ds-bubble{padding:9px 13px;border-radius:16px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.ds-bubble.me{background:var(--ds-accent);color:var(--accent-fg);border-bottom-right-radius:6px}
+.ds-bubble.them{background:linear-gradient(180deg,var(--card-a),var(--card-b));box-shadow:var(--card-sh);color:var(--text);border-bottom-left-radius:6px}
+.ds-msg-in{animation:ds-fade .35s var(--out) backwards}
+.ds-composer{display:flex;align-items:flex-end;gap:8px;padding:6px 6px 6px 14px;border-radius:16px;background:var(--field);box-shadow:inset 0 0 0 1px var(--ds-ring);transition:box-shadow .25s}
+.ds-composer:focus-within{box-shadow:inset 0 0 0 1px var(--focus),0 0 0 4px var(--drop)}
+.ds-composer textarea{flex:1;min-height:36px;max-height:160px;padding:8px 0;border:0;background:transparent;color:var(--text);font:inherit;font-size:13.5px;resize:none;outline:0;field-sizing:content}
+.ds-send{flex:none;display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:11px;background:var(--ds-accent);color:var(--accent-fg);cursor:pointer;transition:transform .3s var(--spring),opacity .2s}
+.ds-send:hover{transform:translateY(-1px)}
+.ds-send:active{transform:scale(.94)}
+.ds-send:disabled{opacity:.35;cursor:default;transform:none}
+.ds-msheet input:not([type=checkbox]),.ds-msheet select{width:100%;height:40px;padding:0 12px;border:0;border-radius:10px;background:var(--field);box-shadow:inset 0 0 0 1px var(--ds-ring);color:var(--text);font-size:13.5px;outline:0}
+.ds-msheet input:focus,.ds-msheet select:focus{box-shadow:inset 0 0 0 1px var(--focus),0 0 0 4px var(--drop)}
+.ds-cal-veil.closing{animation:ds-veil-out .26s ease-in both}
+.ds-cal-sheet.closing{animation:ds-shrink .26s ease-in both}

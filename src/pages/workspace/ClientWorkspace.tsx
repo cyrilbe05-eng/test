@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useQuery } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
 import { ClientLayout } from '@/components/workspace/ClientLayout'
-import { Ms, StatusDot } from '@/components/ds'
+import { Ms } from '@/components/ds'
 import { projectTimeLabel } from '@/lib/utils'
 import type { Project, Plan, ProjectStatus } from '@/types'
 import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
@@ -13,10 +13,15 @@ import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
 
 type Tab = 'active' | 'completed' | 'all'
 
-// What the client sees (same words as before the redesign).
-const CLIENT_LABEL: Record<ProjectStatus, string> = {
-  pending_assignment: 'Pending', in_progress: 'In progress', in_review: 'In review', admin_approved: 'Admin OK',
-  client_reviewing: 'Reviewing', revision_requested: 'Revision', client_approved: 'Approved',
+// What the client sees: same words and colours as before the redesign.
+const CLIENT_STATUS: Record<ProjectStatus, { label: string; text: string; dot: string }> = {
+  pending_assignment: { label: 'Pending', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-400' },
+  in_progress: { label: 'In progress', text: 'text-zinc-700 dark:text-zinc-300', dot: 'bg-zinc-500' },
+  in_review: { label: 'In review', text: 'text-violet-700 dark:text-violet-300', dot: 'bg-violet-500' },
+  admin_approved: { label: 'Admin OK', text: 'text-violet-700 dark:text-violet-300', dot: 'bg-violet-400' },
+  client_reviewing: { label: 'Reviewing', text: 'text-cyan-700 dark:text-cyan-300', dot: 'bg-cyan-500' },
+  revision_requested: { label: 'Revision', text: 'text-red-700 dark:text-red-300', dot: 'bg-red-400' },
+  client_approved: { label: 'Approved', text: 'text-green-700 dark:text-green-300', dot: 'bg-green-500' },
 }
 
 function Tile({ label, value, icon, on, onClick }: { label: string; value: string | number; icon: string; on?: boolean; onClick?: () => void }) {
@@ -101,10 +106,10 @@ export default function ClientWorkspace() {
             {shown.map((x) => (
               // One tap opens the video.
               <Link key={x.id} to={`/workspace/projects/${x.id}`} className="ds-hrow" style={{ margin: '0 -10px' }}>
-                <StatusDot status={x.status} />
+                <span className={`w-2 h-2 rounded-full flex-none ${CLIENT_STATUS[x.status]?.dot ?? 'bg-zinc-400'}`} />
                 <span className="flex-1 min-w-0 truncate" style={{ fontSize: 14, fontWeight: 550, color: 'var(--strong)' }}>{x.title}</span>
                 <span className="hidden sm:inline whitespace-nowrap" style={{ fontSize: 12.5, color: 'var(--faint)' }}>{projectTimeLabel(x)}</span>
-                <span className="whitespace-nowrap text-right" style={{ fontSize: 12.5, color: 'var(--soft-text)', minWidth: 64 }}>{CLIENT_LABEL[x.status] ?? x.status}</span>
+                <span className={`whitespace-nowrap text-right font-medium ${CLIENT_STATUS[x.status]?.text ?? ''}`} style={{ fontSize: 12.5, minWidth: 64 }}>{CLIENT_STATUS[x.status]?.label ?? x.status}</span>
                 <Ms name="chevron_right" style={{ fontSize: 18, width: 18 }} />
               </Link>
             ))}

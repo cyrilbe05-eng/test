@@ -257,6 +257,9 @@ export interface ChatConnection {
   user_a: string
   user_b: string
   created_at: string
+  /** Both people's details, as the API sends them. */
+  profile_a?: { full_name: string; email: string; role: string; avatar_url: string | null }
+  profile_b?: { full_name: string; email: string; role: string; avatar_url: string | null }
 }
 
 export interface ChatGroup {

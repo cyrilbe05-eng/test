@@ -1,292 +1,102 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { useAuth } from '@/hooks/useAuth'
-import { cn } from '@/lib/utils'
 import { useApiFetch } from '@/lib/api'
-import {
-  useConnections,
-  useGroups,
-  useMessages,
-  useSendMessage,
-  useCreateConnection,
-  useDeleteConnection,
-  useCreateGroup,
-  useDeleteGroup,
-} from '@/hooks/useChat'
-import type { ChatConnection, ChatGroup, ChatMessage, Profile } from '@/types'
+import { useSheetClose } from '@/hooks/useSheetClose'
+import { cn } from '@/lib/utils'
+import { Ms } from '@/components/ds'
+import { useConnections, useGroups, useCreateConnection, useDeleteConnection, useCreateGroup, useDeleteGroup } from '@/hooks/useChat'
+import { ConvRow, GroupMark, MessagesEmpty, MessagesShell, MessageThread, PersonMark, SideNote, SideSection } from '@/components/chat/MessagesUI'
+import type { ChatConnection, ChatGroup, Profile } from '@/types'
 
-type ConversationId = string | null
-
-function roleColor(role?: string) {
-  if (role === 'admin') return 'bg-violet-500'
-  if (role === 'team') return 'bg-teal-500'
-  return 'bg-violet-500'
-}
-
-function getInitial(name?: string) {
-  return (name ?? '?')[0].toUpperCase()
-}
-
-// ─── Thread panel ────────────────────────────────────────────────────────────
-function Thread({
-  conversationId,
-  currentUserId,
-}: {
-  conversationId: string
-  currentUserId: string
-}) {
-  const { data: messages } = useMessages(conversationId)
-  const sendMessage = useSendMessage()
-  const [text, setText] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  const handleSend = () => {
-    const trimmed = text.trim()
-    if (!trimmed) return
-    sendMessage.mutate(
-      { conversationId, text: trimmed },
-      {
-        onError: () => toast.error('Failed to send message'),
-      }
-    )
-    setText('')
-  }
-
+// ─── New DM / New Group sheets ───────────────────────────────────────────────
+function Sheet({ title, onClose, onCreate, pending, children }: { title: string; onClose: () => void; onCreate: () => void; pending: boolean; children: React.ReactNode }) {
+  const { closing, close } = useSheetClose(onClose)
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {(messages ?? []).map((msg: ChatMessage) => {
-          const isMe = msg.sender_id === currentUserId
-          return (
-            <div key={msg.id} className={cn('flex gap-2.5', isMe && 'flex-row-reverse')}>
-              <div
-                className={cn(
-                  'w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0',
-                  roleColor(msg.sender?.role)
-                )}
-              >
-                {getInitial(msg.sender?.full_name)}
-              </div>
-              <div className={cn('max-w-[70%]', isMe && 'items-end flex flex-col')}>
-                <p className="text-xs text-muted-foreground mb-0.5">
-                  {msg.sender?.full_name ?? 'Unknown'}
-                  {' · '}
-                  {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
-                </p>
-                <div
-                  className={cn(
-                    'px-3 py-2 rounded-2xl text-sm',
-                    isMe
-                      ? 'bg-primary text-white rounded-tr-sm'
-                      : 'bg-muted text-foreground rounded-tl-sm'
-                  )}
-                >
-                  {msg.text}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-        <div ref={bottomRef} />
-      </div>
-      <div className="border-t border-border p-3 flex gap-2">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              handleSend()
-            }
-          }}
-          placeholder="Type a message…"
-          rows={2}
-          className="flex-1 resize-none bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-        />
-        <button
-          onClick={handleSend}
-          disabled={!text.trim() || sendMessage.isPending}
-          className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl shadow-clay hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-40 self-end"
-        >
-          Send
-        </button>
+    <div className={cn('ds-cal-veil', closing && 'closing')} onMouseDown={(e) => { if (e.target === e.currentTarget) close() }}>
+      <div className={cn('ds-cal-sheet ds-msheet max-w-sm overflow-hidden', closing && 'closing')}>
+        <h2 className="ds-form-title">{title}</h2>
+        <div className="px-6 space-y-4">{children}</div>
+        <div className="ds-form-foot">
+          <button onClick={close} className="ds-ghost-btn">Cancel</button>
+          <button onClick={onCreate} disabled={pending} className="ds-primary disabled:opacity-40" style={{ paddingLeft: 16 }}>Create</button>
+        </div>
       </div>
     </div>
   )
 }
 
-// ─── New DM Modal ─────────────────────────────────────────────────────────────
-function NewDMModal({
-  users,
-  onClose,
-}: {
-  users: Profile[]
-  onClose: () => void
-}) {
+const FieldName = ({ children }: { children: React.ReactNode }) => <p className="mb-1.5" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--faint)' }}>{children}</p>
+
+function NewDMModal({ users, onClose }: { users: Profile[]; onClose: () => void }) {
   const [userA, setUserA] = useState('')
   const [userB, setUserB] = useState('')
   const createConnection = useCreateConnection()
 
   const handleCreate = () => {
-    if (!userA || !userB || userA === userB) {
-      toast.error('Select two different users')
-      return
-    }
-    createConnection.mutate(
-      { userA, userB },
-      {
-        onSuccess: () => {
-          toast.success('Direct message created')
-          onClose()
-        },
-        onError: () => toast.error('Failed to create DM'),
-      }
-    )
+    if (!userA || !userB || userA === userB) { toast.error('Select two different users'); return }
+    createConnection.mutate({ userA, userB }, {
+      onSuccess: () => { toast.success('Direct message created'); onClose() },
+      onError: () => toast.error('Failed to create DM'),
+    })
   }
 
+  const pick = (value: string, set: (v: string) => void) => (
+    <select value={value} onChange={(e) => set(e.target.value)}>
+      <option value="">Select user…</option>
+      {users.map((u) => <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>)}
+    </select>
+  )
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-        <h2 className="font-heading font-semibold text-lg">New Direct Message</h2>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">User A</label>
-            <select
-              value={userA}
-              onChange={(e) => setUserA(e.target.value)}
-              className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-            >
-              <option value="">Select user…</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name} ({u.role})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">User B</label>
-            <select
-              value={userB}
-              onChange={(e) => setUserB(e.target.value)}
-              className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-            >
-              <option value="">Select user…</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name} ({u.role})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="flex gap-2 justify-end pt-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors">
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={createConnection.isPending}
-            className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl shadow-clay hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-40"
-          >
-            Create
-          </button>
-        </div>
-      </div>
-    </div>
+    <Sheet title="New Direct Message" onClose={onClose} onCreate={handleCreate} pending={createConnection.isPending}>
+      <div><FieldName>User A</FieldName>{pick(userA, setUserA)}</div>
+      <div><FieldName>User B</FieldName>{pick(userB, setUserB)}</div>
+    </Sheet>
   )
 }
 
-// ─── New Group Modal ──────────────────────────────────────────────────────────
-function NewGroupModal({
-  users,
-  onClose,
-}: {
-  users: Profile[]
-  onClose: () => void
-}) {
+function NewGroupModal({ users, onClose }: { users: Profile[]; onClose: () => void }) {
   const [name, setName] = useState('')
   const [memberIds, setMemberIds] = useState<string[]>([])
   const createGroup = useCreateGroup()
 
-  const toggleMember = (id: string) => {
-    setMemberIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-  }
+  const toggleMember = (id: string) => setMemberIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
   const handleCreate = () => {
-    if (!name.trim()) {
-      toast.error('Enter a group name')
-      return
-    }
-    if (memberIds.length < 2) {
-      toast.error('Select at least 2 members')
-      return
-    }
-    createGroup.mutate(
-      { name: name.trim(), memberIds },
-      {
-        onSuccess: () => {
-          toast.success('Group created')
-          onClose()
-        },
-        onError: () => toast.error('Failed to create group'),
-      }
-    )
+    if (!name.trim()) { toast.error('Enter a group name'); return }
+    if (memberIds.length < 2) { toast.error('Select at least 2 members'); return }
+    createGroup.mutate({ name: name.trim(), memberIds }, {
+      onSuccess: () => { toast.success('Group created'); onClose() },
+      onError: () => toast.error('Failed to create group'),
+    })
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-        <h2 className="font-heading font-semibold text-lg">New Group</h2>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Group Name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Project Alpha Team"
-              className="w-full bg-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">Members</label>
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {users.map((u) => (
-                <label key={u.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={memberIds.includes(u.id)}
-                    onChange={() => toggleMember(u.id)}
-                    className="accent-primary"
-                  />
-                  <span className="text-sm">{u.full_name}</span>
-                  <span className="text-xs text-muted-foreground ml-auto">{u.role}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2 justify-end pt-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors">
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={createGroup.isPending}
-            className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl shadow-clay hover:brightness-110 transition-all active:scale-[0.98] disabled:opacity-40"
-          >
-            Create
-          </button>
+    <Sheet title="New Group" onClose={onClose} onCreate={handleCreate} pending={createGroup.isPending}>
+      <div><FieldName>Group name</FieldName><input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Project Alpha Team" /></div>
+      <div>
+        <FieldName>Members</FieldName>
+        <div className="max-h-56 overflow-y-auto -mx-2">
+          {users.map((u) => {
+            const on = memberIds.includes(u.id)
+            return (
+              <button key={u.id} type="button" onClick={() => toggleMember(u.id)} aria-pressed={on}
+                className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-[10px] text-left transition-colors hover:bg-[var(--hover)]">
+                <PersonMark name={u.full_name} role={u.role} size={26} />
+                <span className="flex-1 min-w-0 truncate" style={{ fontSize: 13.5, color: 'var(--strong)' }}>{u.full_name}</span>
+                <span className="capitalize" style={{ fontSize: 12, color: 'var(--faint)' }}>{u.role}</span>
+                <span className="grid place-items-center rounded-full flex-none" style={{ width: 20, height: 20, background: on ? 'var(--ds-accent)' : 'transparent', boxShadow: on ? 'none' : 'inset 0 0 0 1.5px var(--dash)', color: 'var(--accent-fg)', transition: 'background .2s' }}>
+                  {on && <Ms name="check" style={{ fontSize: 14, width: 14, color: 'inherit' }} />}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -304,174 +114,62 @@ export default function AdminMessages() {
     queryFn: () => apiFetch('/api/users'),
   })
 
-  const [activeConvId, setActiveConvId] = useState<ConversationId>(null)
+  const [activeConvId, setActiveConvId] = useState<string | null>(null)
   const [showNewDM, setShowNewDM] = useState(false)
   const [showNewGroup, setShowNewGroup] = useState(false)
 
-  const getOtherUser = (conn: ChatConnection) => {
-    if (!profile) return null
-    const otherId = conn.user_a === profile.id ? conn.user_b : conn.user_a
-    return (users ?? []).find((u) => u.id === otherId) ?? null
+  const byId = (id: string) => (users ?? []).find((u) => u.id === id) ?? null
+  // Admins can set up DMs between any two people: show the other person when
+  // the admin is in it, both names otherwise.
+  const dmInfo = (c: ChatConnection) => {
+    const a = byId(c.user_a) ?? c.profile_a ?? null
+    const b = byId(c.user_b) ?? c.profile_b ?? null
+    if (c.user_a === profile?.id) return { title: b?.full_name ?? 'Unknown', sub: b?.role, mark: <PersonMark name={b?.full_name} role={b?.role} /> }
+    if (c.user_b === profile?.id) return { title: a?.full_name ?? 'Unknown', sub: a?.role, mark: <PersonMark name={a?.full_name} role={a?.role} /> }
+    return { title: `${a?.full_name ?? 'Unknown'} & ${b?.full_name ?? 'Unknown'}`, sub: 'Direct message', mark: <PersonMark name={a?.full_name} role={a?.role} /> }
   }
+
+  const add = (label: string, onClick: () => void) => (
+    <button onClick={onClick} className="inline-flex items-center gap-1 h-7 px-2 rounded-lg transition-colors hover:bg-[var(--hover)]" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--soft-text)' }}>
+      <Ms name="add" style={{ fontSize: 16, width: 16, color: 'inherit' }} />{label}
+    </button>
+  )
+
+  const conn = (connections ?? []).find((c) => c.id === activeConvId)
+  const group = (groups ?? []).find((g) => g.id === activeConvId)
+  const open = conn ? dmInfo(conn) : null
 
   return (
     <AdminLayout>
-      <div className="flex h-full" style={{ minHeight: 'calc(100vh - 52px)' }}>
-        {/* Sidebar */}
-        <aside className={cn(
-          'border-r border-border bg-card/60 flex flex-col flex-shrink-0',
-          'w-full md:w-72',
-          activeConvId ? 'hidden md:flex' : 'flex',
-        )}>
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h2 className="font-heading font-semibold text-sm">Messages</h2>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {/* Direct Messages */}
-            <div className="p-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Direct Messages</p>
-                <button
-                  onClick={() => setShowNewDM(true)}
-                  className="text-xs text-primary hover:underline font-medium"
-                >
-                  + New DM
-                </button>
-              </div>
-              {(connections ?? []).length === 0 && (
-                <p className="text-xs text-muted-foreground px-1">No direct messages yet.</p>
-              )}
-              {(connections ?? []).map((conn) => {
-                const other = getOtherUser(conn)
-                const isActive = activeConvId === conn.id
-                return (
-                  <div
-                    key={conn.id}
-                    onClick={() => setActiveConvId(conn.id)}
-                    className={cn(
-                      'flex items-center gap-2.5 px-2 py-2 rounded-xl cursor-pointer group transition-colors',
-                      isActive ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
-                    )}
-                  >
-                    <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0', roleColor(other?.role))}>
-                      {getInitial(other?.full_name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{other?.full_name ?? 'Unknown'}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{other?.role}</p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteConnection.mutate(conn.id, {
-                          onSuccess: () => {
-                            toast.success('Connection deleted')
-                            if (activeConvId === conn.id) setActiveConvId(null)
-                          },
-                          onError: () => toast.error('Failed to delete'),
-                        })
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-1 rounded"
-                      title="Delete"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Groups */}
-            <div className="p-3 border-t border-border/50">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Groups</p>
-                <button
-                  onClick={() => setShowNewGroup(true)}
-                  className="text-xs text-primary hover:underline font-medium"
-                >
-                  + New Group
-                </button>
-              </div>
-              {(groups ?? []).length === 0 && (
-                <p className="text-xs text-muted-foreground px-1">No groups yet.</p>
-              )}
-              {(groups ?? []).map((group: ChatGroup) => {
-                const isActive = activeConvId === group.id
-                return (
-                  <div
-                    key={group.id}
-                    onClick={() => setActiveConvId(group.id)}
-                    className={cn(
-                      'flex items-center gap-2.5 px-2 py-2 rounded-xl cursor-pointer group transition-colors',
-                      isActive ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
-                    )}
-                  >
-                    <div className="w-8 h-8 rounded-full bg-slate-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                      {getInitial(group.name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{group.name}</p>
-                      <p className="text-xs text-muted-foreground">{group.member_ids.length} members</p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteGroup.mutate(group.id, {
-                          onSuccess: () => {
-                            toast.success('Group deleted')
-                            if (activeConvId === group.id) setActiveConvId(null)
-                          },
-                          onError: () => toast.error('Failed to delete'),
-                        })
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-1 rounded"
-                      title="Delete"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </aside>
-
-        {/* Thread panel */}
-        <main className={cn('flex-1 flex flex-col bg-background', !activeConvId && 'hidden md:flex')}>
-          {activeConvId ? (
-            <>
-              <div className="md:hidden flex items-center gap-2 px-3 py-2 border-b border-border bg-card/60">
-                <button
-                  onClick={() => setActiveConvId(null)}
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  Back
-                </button>
-              </div>
-              <Thread conversationId={activeConvId} currentUserId={profile?.id ?? ''} />
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-muted-foreground">Select a conversation to start messaging</p>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
+      <MessagesShell heading="Messages" open={!!activeConvId} side={<>
+        <SideSection title="Direct Messages" action={add('New DM', () => setShowNewDM(true))}>
+          {(connections ?? []).length === 0 && <SideNote text="No direct messages yet." />}
+          {(connections ?? []).map((c) => {
+            const d = dmInfo(c)
+            return <ConvRow key={c.id} active={activeConvId === c.id} onClick={() => setActiveConvId(c.id)} mark={d.mark} title={d.title} sub={d.sub}
+              onDelete={() => deleteConnection.mutate(c.id, {
+                onSuccess: () => { toast.success('Connection deleted'); if (activeConvId === c.id) setActiveConvId(null) },
+                onError: () => toast.error('Failed to delete'),
+              })} />
+          })}
+        </SideSection>
+        <SideSection title="Groups" action={add('New Group', () => setShowNewGroup(true))}>
+          {(groups ?? []).length === 0 && <SideNote text="No groups yet." />}
+          {(groups ?? []).map((g: ChatGroup) => (
+            <ConvRow key={g.id} active={activeConvId === g.id} onClick={() => setActiveConvId(g.id)} mark={<GroupMark />} title={g.name} sub={`${g.member_ids.length} members`}
+              onDelete={() => deleteGroup.mutate(g.id, {
+                onSuccess: () => { toast.success('Group deleted'); if (activeConvId === g.id) setActiveConvId(null) },
+                onError: () => toast.error('Failed to delete'),
+              })} />
+          ))}
+        </SideSection>
+      </>}>
+        {activeConvId ? (
+          <MessageThread key={activeConvId} conversationId={activeConvId} currentUserId={profile?.id ?? ''} onBack={() => setActiveConvId(null)}
+            title={group?.name ?? open?.title} sub={group ? `${group.member_ids.length} members` : open?.sub}
+            mark={group ? <GroupMark size={36} /> : open?.mark} />
+        ) : <MessagesEmpty text="Select a conversation to start messaging" />}
+      </MessagesShell>
 
       {showNewDM && <NewDMModal users={users ?? []} onClose={() => setShowNewDM(false)} />}
       {showNewGroup && <NewGroupModal users={users ?? []} onClose={() => setShowNewGroup(false)} />}
