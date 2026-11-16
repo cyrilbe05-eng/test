@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
-import { Ms, Segmented } from '@/components/ds'
+import { Ms } from '@/components/ds'
 import { FieldEditor } from '@/components/scripts/RichEditor'
 import { SCRIPT_STATUS, SCRIPT_TYPES } from '@/lib/scriptStatus'
 import type { useScriptActions } from '@/hooks/useScripts'
@@ -13,26 +13,13 @@ import type { Script, ScriptField, ScriptType } from '@/types/scripts'
 type Actions = ReturnType<typeof useScriptActions>
 // Script, caption and client notes go to the client's calendar; editor notes
 // only to the team.
-const TABS: { value: ScriptField; label: string }[] = [
+const SECTIONS: { value: ScriptField; label: string }[] = [
   { value: 'script', label: 'Script' },
   { value: 'caption', label: 'Caption' },
   { value: 'client_notes', label: 'Client notes' },
   { value: 'notes', label: 'Editor notes' },
 ]
 const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
-
-/** Phones: the four tabs get narrower so they all fit. */
-function useNarrow() {
-  const q = '(max-width: 640px)'
-  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches)
-  useEffect(() => {
-    const m = window.matchMedia(q)
-    const on = () => setNarrow(m.matches)
-    m.addEventListener('change', on)
-    return () => m.removeEventListener('change', on)
-  }, [])
-  return narrow
-}
 
 export function StatusDot({ status }: { status: Script['status'] }) {
   const [d, l] = SCRIPT_STATUS[status].colors
@@ -48,8 +35,8 @@ function Links({ script, actions, canEdit }: { script: Script; actions: Actions;
   const [adding, setAdding] = useState('')
   const save = (links: string[]) => actions.updateScript.mutate({ id: script.id, links }, { onError: (e) => toast.error(errMsg(e)) })
   return (
-    <div className="mt-4">
-      <p className="mb-1.5" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--soft-text)' }}>Inspo</p>
+    <div className="mt-3">
+      <p className="mb-1.5" style={{ fontSize: 13, fontWeight: 600, color: 'var(--strong)' }}>Inspo</p>
       <ul className="space-y-1">
         {script.links.map((u, i) => (
           <li key={u + i} className="flex items-center gap-2 min-w-0">
@@ -87,8 +74,6 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
   const [open, setOpen] = useState(!!defaultOpen)
   // A just-created script opens (the signal can arrive after it appears).
   useEffect(() => { if (defaultOpen) setOpen(true) }, [defaultOpen])
-  const [tab, setTab] = useState<ScriptField>('script')
-  const narrow = useNarrow()
   const [renaming, setRenaming] = useState(false)
   const [title, setTitle] = useState(script.title)
   const canEdit = true // copywriter (own clients) and admins can both edit
@@ -102,7 +87,6 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
     if (t && t !== script.title) actions.updateScript.mutate({ id: script.id, title: t }, onErr)
     else setTitle(script.title)
   }
-  const extras = renderFieldExtras?.(tab)
 
   return (
     <div className="ds-stoggle">
@@ -124,7 +108,6 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
         <div className="px-3.5 sm:px-4 pb-4 animate-fade-in">
           <div className="flex flex-wrap items-center gap-2 pb-3">
             <span className="sm:hidden"><StatusDot status={script.status} /></span>
-            <div className="max-w-full overflow-x-auto"><Segmented label="Section" width={narrow ? 78 : 106} value={tab} onChange={setTab} options={TABS} /></div>
             <div className="flex-1" />
             <select value={script.type} aria-label="Type" className="ds-tool pr-8" style={{ height: 36 }}
               onChange={(e) => actions.updateScript.mutate({ id: script.id, type: e.target.value as ScriptType }, onErr)}>
@@ -137,16 +120,20 @@ export function ScriptToggle({ script, actions, isAdmin, first, last, defaultOpe
               onClick={() => { if (confirm(`Delete "${script.title}"?`)) actions.deleteScript.mutate(script.id, onErr) }}><Ms name="delete" style={{ fontSize: 17, width: 17, color: 'inherit' }} /></button>
           </div>
 
-          {/* Every tab's editor stays mounted, so switching never loses a pending save. */}
-          {TABS.map(({ value: f }) => (
-            <div key={f} hidden={tab !== f}>
-              <FieldEditor script={script} field={f} canEdit={canEdit} save={saveField(f)}
-                toolbarRight={tab === f ? extras?.toolbarRight : undefined} onAreaSelect={tab === f ? extras?.onAreaSelect : undefined} />
-            </div>
-          ))}
-          {extras?.below}
-
-          {tab === 'script' && <Links script={script} actions={actions} canEdit={canEdit} />}
+          {/* All four in one view, each autosaving on its own. */}
+          <div className="space-y-5">
+            {SECTIONS.map(({ value: f, label }) => {
+              const extras = renderFieldExtras?.(f)
+              return (
+                <div key={f}>
+                  <FieldEditor script={script} field={f} label={label} compact={f !== 'script'} canEdit={canEdit} save={saveField(f)}
+                    toolbarRight={extras?.toolbarRight} onAreaSelect={extras?.onAreaSelect} />
+                  {extras?.below}
+                  {f === 'script' && <Links script={script} actions={actions} canEdit={canEdit} />}
+                </div>
+              )
+            })}
+          </div>
 
           <div className="flex flex-wrap items-center gap-2 mt-4 pt-3" style={{ borderTop: '1px solid var(--line)' }}>
             <span className="flex-1 min-w-0 truncate" style={{ fontSize: 12, color: 'var(--faint)' }}>

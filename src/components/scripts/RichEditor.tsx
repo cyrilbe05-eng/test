@@ -17,16 +17,16 @@ import type { Script, ScriptField } from '@/types/scripts'
 const SAVE_DELAY = 900
 
 /** One editable area. Uncontrolled: `revision` changing re-applies `html`. */
-function RichArea({ html, revision, onInput, readOnly, placeholder, areaRef, onSelect }: {
+function RichArea({ html, revision, onInput, readOnly, placeholder, areaRef, onSelect, compact }: {
   html: string; revision: number; onInput: (html: string) => void; readOnly?: boolean; placeholder?: string
-  areaRef?: (el: HTMLDivElement | null) => void; onSelect?: () => void
+  areaRef?: (el: HTMLDivElement | null) => void; onSelect?: () => void; compact?: boolean
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
   useEffect(() => { if (ref.current && ref.current.innerHTML !== html) ref.current.innerHTML = html }, [revision]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div
       ref={(el) => { ref.current = el; areaRef?.(el) }}
-      className="ds-rich"
+      className={cn('ds-rich', compact && 'compact')}
       contentEditable={!readOnly}
       suppressContentEditableWarning
       role="textbox"
@@ -70,9 +70,13 @@ const PLACEHOLDER: Record<ScriptField, string> = {
 }
 const same = (a: Value, b: Value) => JSON.stringify(a) === JSON.stringify(b)
 
-export function FieldEditor({ script, field, canEdit, save, toolbarRight, onAreaSelect }: {
+export function FieldEditor({ script, field, canEdit, save, toolbarRight, onAreaSelect, label, compact }: {
   script: Script
   field: ScriptField
+  /** Section heading shown left of the toolbar ("Caption", …). */
+  label?: string
+  /** Shorter box (caption and notes). */
+  compact?: boolean
   canEdit: boolean
   save: (value: { html?: string; slides?: string[] }, baseVersion: number, force?: boolean) => Promise<SaveResult>
   /** Extra controls next to B / I / U (e.g. "Comment"). */
@@ -163,14 +167,15 @@ export function FieldEditor({ script, field, canEdit, save, toolbarRight, onArea
   const slides = Array.isArray(value.current) ? (value.current as string[]) : null
   return (
     <div>
-      {canEdit && (
-        <div className="flex items-center gap-2 mb-2">
-          <Toolbar />
-          <div className="flex-1" />
-          {toolbarRight}
-          <span className="tabular-nums" style={{ fontSize: 12, color: state === 'error' ? 'var(--bad, #dc2626)' : 'var(--faint)', minWidth: 52, textAlign: 'right' }}>
+      {(canEdit || label) && (
+        <div className="flex items-center gap-2 mb-1.5">
+          {label && <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--strong)' }}>{label}</span>}
+          <span className="tabular-nums" style={{ fontSize: 12, color: state === 'error' ? 'var(--bad, #dc2626)' : 'var(--faint)' }}>
             {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : state === 'error' ? 'Not saved' : ''}
           </span>
+          <div className="flex-1" />
+          {toolbarRight}
+          {canEdit && <Toolbar />}
         </div>
       )}
 
@@ -205,7 +210,7 @@ export function FieldEditor({ script, field, canEdit, save, toolbarRight, onArea
         </div>
       ) : (
         <RichArea html={value.current as string} revision={revision} readOnly={!canEdit} onInput={(h) => changed(h)} onSelect={onAreaSelect}
-          placeholder={PLACEHOLDER[field]} />
+          placeholder={PLACEHOLDER[field]} compact={compact} />
       )}
       <span className={cn('sr-only')} aria-live="polite">{state === 'saved' ? 'Saved' : ''}</span>
     </div>
