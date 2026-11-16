@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { questionsForPackage, isAnswered, missingRequired, toStored, fromStored, parseQuestionInput, type Question } from './onboarding'
+import { questionsForPackage, isAnswered, missingRequired, toStored, fromStored, parseQuestionInput, placeInSection, type Question } from './onboarding'
 import { computeInfo, evaluateClient, type ClientInput } from './compute'
 import type { PlanItem } from './plans'
 
@@ -79,5 +79,28 @@ describe('"Finished onboarding" info', () => {
     expect(a.health).toBe(b.health)
     expect(a.alerts).toEqual(b.alerts)
     expect(a.info).toEqual(['Finished onboarding'])
+  })
+})
+
+describe('placeInSection', () => {
+  const q = (id: string, section: string) => ({ id, section })
+  const list = [q('a', 'Getting started'), q('b', 'Getting started'), q('c', 'Style'), q('d', 'Style')]
+  it('moves a new question to the end of its section', () => {
+    expect(placeInSection([...list, q('n', 'Getting started')], 'n', 'Getting started')).toEqual(['a', 'b', 'n', 'c', 'd'])
+  })
+  it('keeps a new section at the end', () => {
+    expect(placeInSection([...list, q('n', 'Last step')], 'n', 'Last step')).toEqual(['a', 'b', 'c', 'd', 'n'])
+  })
+  it('leaves a question already inside its section alone', () => {
+    expect(placeInSection(list, 'b', 'Getting started')).toEqual(['a', 'b', 'c', 'd'])
+    expect(placeInSection(list, 'c', 'Style')).toEqual(['a', 'b', 'c', 'd'])
+  })
+  it('joins the first group when the section is already split', () => {
+    const split = [...list, q('e', 'Getting started'), q('n', 'Getting started')]
+    expect(placeInSection(split, 'n', 'Getting started')).toEqual(['a', 'b', 'n', 'c', 'd', 'e'])
+    expect(placeInSection(split, 'e', 'Getting started')).toEqual(['a', 'b', 'e', 'c', 'd', 'n'])
+  })
+  it('moves a question whose section changed', () => {
+    expect(placeInSection([q('a', 'Getting started'), q('b', 'Getting started'), q('c', 'Style'), q('d', 'Getting started')], 'd', 'Getting started')).toEqual(['a', 'b', 'd', 'c'])
   })
 })

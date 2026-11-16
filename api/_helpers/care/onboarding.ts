@@ -374,6 +374,31 @@ export function parseQuestionInput(body: unknown, mode: 'create' | 'update'): Pa
   return out
 }
 
+/** Order of question ids with `id` kept inside its section: if it sits apart
+ *  from the section's (first) group, it moves to the end of that group. A new
+ *  section, or a question already in the group, keeps its place. */
+export function placeInSection(list: Pick<Question, 'id' | 'section'>[], id: string, section: string): string[] {
+  const others = list.filter((q) => q.id !== id)
+  const at = list.findIndex((q) => q.id === id)
+  const ids = others.map((q) => q.id)
+  const first = others.findIndex((q) => q.section === section)
+  if (first < 0) { ids.splice(at < 0 ? ids.length : at, 0, id); return ids }
+  // The section's first run (an older split stays apart; this one joins the top).
+  let last = first
+  while (last + 1 < others.length && others[last + 1].section === section) last++
+  // Already inside (or right next to) that run: keep it where it is.
+  if (at >= first && at <= last + 1) { ids.splice(at, 0, id); return ids }
+  ids.splice(last + 1, 0, id)
+  return ids
+}
+
+async function saveOrder(ids: string[]) {
+  const now = nowIso()
+  for (const [i, id] of ids.entries()) {
+    await dbExecute('UPDATE onboarding_questions SET sort_order = ?, updated_at = ? WHERE id = ?', [(i + 1) * 10, now, id])
+  }
+}
+
 export async function handleQuestionsRoute(req: VercelRequest, res: VercelResponse, rest: string[]) {
   try {
     await requireCareAdmin(req)
@@ -389,6 +414,10 @@ export async function handleQuestionsRoute(req: VercelRequest, res: VercelRespon
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
           [id, q.section, q.text, q.type, q.type === 'choice' ? JSON.stringify(q.options) : null,
             q.required === false ? 0 : 1, q.admin_only ? 1 : 0, (max ?? 0) + 10, q.packages ?? 'both'])
+        // Goes at the end of its section, not the end of the whole list.
+        const list = await loadQuestions()
+        const order = placeInSection(list, id, q.section!)
+        if (order.join() !== list.map((x) => x.id).join()) await saveOrder(order)
         res.status(201).json(await loadQuestions()); return
       }
       // PATCH { order: [ids] } — new order (ids not listed keep their place after).
@@ -408,8 +437,17 @@ export async function handleQuestionsRoute(req: VercelRequest, res: VercelRespon
       res.status(405).json({ error: 'Method not allowed' }); return
     }
     if (rest.length === 1) {
+      if (req.method === 'DELETE') {
+        const cur = (await loadQuestions()).find((q) => q.id === rest[0])
+        if (!cur) notFound('Question not found')
+        // Clients' answers to it go too (the table also cascades).
+        await dbExecute('DELETE FROM onboarding_answers WHERE question_id = ?', [cur!.id])
+        await dbExecute('DELETE FROM onboarding_questions WHERE id = ?', [cur!.id])
+        res.json(await loadQuestions()); return
+      }
       if (req.method !== 'PATCH') { res.status(405).json({ error: 'Method not allowed' }); return }
-      const cur = (await loadQuestions()).find((q) => q.id === rest[0])
+      const all = await loadQuestions()
+      const cur = all.find((q) => q.id === rest[0])
       if (!cur) notFound('Question not found')
       const patch = parseQuestionInput(req.body, 'update')
       if (!Object.keys(patch).length) bad('Nothing to update')
@@ -426,6 +464,12 @@ export async function handleQuestionsRoute(req: VercelRequest, res: VercelRespon
          WHERE id = ?`,
         [next.section, next.text, next.type, type === 'choice' ? JSON.stringify(options) : null,
           next.required ? 1 : 0, next.admin_only ? 1 : 0, next.packages, next.active ? 1 : 0, nowIso(), cur!.id])
+      // Saving a question that sits apart from its section moves it into it.
+      if (patch.section !== undefined) {
+        const list = all.map((x) => (x.id === cur!.id ? { ...x, section: next.section } : x))
+        const order = placeInSection(list, cur!.id, next.section)
+        if (order.join() !== list.map((x) => x.id).join()) await saveOrder(order)
+      }
       res.json(await loadQuestions()); return
     }
     res.status(404).json({ error: 'Not found' })

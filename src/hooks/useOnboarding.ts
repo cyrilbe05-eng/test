@@ -87,6 +87,7 @@ export function useQuestionActions() {
     create: useMutation({ mutationFn: (b: QuestionBody) => apiFetch<Question[]>(base, json('POST', b)), ...store }),
     update: useMutation({ mutationFn: ({ id, ...b }: QuestionBody & { id: string }) => apiFetch<Question[]>(`${base}/${id}`, json('PATCH', b)), ...store }),
     reorder: useMutation({ mutationFn: (order: string[]) => apiFetch<Question[]>(base, json('PATCH', { order })), ...store }),
+    remove: useMutation({ mutationFn: (id: string) => apiFetch<Question[]>(`${base}/${id}`, { method: 'DELETE' }), ...store }),
   }
 }
 

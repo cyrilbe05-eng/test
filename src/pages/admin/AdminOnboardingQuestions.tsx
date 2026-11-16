@@ -43,7 +43,7 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
   )
 }
 
-function QuestionForm({ initial, sections, saving, onSave, onCancel }: { initial: Form; sections: string[]; saving: boolean; onSave: (f: Form) => void; onCancel: () => void }) {
+function QuestionForm({ initial, sections, saving, onSave, onCancel, onDelete }: { initial: Form; sections: string[]; saving: boolean; onSave: (f: Form) => void; onCancel: () => void; onDelete?: () => void }) {
   const [f, setF] = useState(initial)
   const ok = f.section.trim() && f.text.trim() && (f.type !== 'choice' || f.options.some((o) => o.trim()))
   return (
@@ -81,6 +81,11 @@ function QuestionForm({ initial, sections, saving, onSave, onCancel }: { initial
         <Switch label="Admin only" checked={f.admin_only} onChange={(admin_only) => setF({ ...f, admin_only })} />
       </div>
       <div className="flex justify-end gap-2">
+        {onDelete && (
+          <button type="button" onClick={onDelete} className="mr-auto min-h-[44px] px-3 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-500/10 inline-flex items-center gap-1.5">
+            <Icon name="delete" size={18} />Delete
+          </button>
+        )}
         <button type="button" className={btn} onClick={onCancel}>Cancel</button>
         <button type="submit" disabled={!ok || saving} className="min-h-[44px] px-4 rounded-lg bg-primary text-white text-sm font-semibold disabled:opacity-50">Save</button>
       </div>
@@ -92,7 +97,7 @@ const chip = 'text-[12px] text-muted-foreground whitespace-nowrap'
 
 export default function AdminOnboardingQuestions() {
   const { data, isLoading, error } = useOnboardingQuestions()
-  const { create, update, reorder } = useQuestionActions()
+  const { create, update, reorder, remove } = useQuestionActions()
   const [editing, setEditing] = useState<string | null>(null) // question id, or 'new'
   const onErr = { onError: (e: unknown) => toast.error(errMsg(e)) }
 
@@ -132,7 +137,11 @@ export default function AdminOnboardingQuestions() {
                 )}
                 {editing === q.id ? (
                   <QuestionForm initial={toForm(q)} sections={sections} saving={update.isPending} onCancel={() => setEditing(null)}
-                    onSave={(f) => update.mutate({ id: q.id, ...toBody(f) }, { ...onErr, onSuccess: () => setEditing(null) })} />
+                    onSave={(f) => update.mutate({ id: q.id, ...toBody(f) }, { ...onErr, onSuccess: () => setEditing(null) })}
+                    onDelete={() => {
+                      if (!window.confirm('Delete this question? Answers clients gave to it are deleted too.')) return
+                      remove.mutate(q.id, { ...onErr, onSuccess: () => { setEditing(null); toast.success('Question deleted') } })
+                    }} />
                 ) : (
                   <div className="flex items-center gap-1 py-1">
                     <span className="w-6 text-xs tabular-nums text-muted-foreground flex-shrink-0">{i + 1}</span>
