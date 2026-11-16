@@ -41,7 +41,7 @@ export function BoardList({ data, selected, onSelect }: { data: Scoreboard; sele
                   <EditorAvatar name={r.name} size={first ? 36 : 30} />
                   <span className="truncate max-w-full" style={{ fontSize: 13, fontWeight: 600, color: 'var(--strong)' }}>{r.name.split(' ')[0]}{data.me === r.editorId ? ' (you)' : ''}</span>
                   <span className="text-center leading-tight" style={{ fontSize: 11.5, color: s.tone === 'todo' ? 'var(--faint)' : 'var(--strong)', fontWeight: s.tone === 'todo' ? 400 : 600 }}>{s.text}</span>
-                  <span className="tabular-nums" style={{ fontSize: 11, color: 'var(--faint)' }}>{r.videoCount} videos{r.finalScore !== null ? ` · avg ${Math.round(r.finalScore)}` : ''}</span>
+                  <span className="tabular-nums" style={{ fontSize: 11, color: 'var(--faint)' }}>{r.videoCount} video{r.videoCount === 1 ? '' : 's'}{r.finalScore !== null ? ` · avg ${Math.round(r.finalScore)}` : ''}</span>
                 </span>
               </button>
             )

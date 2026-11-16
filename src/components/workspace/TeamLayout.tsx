@@ -17,6 +17,8 @@ const NAV_LINKS: Link[] = [
 const PLANS_LINK: Link = { to: '/team/plans', label: 'Plans', icon: 'receipt_long' }
 const SOPS_LINK: Link = { to: '/team/sops', label: 'SOPs', icon: 'menu_book' }
 const ALL_PROJECTS_LINK: Link = { to: '/team/all', label: 'All projects', icon: 'view_kanban', exact: true }
+// Editors only: the monthly leaderboard (copywriters aren't scored).
+const LEADERBOARD_LINK: Link = { to: '/team/leaderboard', label: 'Leaderboard', icon: 'leaderboard' }
 
 interface TeamLayoutProps {
   children: React.ReactNode
@@ -33,10 +35,14 @@ export function TeamLayout({ children, bare }: TeamLayoutProps) {
     : [{ ...NAV_LINKS[0], label: 'Home' }, ALL_PROJECTS_LINK, ...NAV_LINKS.slice(1)]
 
   const item = (l: Link): FrameItem => ({ ...l, on: l.exact ? pathname === l.to : pathname.startsWith(l.to) })
-  // Bottom bar is full; SOPs stays in the ☰ menu on phones.
+  // Sidebar: the leaderboard right after My Stats. Bottom bar is full, so on
+  // phones it (like SOPs) lives in the ☰ menu.
+  const side = profile?.team_role === 'copywriter'
+    ? links
+    : links.flatMap((l) => (l.to === '/team/stats' ? [l, LEADERBOARD_LINK] : [l]))
   return (
     <AppFrame
-      groups={[links.map(item), [item(SOPS_LINK)]]}
+      groups={[side.map(item), [item(SOPS_LINK)]]}
       bottom={links.map(item)}
       subtitle={profile?.email}
       viewingAs="team"
