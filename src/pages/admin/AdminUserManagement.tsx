@@ -361,6 +361,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
           {/* Footer actions */}
           {user.role !== 'admin' && (
             <div className="pt-2 border-t border-border/60 space-y-2">
+              {!isManagerViewer && (
               <button
                 onClick={() => onViewAs(user)}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-semibold"
@@ -371,6 +372,7 @@ function UserProfileModal({ user, plans, onClose, onViewAs, onResetPassword }: {
                 </svg>
                 View as {user.full_name.split(' ')[0]}
               </button>
+              )}
               {!isManagerViewer && (
               <button
                 onClick={() => onResetPassword(user)}

@@ -130,11 +130,18 @@ async function handleGetClients(req: VercelRequest, res: VercelResponse) {
       ['client']
     )
 
-    const shaped = clients.map((c) => ({
-      ...publicProfile(c),
-      password_changed: Boolean(c.password_changed),
-      disabled: Boolean(c.disabled),
-    }))
+    // The team only needs to know who the client is (pickers, gallery, SOPs);
+    // contact details (email, phone…) stay with admins.
+    const shaped = profile.role === 'admin'
+      ? clients.map((c) => ({
+          ...publicProfile(c),
+          password_changed: Boolean(c.password_changed),
+          disabled: Boolean(c.disabled),
+        }))
+      : clients.map((c) => ({
+          id: c.id, role: c.role, full_name: c.full_name, avatar_url: c.avatar_url ?? null,
+          disabled: Boolean(c.disabled), created_at: c.created_at,
+        }))
 
     res.json(shaped)
   } catch (e: any) {
@@ -463,6 +470,9 @@ async function handleImpersonateUser(req: VercelRequest, res: VercelResponse) {
   try {
     const { profile: callerProfile } = await requireAuth(req)
     requireRole(callerProfile, 'admin')
+    // Viewing as someone is acting as them — same reason managers can't
+    // reset passwords.
+    requireFullAdmin(callerProfile, 'view the app as someone else')
 
     const targetId = req.query.id as string
     const [target] = await dbQuery<Profile>('SELECT * FROM profiles WHERE id = ? AND disabled = 0', [targetId])
@@ -1100,13 +1110,18 @@ async function handleUpdateProjectStatus(req: VercelRequest, res: VercelResponse
       if ((profile as any).team_role === 'copywriter') { res.status(403).json({ error: 'Only editors change a project\'s status' }); return }
       if (!TEAM_ALLOWED_STATUSES.includes(status)) { res.status(403).json({ error: 'Forbidden' }); return }
     }
-    // Team members can update status on any project they can see
-
     const [project] = await dbQuery<{ id: string; title: string; client_id: string; status: string }>(
       'SELECT id, title, client_id, status FROM projects WHERE id = ?',
       [projectId]
     )
     if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+    // Editors move only projects they are assigned to ("Start Processing"
+    // claims the project first, so it is assigned by then).
+    if (profile.role === 'team') {
+      const [mine] = await dbQuery<{ id: string }>(
+        'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?', [projectId, clerkUserId])
+      if (!mine) { res.status(403).json({ error: 'Only the assigned editor can change this project' }); return }
+    }
 
     const now = nowIso()
     await dbExecute(
@@ -1194,6 +1209,10 @@ async function handleApproveClient(req: VercelRequest, res: VercelResponse) {
       [projectId, clerkUserId]
     )
     if (!projects[0]) { res.status(404).json({ error: 'Project not found' }); return }
+    // Same rule as requesting a revision: only a video that is in review.
+    if (projects[0].status !== 'client_reviewing') {
+      res.status(403).json({ error: 'Only a video in review can be approved' }); return
+    }
 
     const now = nowIso()
 
@@ -1270,7 +1289,9 @@ async function handleGetProjectFiles(req: VercelRequest, res: VercelResponse) {
       [projectId]
     )
 
-    const shaped = files.map(({ uploader_full_name, ...f }: any) => ({
+    // Clients never see an edit before the admin approves it.
+    const visible = profile.role === 'client' ? files.filter((f: any) => f.file_type !== 'deliverable' || f.approved) : files
+    const shaped = visible.map(({ uploader_full_name, ...f }: any) => ({
       ...f,
       approved: Boolean(f.approved),
       profiles: { full_name: uploader_full_name },
@@ -1868,6 +1889,8 @@ async function handleGetProjectFileSignedUrl(req: VercelRequest, res: VercelResp
         [file.project_id, clerkUserId]
       )
       if (!projects[0]) { res.status(403).json({ error: 'Forbidden' }); return }
+      // Clients never open an edit before the admin approves it.
+      if (file.file_type === 'deliverable' && !file.approved) { res.status(403).json({ error: 'Forbidden' }); return }
     } else if (profile.role !== 'team') {
       res.status(403).json({ error: 'Forbidden' }); return
     }
@@ -3680,14 +3703,13 @@ async function handleProfile(req: VercelRequest, res: VercelResponse) {
       res.json({ ...profile, password_changed: Boolean(profile.password_changed), disabled: Boolean(profile.disabled) })
 
     } else if (req.method === 'PATCH') {
-      const body = req.body as Partial<Pick<Profile, 'password_changed' | 'avatar_url' | 'phone'>>
+      // password_changed is not editable here: only an actual password change
+      // (/api/auth/change-password) sets it, so the first-login change can't
+      // be skipped.
+      const body = req.body as Partial<Pick<Profile, 'avatar_url' | 'phone'>>
       const updates: string[] = []
       const params: unknown[] = []
 
-      if (body.password_changed !== undefined) {
-        updates.push('password_changed = ?')
-        params.push(body.password_changed ? 1 : 0)
-      }
       if (body.avatar_url !== undefined) {
         if (!isValidAvatar(body.avatar_url)) { res.status(400).json({ error: 'Picture must be a small image' }); return }
         updates.push('avatar_url = ?')
@@ -3810,10 +3832,11 @@ async function handleGetTimelineComments(req: VercelRequest, res: VercelResponse
         p.avatar_url AS profile_avatar_url
        FROM timeline_comments tc
        LEFT JOIN profiles p ON tc.author_id = p.id
-       WHERE tc.project_id = ?
+       WHERE tc.project_id = ?${profile.role === 'client' ? " AND COALESCE(tc.author_role, '') != 'admin'" : ''}
        ORDER BY tc.created_at ASC`,
       [projectId]
     )
+    // (Clients: admin notes to the editor stay internal.)
 
     const shaped = comments.map(({ profile_full_name, profile_avatar_url, ...c }: any) => ({
       ...c,
