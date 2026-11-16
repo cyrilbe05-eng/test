@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { differenceInCalendarDays, format, formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import { TeamLayout } from '@/components/workspace/TeamLayout'
+import { LeaderboardPopup } from '@/components/scoreboard/LeaderboardPopup'
 import { useApiFetch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -80,6 +81,7 @@ export default function EditorHome() {
 
   return (
     <TeamLayout>
+      <LeaderboardPopup />
       <main className="px-4 md:px-6 py-5 md:py-6 space-y-4 max-w-5xl">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-heading font-semibold tracking-tight truncate">{profile?.full_name?.split(' ')[0] ?? ''}</h1>

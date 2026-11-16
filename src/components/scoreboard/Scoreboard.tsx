@@ -27,13 +27,15 @@ export function BoardList({ data, selected, onSelect }: { data: Scoreboard; sele
           {cols.map((r, i) => {
             const s = standing(r, data.rules)
             const first = r.rank === 1
-            const on = selected === r.editorId || data.me === r.editorId
+            // The solid column: the viewing editor's own, or #1 for admins.
+            const solid = data.me ? data.me === r.editorId : first
+            const on = selected === r.editorId
             return (
               <button key={r.editorId} type="button" role="listitem" onClick={() => onSelect?.(r.editorId)} disabled={!onSelect}
                 aria-label={`${r.rank}. ${r.name}, ${pts(r.totalPoints)} points`} className={cn('ds-podium-col', onSelect && 'cursor-pointer')}>
                 {first && <Ms name="crown" className="ds-crown" style={{ fontSize: 30, width: 30 }} />}
                 <span className="tabular-nums" style={{ fontSize: first ? 20 : 15, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--strong)' }}>{pts(r.totalPoints)}</span>
-                <span className={cn('ds-podium', first && 'first', on && 'on')}
+                <span className={cn('ds-podium', solid && 'first', on && 'on')}
                   style={{ height: Math.max(36, (r.totalPoints / top) * BAR_MAX), animationDelay: `${i * 70}ms` }}>
                   <span className="tabular-nums" style={{ fontSize: first ? 22 : 16, fontWeight: 700 }}>{r.rank}</span>
                 </span>

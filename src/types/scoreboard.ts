@@ -16,6 +16,8 @@ export interface BoardRow {
   finalScore: number | null
   eligible: boolean
   isWinner: boolean
+  /** The second qualifying editor (2nd-place bonus). */
+  isRunnerUp: boolean
   provisional: boolean
   firstTryRate: number | null
   flaggedCount: number
@@ -45,7 +47,7 @@ export interface Scoreboard {
   month: string
   months: string[]
   rules: { minFinalScore: number; minVideos: number; minVideosForRanking: number }
-  bonus: { amount: number; currency: string } | null
+  bonus: { amount: number; runnerUpAmount: number | null; currency: string } | null
   /** Link to the scoring rulebook PDF, set by an admin. */
   rulebookUrl: string | null
   winnerEditorId: string | null

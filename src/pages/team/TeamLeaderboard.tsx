@@ -3,32 +3,11 @@ import { TeamLayout } from '@/components/workspace/TeamLayout'
 import { Ms } from '@/components/ds'
 import { StatTile } from '@/components/charts/Charts'
 import { BoardList, VideoList } from '@/components/scoreboard/Scoreboard'
-import { money, monthLabel } from '@/lib/scoreboardText'
+import { editorHeadline, money, monthLabel } from '@/lib/scoreboardText'
 import { useScoreboard } from '@/hooks/useScoreboard'
-import type { BoardRow, Scoreboard } from '@/types/scoreboard'
 
 // Editors: this month's leaderboard, where they stand on the bonus, and
 // where each of their videos' points came from.
-
-/** One sentence on the editor's bonus standing. */
-function headline(me: BoardRow | undefined, data: Scoreboard): string {
-  const bonus = data.bonus ? money(data.bonus.amount) : 'the bonus'
-  if (!me) return 'No videos delivered yet this month'
-  const leader = data.board[0]
-  const next = data.board[me.rank - 2]
-  if (me.isWinner) return `You're winning ${bonus}`
-  if (me.eligible) {
-    const winner = data.board.find((b) => b.isWinner)
-    const gap = Math.ceil((winner ?? leader).totalPoints - me.totalPoints)
-    return gap > 0 ? `You qualify. ${gap} points behind the lead for ${bonus}` : `You qualify for ${bonus}`
-  }
-  const left = data.rules.minVideos - me.videoCount
-  const parts: string[] = []
-  if (left > 0) parts.push(`${left} more video${left === 1 ? '' : 's'}`)
-  if (me.finalScore !== null && me.finalScore < data.rules.minFinalScore) parts.push(`an average of ${data.rules.minFinalScore}`)
-  const need = parts.length ? `You need ${parts.join(' and ')} to qualify for ${bonus}` : `Not yet qualified for ${bonus}`
-  return next && me.rank > 1 ? `${need}. ${Math.ceil(next.totalPoints - me.totalPoints)} points to pass ${next.name.split(' ')[0]}` : need
-}
 
 export default function TeamLeaderboard() {
   const [params, setParams] = useSearchParams()
@@ -64,7 +43,7 @@ export default function TeamLeaderboard() {
               <span className="tabular-nums" style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-.03em', color: 'var(--strong)', lineHeight: 1 }}>
                 {me ? `#${me.rank}` : '—'}<span style={{ fontSize: 15, fontWeight: 500, color: 'var(--faint)' }}>{me ? ` of ${data.board.length}` : ''}</span>
               </span>
-              <p className="flex-1 min-w-[14rem]" style={{ fontSize: 15, fontWeight: 550, color: 'var(--strong)' }}>{headline(me, data)}</p>
+              <p className="flex-1 min-w-[14rem]" style={{ fontSize: 15, fontWeight: 550, color: 'var(--strong)' }}>{editorHeadline(me, data)}</p>
             </section>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -72,7 +51,8 @@ export default function TeamLeaderboard() {
               <StatTile label="Videos" value={`${me?.videoCount ?? 0} / ${data.rules.minVideos}`}
                 sub={<span className="ds-track block mt-1.5" aria-hidden><i style={{ width: `${Math.min(100, ((me?.videoCount ?? 0) / data.rules.minVideos) * 100)}%` }} /></span>} />
               <StatTile label="Average" value={me?.finalScore != null ? Math.round(me.finalScore) : '—'} sub={`${data.rules.minFinalScore} needed`} />
-              <StatTile label="Bonus" value={data.bonus ? money(data.bonus.amount) : '—'} sub={data.winnerEditorId ? `Leader: ${data.board.find((b) => b.isWinner)?.name.split(' ')[0]}` : 'No one qualified yet'} />
+              <StatTile label="Bonus" value={data.bonus ? money(data.bonus.amount) : '—'}
+                sub={data.bonus?.runnerUpAmount != null ? `2nd place: ${money(data.bonus.runnerUpAmount)}` : data.winnerEditorId ? `Leader: ${data.board.find((b) => b.isWinner)?.name.split(' ')[0]}` : 'No one qualified yet'} />
             </div>
 
             <BoardList data={data} />

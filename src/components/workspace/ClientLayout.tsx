@@ -30,7 +30,6 @@ export function ClientLayout({ children, bare }: ClientLayoutProps) {
     [
       // Home is also the Active list.
       { to: '/workspace', label: 'Home', icon: 'home', on: at('/workspace', true), badge: count(active.length) },
-      { to: '/workspace/onboarding', label: 'Onboarding', icon: 'assignment', on: at('/workspace/onboarding') },
       { to: '/workspace/videos', label: 'Videos', icon: 'movie', on: at('/workspace/videos') },
     ],
     [
@@ -38,6 +37,10 @@ export function ClientLayout({ children, bare }: ClientLayoutProps) {
       { to: '/workspace/messages', label: 'Messages', icon: 'chat_bubble', on: at('/workspace/messages') },
       { to: '/workspace/calendar', label: 'Calendar', icon: 'calendar_month', on: at('/workspace/calendar') },
       { to: '/workspace/analytics', label: 'Analytics', icon: 'monitoring', on: at('/workspace/analytics') },
+    ],
+    // Onboarding: last item of the sidebar.
+    [
+      { to: '/workspace/onboarding', label: 'Onboarding', icon: 'assignment', on: at('/workspace/onboarding') },
     ],
   ]
 

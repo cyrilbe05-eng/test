@@ -17,22 +17,29 @@ const errMsg = (e: unknown) => (e as Error)?.message ?? 'Something went wrong'
 function BonusTile({ data }: { data: Scoreboard }) {
   const { saveBonus, removeBonus } = useScoreboardActions()
   const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState('')
-  const start = () => { setValue(data.bonus ? String(data.bonus.amount) : ''); setEditing(true) }
+  const [first, setFirst] = useState('')
+  const [second, setSecond] = useState('')
+  const start = () => {
+    setFirst(data.bonus ? String(data.bonus.amount) : '')
+    setSecond(data.bonus?.runnerUpAmount != null ? String(data.bonus.runnerUpAmount) : '')
+    setEditing(true)
+  }
   const save = () => {
-    const amount = Number(value)
+    const amount = Number(first)
+    const runnerUp = second.trim() === '' ? null : Number(second)
     const done = { onSuccess: () => { setEditing(false); toast.success('Bonus saved') }, onError: (e: unknown) => toast.error(errMsg(e)) }
-    if (value.trim() === '') removeBonus.mutate(data.month, done)
-    else if (!Number.isFinite(amount) || amount < 0) toast.error('Enter an amount')
-    else saveBonus.mutate({ month: data.month, amount }, done)
+    if (first.trim() === '' && runnerUp === null) removeBonus.mutate(data.month, done)
+    else if (!Number.isFinite(amount) || amount < 0 || (runnerUp !== null && (!Number.isFinite(runnerUp) || runnerUp < 0))) toast.error('Enter an amount')
+    else saveBonus.mutate({ month: data.month, amount, runnerUpAmount: runnerUp }, done)
   }
   if (editing) {
     return (
       <div className="clay-card p-4 min-w-0">
         <p style={{ fontSize: 12.5, color: 'var(--faint)' }}>Bonus</p>
         <form className="flex items-center gap-2 mt-1.5" onSubmit={(e) => { e.preventDefault(); save() }}>
-          <input autoFocus inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder="$" aria-label="Bonus amount" className="ds-field" style={{ height: 36 }} />
-          <button type="submit" className="ds-primary" style={{ height: 36, paddingLeft: 14 }} disabled={saveBonus.isPending || removeBonus.isPending}>Save</button>
+          <input autoFocus inputMode="decimal" value={first} onChange={(e) => setFirst(e.target.value)} placeholder="1st $" aria-label="1st place bonus" className="ds-field min-w-0" style={{ height: 36 }} />
+          <input inputMode="decimal" value={second} onChange={(e) => setSecond(e.target.value)} placeholder="2nd $" aria-label="2nd place bonus" className="ds-field min-w-0" style={{ height: 36 }} />
+          <button type="submit" className="ds-primary flex-none" style={{ height: 36, paddingLeft: 14 }} disabled={saveBonus.isPending || removeBonus.isPending}>Save</button>
         </form>
       </div>
     )
@@ -43,6 +50,7 @@ function BonusTile({ data }: { data: Scoreboard }) {
       <span className="block tabular-nums mt-1" style={{ fontSize: 28, fontWeight: 650, letterSpacing: '-.03em', color: 'var(--strong)', lineHeight: 1.15 }}>
         {data.bonus ? money(data.bonus.amount) : '—'}
       </span>
+      {data.bonus?.runnerUpAmount != null && <span className="block mt-0.5" style={{ fontSize: 12, color: 'var(--faint)' }}>2nd place: {money(data.bonus.runnerUpAmount)}</span>}
     </button>
   )
 }
@@ -130,6 +138,7 @@ export default function AdminLeaderboard() {
   const editorId = selected && data?.board.some((b) => b.editorId === selected) ? selected : data?.board[0]?.editorId ?? null
   const editor = data?.board.find((b) => b.editorId === editorId)
   const winner = data?.board.find((b) => b.isWinner)
+  const runnerUp = data?.board.find((b) => b.isRunnerUp)
 
   return (
     <AdminLayout>
@@ -164,7 +173,7 @@ export default function AdminLeaderboard() {
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatTile label="Winner" value={winner?.name ?? '—'} sub={winner ? `${Math.round(winner.totalPoints)} points` : 'No one eligible yet'} />
+              <StatTile label="Winner" value={winner?.name ?? '—'} sub={winner ? `${Math.round(winner.totalPoints)} points${runnerUp ? ` · 2nd: ${runnerUp.name.split(' ')[0]}` : ''}` : 'No one eligible yet'} />
               <BonusTile data={data} />
               <StatTile label="Videos" value={data.videos.length} sub={monthLabel(data.month)} />
               <StatTile label="Eligible" value={`${data.board.filter((b) => b.eligible).length} of ${data.board.length}`} sub={`${data.rules.minVideos}+ videos, average ${data.rules.minFinalScore}+`} />

@@ -6,7 +6,7 @@
 //   DELETE /api/scoreboard/clients/:clientId    back to the defaults
 //   PUT    /api/scoreboard/adjustments/:projectId  { amount, reason }
 //   DELETE /api/scoreboard/adjustments/:projectId
-//   PUT    /api/scoreboard/bonus/:month         { amount }
+//   PUT    /api/scoreboard/bonus/:month         { amount, runnerUpAmount? }  1st / 2nd place
 //   DELETE /api/scoreboard/bonus/:month
 //   PUT    /api/scoreboard/rulebook             { url }   the rulebook PDF link
 //   DELETE /api/scoreboard/rulebook
@@ -117,10 +117,19 @@ export async function handleScoreboardRoute(req: VercelRequest, res: VercelRespo
         await save('DELETE FROM scoreboard_bonus WHERE month = ?', [key])
       } else if (req.method === 'PUT') {
         const amount = num(req.body?.amount, 0, 1_000_000, 'Bonus')
+        // Optional 2nd-place amount (migration 023); empty/absent = none.
+        const ru = req.body?.runnerUpAmount
+        const runnerUp = ru === undefined || ru === null || ru === '' ? null : num(ru, 0, 1_000_000, '2nd place bonus')
         await save(
           `INSERT INTO scoreboard_bonus (month, amount, currency, updated_at, updated_by) VALUES (?, ?, 'USD', ?, ?)
            ON CONFLICT(month) DO UPDATE SET amount = excluded.amount, currency = 'USD', updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
           [key, amount, nowIso(), by])
+        try {
+          await dbExecute('UPDATE scoreboard_bonus SET runner_up_amount = ? WHERE month = ?', [runnerUp, key])
+        } catch (e: any) {
+          if (!/no such column/i.test(String(e?.message))) throw e
+          if (runnerUp !== null) throw fail(500, 'The 2nd place bonus needs database migration 023 — run db/migrations/023_scoreboard_runner_up.sql')
+        }
       } else { res.status(405).json({ error: 'Method not allowed' }); return }
       res.json({ ok: true }); return
     }

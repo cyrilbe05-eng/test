@@ -21,6 +21,8 @@ export interface BoardRow {
   finalScore: number | null
   eligible: boolean
   isWinner: boolean
+  /** The second qualifying editor (gets the 2nd-place bonus, if set). */
+  isRunnerUp: boolean
   provisional: boolean
   firstTryRate: number | null
   flaggedCount: number
@@ -50,7 +52,7 @@ export interface Scoreboard {
   month: string
   months: string[]
   rules: { minFinalScore: number; minVideos: number; minVideosForRanking: number }
-  bonus: { amount: number; currency: string } | null
+  bonus: { amount: number; runnerUpAmount: number | null; currency: string } | null
   /** Link to the scoring rulebook PDF, set by an admin. */
   rulebookUrl: string | null
   winnerEditorId: string | null
@@ -101,6 +103,9 @@ export async function loadScoreboard(requestedMonth?: string | null): Promise<Sc
   const summary = monthSummaries.find((m) => m.periodMonth === month)
 
   const withVideos = (summary?.results ?? []).filter((r) => r.videoCount > 0)
+  // 1st place = the top qualifying editor (summarizeMonths' winner); 2nd =
+  // the next qualifying one by points.
+  const runnerUpEditorId = withVideos.filter((r) => r.eligible)[1]?.editorId ?? null
   const board: BoardRow[] = withVideos.map((r, i) => ({
     editorId: r.editorId,
     name: r.name,
@@ -111,6 +116,7 @@ export async function loadScoreboard(requestedMonth?: string | null): Promise<Sc
     finalScore: r.finalScore,
     eligible: r.eligible,
     isWinner: r.editorId === summary?.winnerEditorId,
+    isRunnerUp: r.editorId === runnerUpEditorId,
     provisional: r.videoCount < MIN_VIDEOS_FOR_RANKING,
     firstTryRate: r.firstTryRate,
     flaggedCount: r.flaggedCount,
@@ -158,8 +164,11 @@ export async function loadScoreboard(requestedMonth?: string | null): Promise<Sc
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 
+  type BonusRow = { amount: number; currency: string; runner_up_amount?: number | null }
   const [[bonusRow], [rulebook]] = await Promise.all([
-    optional(dbQuery<{ amount: number; currency: string }>('SELECT amount, currency FROM scoreboard_bonus WHERE month = ?', [month])),
+    // runner_up_amount needs migration 023; before it, read 1st place only.
+    dbQuery<BonusRow>('SELECT amount, currency, runner_up_amount FROM scoreboard_bonus WHERE month = ?', [month])
+      .catch(() => optional(dbQuery<BonusRow>('SELECT amount, currency FROM scoreboard_bonus WHERE month = ?', [month]))),
     optional(dbQuery<{ value: string }>("SELECT value FROM scoreboard_config WHERE key = 'rulebook_url'")),
   ])
 
@@ -167,7 +176,7 @@ export async function loadScoreboard(requestedMonth?: string | null): Promise<Sc
     month,
     months,
     rules: { minFinalScore: DEFAULT_SCORING_CONSTANTS.ELIGIBILITY_MIN_FINAL_SCORE, minVideos: DEFAULT_SCORING_CONSTANTS.ELIGIBILITY_MIN_VIDEOS, minVideosForRanking: MIN_VIDEOS_FOR_RANKING },
-    bonus: bonusRow ? { amount: bonusRow.amount, currency: bonusRow.currency } : null,
+    bonus: bonusRow ? { amount: bonusRow.amount, runnerUpAmount: bonusRow.runner_up_amount ?? null, currency: bonusRow.currency } : null,
     rulebookUrl: rulebook?.value ?? null,
     winnerEditorId: summary?.winnerEditorId ?? null,
     board,
