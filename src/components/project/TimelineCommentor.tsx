@@ -283,13 +283,14 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
     // Remove old markers
     bar.querySelectorAll('.comment-marker, .comment-range, .compose-range').forEach((el) => el.remove())
     ;(bar as HTMLElement).style.position = 'relative'
-    // Live preview of the range being composed (brighter, dashed outline)
+    // Live preview of the range being composed (slim band with end ticks)
     if (showAddComment && rangeEndTs != null && rangeEndTs > rangeStartTs) {
       const s = Math.min(100, Math.max(0, (rangeStartTs / duration) * 100))
       const e = Math.min(100, Math.max(0, (rangeEndTs / duration) * 100))
       const preview = document.createElement('span')
       preview.className = 'compose-range'
-      preview.style.cssText = `position:absolute;top:-2px;bottom:-2px;left:${s}%;width:${e - s}%;background:hsl(var(--primary)/0.45);border:1px dashed hsl(var(--primary));border-radius:3px;z-index:11;pointer-events:none;`
+      preview.style.left = `${s}%`
+      preview.style.width = `${e - s}%`
       bar.appendChild(preview)
     }
     // Add new markers (filter admin comments for clients)
@@ -302,7 +303,8 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
       if (endPct <= startPct) return
       const band = document.createElement('span')
       band.className = 'comment-range'
-      band.style.cssText = `position:absolute;top:0;bottom:0;left:${startPct}%;width:${endPct - startPct}%;background:hsl(var(--primary)/0.35);border-radius:3px;z-index:9;pointer-events:none;`
+      band.style.left = `${startPct}%`
+      band.style.width = `${endPct - startPct}%`
       bar.appendChild(band)
     })
     const seen = new Set<number>()
@@ -313,7 +315,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
       seen.add(key)
       const dot = document.createElement('span')
       dot.className = 'comment-marker'
-      dot.style.cssText = `position:absolute;top:50%;left:${pct}%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:hsl(var(--primary));border:2px solid white;cursor:pointer;z-index:10;pointer-events:none;`
+      dot.style.left = `${pct}%`
       bar.appendChild(dot)
     })
   }, [comments, currentUserRole, duration, showAddComment, rangeStartTs, rangeEndTs])

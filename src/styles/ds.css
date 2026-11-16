@@ -354,3 +354,14 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 .ds-notif-icon{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--panel-ring);color:var(--soft-text)}
 .ds-notif.unread .ds-notif-icon{background:var(--field);color:var(--strong)}
 @media (max-width:767px){.ds-notif-panel{position:fixed;top:60px;right:12px}}
+
+/* ── Comment markers on the video timeline (TimelineCommentor) ──
+   The player's controls sit on the dark video, so markers are white in
+   both themes: slim bands hugging the track, small dots, no outlines. */
+.plyr__progress .comment-range,.plyr__progress .compose-range{position:absolute;top:50%;height:5px;transform:translateY(-50%);border-radius:999px;pointer-events:none}
+.plyr__progress .comment-range{z-index:9;background:rgba(255,255,255,.28)}
+.plyr__progress .compose-range{z-index:11;height:7px;background:rgba(255,255,255,.5);box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.plyr__progress .compose-range::before,.plyr__progress .compose-range::after{content:"";position:absolute;top:50%;width:3px;height:15px;border-radius:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.3);transform:translate(-50%,-50%)}
+.plyr__progress .compose-range::before{left:0}
+.plyr__progress .compose-range::after{left:100%}
+.plyr__progress .comment-marker{position:absolute;top:50%;z-index:10;width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.35);transform:translate(-50%,-50%);pointer-events:none}
