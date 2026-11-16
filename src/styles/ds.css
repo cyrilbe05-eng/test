@@ -421,3 +421,10 @@ html.dark .ds{--ink-bar:#D9D9DE;--bad-bar:#F2766B}
 .ds-cmt{padding:10px 12px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--panel-ring);cursor:pointer;transition:box-shadow .2s}
 .ds-cmt.active{box-shadow:inset 0 0 0 1.5px var(--focus)}
 .ds-cmt.resolved{opacity:.6}
+
+/* Dropdowns: one tidy chevron with room around it (the browser's own arrow
+   sat against the edge). Grey works on both themes. */
+select.ds-tool,select.ds-field,.ds-cal-sheet select,.ds-msheet select{-webkit-appearance:none;appearance:none;padding-right:38px !important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238E8E96' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;background-repeat:no-repeat !important;background-position:right 13px center !important;background-size:15px 15px !important}
+select.ds-tool::-ms-expand{display:none}
+/* Sidebar count badge (e.g. scripts to review). */
+.ds-nav-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--ds-accent);color:var(--accent-fg);font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}

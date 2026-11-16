@@ -5,6 +5,7 @@
 // only ever sees a script once it is pushed to their calendar, as plain text.
 //
 //   GET    /api/scripts                          pages list (+ clients a page can be made for)
+//   GET    /api/scripts/badge                    { count } for the sidebar
 //   POST   /api/scripts/pages                    { clientId }
 //   GET    /api/scripts/pages/:clientId          the page: groups, scripts, comments
 //   DELETE /api/scripts/pages/:clientId
@@ -141,6 +142,22 @@ export async function handleScriptsRoute(req: VercelRequest, res: VercelResponse
     const body = (req.body ?? {}) as Record<string, any>
     const [a, id, sub] = rest
     const now = nowIso()
+
+    // ── Sidebar badge ────────────────────────────────────────────────────────
+    // Admins: scripts waiting for review. Copywriters: open comment threads
+    // on their clients' scripts whose last message isn't theirs.
+    if (a === 'badge' && rest.length === 1) {
+      if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return }
+      const [row] = c.isAdmin
+        ? await dbQuery<{ n: number }>("SELECT COUNT(*) AS n FROM scripts WHERE status = 'in_review'")
+        : await dbQuery<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM script_comments t JOIN scripts s ON s.id = t.script_id
+           WHERE t.parent_id IS NULL AND t.resolved_at IS NULL
+             AND s.client_id IN (SELECT client_id FROM client_team_assignments WHERE team_member_id = ?)
+             AND COALESCE((SELECT r.author_id FROM script_comments r WHERE r.parent_id = t.id ORDER BY r.created_at DESC LIMIT 1), t.author_id) <> ?`,
+          [c.id, c.id])
+      res.json({ count: row?.n ?? 0 }); return
+    }
 
     // ── Pages list ───────────────────────────────────────────────────────────
     if (rest.length === 0) {

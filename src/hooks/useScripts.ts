@@ -10,6 +10,19 @@ export function useScriptsOverview() {
   return useQuery({ queryKey: ['scripts'], queryFn: () => apiFetch<ScriptsOverview>('/api/scripts'), refetchInterval: 30_000 })
 }
 
+/** Sidebar count: admins — scripts to review; copywriters — comments to
+ *  check. Only fetched for those roles; failures just show no badge. */
+export function useScriptsBadge(enabled: boolean) {
+  const apiFetch = useApiFetch()
+  return useQuery({
+    queryKey: ['scripts', 'badge'],
+    enabled,
+    retry: false,
+    refetchInterval: 60_000,
+    queryFn: () => apiFetch<{ count: number }>('/api/scripts/badge'),
+  })
+}
+
 export function useScriptPage(clientId: string | undefined) {
   const apiFetch = useApiFetch()
   return useQuery({
@@ -33,12 +46,14 @@ export function useScriptActions(clientId: string) {
   const putScript = (s: Script) => qc.setQueryData<ScriptPage>(key, (p) => p && ({
     ...p, groups: p.groups.map((g) => ({ ...g, scripts: g.scripts.map((x) => (x.id === s.id ? s : x)) })),
   }))
-  const putComments = (scriptId: string, list: ScriptComment[]) => qc.setQueryData<ScriptPage>(key, (p) => p && ({
-    ...p, comments: [...p.comments.filter((c) => c.scriptId !== scriptId), ...list],
-  }))
+  const putComments = (scriptId: string, list: ScriptComment[]) => {
+    qc.setQueryData<ScriptPage>(key, (p) => p && ({ ...p, comments: [...p.comments.filter((c) => c.scriptId !== scriptId), ...list] }))
+    qc.invalidateQueries({ queryKey: ['scripts', 'badge'] })
+  }
   const send = <T,>(path: string, method: string, body?: unknown) =>
     apiFetch<T>(`/api/scripts/${path}`, { method, body: body === undefined ? undefined : JSON.stringify(body) })
-  const refreshList = () => qc.invalidateQueries({ queryKey: ['scripts'], exact: true })
+  const refreshBadge = () => qc.invalidateQueries({ queryKey: ['scripts', 'badge'] })
+  const refreshList = () => { qc.invalidateQueries({ queryKey: ['scripts'], exact: true }); refreshBadge() }
 
   return {
     putScript,

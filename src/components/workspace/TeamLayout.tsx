@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { AppFrame, type FrameItem } from '@/components/ds/Frame'
+import { useScriptsBadge } from '@/hooks/useScripts'
 
 type Link = { to: string; label: string; icon: string; exact?: boolean }
 
@@ -35,7 +36,13 @@ export function TeamLayout({ children, bare }: TeamLayoutProps) {
     ? [...NAV_LINKS, PLANS_LINK, SCRIPTS_LINK]
     : [{ ...NAV_LINKS[0], label: 'Home' }, ALL_PROJECTS_LINK, ...NAV_LINKS.slice(1)]
 
-  const item = (l: Link): FrameItem => ({ ...l, on: l.exact ? pathname === l.to : pathname.startsWith(l.to) })
+  // Copywriters: comments waiting on them (Scripts badge).
+  const toCheck = useScriptsBadge(profile?.team_role === 'copywriter').data?.count ?? 0
+  const item = (l: Link): FrameItem => ({
+    ...l,
+    on: l.exact ? pathname === l.to : pathname.startsWith(l.to),
+    badge: l.to === '/team/scripts' && toCheck > 0 ? <span className="ds-nav-badge" aria-label={`${toCheck} comments to check`}>{toCheck}</span> : undefined,
+  })
   // Sidebar: the leaderboard right after My Stats. Bottom bar is full, so on
   // phones it (like SOPs) lives in the ☰ menu.
   const side = profile?.team_role === 'copywriter'

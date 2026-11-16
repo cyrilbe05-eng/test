@@ -11,6 +11,7 @@ import { Ms, ThemeFadeButton } from '@/components/ds'
 import { cn } from '@/lib/utils'
 import { ProfileMenu } from '@/components/ds/ProfileMenu'
 import { useCardTilt } from '@/hooks/useCardTilt'
+import { useScriptsBadge } from '@/hooks/useScripts'
 
 // Admin frame (DESIGN.md): 236px sidebar with a single sliding indicator,
 // logo on top, profile + sign out at the bottom; no top bar on desktop.
@@ -82,6 +83,8 @@ export function AdminLayout({ children, bare }: AdminLayoutProps) {
     clearToken(); qc.clear(); toast.success('Signed out'); navigate('/login', { replace: true })
   }
 
+  // Scripts waiting for review (Script Review badge).
+  const toReview = useScriptsBadge(profile?.role === 'admin').data?.count ?? 0
   const groups = GROUPS.map((g) => g.filter((i) => !(i.fullAdminOnly && profile?.admin_role === 'manager'))).filter((g) => g.length)
   // One sliding indicator: its offset is 34px per item and 17px per gap.
   let y = 0
@@ -108,6 +111,7 @@ export function AdminLayout({ children, bare }: AdminLayoutProps) {
                 <Link key={item.to} to={item.to} onClick={onPick} className={cn('ds-nav', on && 'on')} aria-current={on ? 'page' : undefined}>
                   <Ms name={item.icon} />
                   {item.label}
+                  {item.to === '/admin/scripts' && toReview > 0 && <span className="ds-nav-badge ml-auto" aria-label={`${toReview} to review`}>{toReview}</span>}
                 </Link>
               )
             })}
