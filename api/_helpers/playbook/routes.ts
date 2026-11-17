@@ -221,7 +221,10 @@ export async function handlePlaybookRoute(req: VercelRequest, res: VercelRespons
       if (sub === 'url' && req.method === 'GET') {
         await loadVideo(c, at.video_id) // clients: only for videos they may see
         if (at.kind !== 'file' || !at.storage_key) throw fail(400, 'Not a file')
-        res.json({ url: await getPresignedDownloadUrl(at.storage_key, STREAM_TTL, at.file_name, inferMimeType(at.file_name ?? '', at.mime_type)) }); return
+        // PDFs and images open in the browser; anything else downloads.
+        const type = inferMimeType(at.file_name ?? '', at.mime_type)
+        const inline = !!type && (type === 'application/pdf' || type.startsWith('image/'))
+        res.json({ url: await getPresignedDownloadUrl(at.storage_key, STREAM_TTL, inline ? undefined : at.file_name, type), inline }); return
       }
       adminOnly()
       if (rest.length === 2 && req.method === 'DELETE') {

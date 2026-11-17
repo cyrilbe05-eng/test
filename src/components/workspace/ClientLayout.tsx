@@ -5,6 +5,7 @@ import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
 import { AppFrame, type FrameItem } from '@/components/ds/Frame'
 import { Ms } from '@/components/ds'
 import type { Project } from '@/types'
+import { PLAYBOOK_NAME, PLAYBOOK_PATH } from '@/lib/playbook'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -38,8 +39,9 @@ export function ClientLayout({ children, bare }: ClientLayoutProps) {
       { to: '/workspace/calendar', label: 'Calendar', icon: 'calendar_month', on: at('/workspace/calendar') },
       { to: '/workspace/analytics', label: 'Analytics', icon: 'monitoring', on: at('/workspace/analytics') },
     ],
-    // Onboarding: last item of the sidebar.
+    // Playbook, then Onboarding last in the sidebar.
     [
+      { to: `/workspace/${PLAYBOOK_PATH}`, label: PLAYBOOK_NAME, icon: 'video_library', on: at(`/workspace/${PLAYBOOK_PATH}`) },
       { to: '/workspace/onboarding', label: 'Onboarding', icon: 'assignment', on: at('/workspace/onboarding') },
     ],
   ]

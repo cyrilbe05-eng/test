@@ -61,6 +61,7 @@ import AdminOnboardingQuestions from '@/pages/admin/AdminOnboardingQuestions'
 import AdminLeaderboard from '@/pages/admin/AdminLeaderboard'
 import AdminScriptReview from '@/pages/admin/AdminScriptReview'
 import AdminPlaybook from '@/pages/admin/AdminPlaybook'
+import ClientPlaybook from '@/pages/workspace/ClientPlaybook'
 import { PLAYBOOK_PATH } from '@/lib/playbook'
 import TeamGallery from '@/pages/team/TeamGallery'
 import TeamMessages from '@/pages/team/TeamMessages'
@@ -183,6 +184,8 @@ function ProductionApp() {
           <Route path="/workspace/messages" element={<ProtectedRoute allowedRoles={['client']}><ClientMessages /></ProtectedRoute>} />
           <Route path="/workspace/calendar" element={<ProtectedRoute allowedRoles={['client']}><ClientCalendar /></ProtectedRoute>} />
           <Route path="/workspace/analytics" element={<ProtectedRoute allowedRoles={['client']}><ClientAnalytics /></ProtectedRoute>} />
+          <Route path={`/workspace/${PLAYBOOK_PATH}`} element={<ProtectedRoute allowedRoles={['client']}><ClientPlaybook /></ProtectedRoute>} />
+          <Route path={`/workspace/${PLAYBOOK_PATH}/:videoId`} element={<ProtectedRoute allowedRoles={['client']}><ClientPlaybook /></ProtectedRoute>} />
 
           {/* Editors: Home (my videos + limit); copywriters: the board. Board for everyone at /team/all. */}
           <Route path="/team" element={<ProtectedRoute allowedRoles={['team']}><TeamHome /></ProtectedRoute>} />
