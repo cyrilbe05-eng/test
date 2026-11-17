@@ -31,7 +31,7 @@ import { requireAuth } from '../auth.js'
 import { dbExecute, dbQuery, newId, nowIso } from '../db.js'
 import { deleteObject, ensurePlayableObject, getPresignedDownloadUrl, getPresignedUploadUrl } from '../r2.js'
 import { inferMimeType } from '../mime.js'
-import { cleanLink, parseVideoLink } from './links.js'
+import { cleanLink, linkThumbnail, parseVideoLink } from './links.js'
 
 type Caller = { id: string; isAdmin: boolean }
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status })
@@ -89,7 +89,7 @@ async function overview(c: Caller) {
       ...(c.isAdmin ? { audience: s.audience, clientIds: audience.filter((a) => a.section_id === s.id).map((a) => a.client_id) } : {}),
       videos: videos.filter((v) => v.section_id === s.id).map((v) => ({
         id: v.id, title: v.title, description: v.description ?? '', source: v.source,
-        thumbnailUrl: thumbs.get(v.id) ?? null,
+        thumbnailUrl: thumbs.get(v.id) ?? linkThumbnail(v.external_url),
         attachments: attachments.filter((a) => a.video_id === v.id).map((a) => ({ id: a.id, kind: a.kind, title: a.title, url: a.kind === 'link' ? a.url : null, fileName: a.file_name })),
         ...(c.isAdmin
           ? { status: v.status, externalUrl: v.external_url, fileName: v.file_name, fileSize: v.file_size, mimeType: v.mime_type, hasThumbnail: !!v.thumbnail_key, watchedCount: viewCounts.get(v.id) ?? 0, updatedAt: v.updated_at }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanLink, parseVideoLink } from './links'
+import { cleanLink, linkThumbnail, parseVideoLink } from './links'
 
 describe('parseVideoLink', () => {
   it('reads every common YouTube link shape', () => {
@@ -26,5 +26,13 @@ describe('cleanLink', () => {
     expect(cleanLink('example.com/checklist.pdf')).toBe('https://example.com/checklist.pdf')
     expect(cleanLink('javascript:alert(1)')).toBeNull()
     expect(cleanLink('')).toBeNull()
+  })
+})
+
+describe('linkThumbnail', () => {
+  it('gives YouTube videos their still, nothing for Loom or junk', () => {
+    expect(linkThumbnail('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg')
+    expect(linkThumbnail('https://www.loom.com/share/0281766fa2d04bb788eaf19e65135184')).toBeNull()
+    expect(linkThumbnail(null)).toBeNull()
   })
 })

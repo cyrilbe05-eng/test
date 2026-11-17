@@ -32,7 +32,17 @@ export function grabFrame(file: Blob, atSeconds = 1): Promise<Blob | null> {
     video.playsInline = true
     video.preload = 'auto'
     video.onloadedmetadata = () => { video.currentTime = Math.min(atSeconds, Math.max(0, (video.duration || 0) / 2)) }
+    // "seeked" can fire before a big (4K) frame is painted: drawing then gives
+    // black. Wait for the frame itself (or a moment, where unsupported).
     video.onseeked = () => {
+      const painted = new Promise<void>((r) => {
+        window.setTimeout(r, 1500)
+        if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(() => r())
+      })
+      void painted.then(draw)
+    }
+    const draw = () => {
+      if (done) return
       const w = Math.min(960, video.videoWidth || 0)
       if (!w) { window.clearTimeout(timer); finish(null); return }
       const h = Math.round((video.videoHeight / video.videoWidth) * w)

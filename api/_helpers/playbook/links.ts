@@ -35,6 +35,13 @@ export function parseVideoLink(raw: unknown): { source: LinkSource; url: string;
   return null
 }
 
+/** YouTube's own still for a link video (Loom has none without an API call). */
+export function linkThumbnail(raw: unknown): string | null {
+  const l = parseVideoLink(raw)
+  if (l?.source !== 'youtube') return null
+  return `https://i.ytimg.com/vi/${new URL(l.url).searchParams.get('v')}/hqdefault.jpg`
+}
+
 /** Attachment links: plain web links only. */
 export function cleanLink(raw: unknown): string | null {
   if (typeof raw !== 'string' || !raw.trim()) return null
