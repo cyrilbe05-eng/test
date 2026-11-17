@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { ClientMark, Ms, Segmented } from '@/components/ds'
 import { useSheetClose } from '@/hooks/useSheetClose'
-import { usePlaybook, usePlaybookActions } from '@/hooks/usePlaybook'
+import { usePlaybook, usePlaybookActions, usePlaybookViews } from '@/hooks/usePlaybook'
 import { useApiFetch } from '@/lib/api'
 import { PLAYBOOK_NAME, grabFrame, isHevcVideo } from '@/lib/playbook'
 import { uploadPlaybookFile } from '@/lib/storage'
@@ -265,7 +265,36 @@ function EditVideo({ video, sections, actions, onClose }: { video: PlaybookVideo
           <Ms name="attach_file" style={{ fontSize: 17, width: 17, color: 'inherit' }} />{busy === 'file' ? 'Uploading…' : 'Add file'}
         </button>
       </Field>
+
+      <WatchedBy videoId={video.id} />
     </Sheet>
+  )
+}
+
+/** Every client who can see the video: watched (with the date) first. */
+function WatchedBy({ videoId }: { videoId: string }) {
+  const { data: viewers } = usePlaybookViews(videoId)
+  if (!viewers) return null
+  const list = [...viewers].sort((a, b) => (b.watchedAt ?? '').localeCompare(a.watchedAt ?? '') || a.name.localeCompare(b.name))
+  const n = list.filter((v) => v.watchedAt).length
+  return (
+    <Field label={`Watched by ${n}/${list.length}`}>
+      {list.length === 0
+        ? <p style={{ fontSize: 13, color: 'var(--faint)' }}>No clients can see this section</p>
+        : (
+          <ul>
+            {list.map((v) => (
+              <li key={v.clientId} className="flex items-center gap-2.5 min-w-0" style={{ minHeight: 40 }}>
+                <ClientMark name={v.name} size={24} />
+                <span className="flex-1 min-w-0 truncate" style={{ fontSize: 13.5, color: 'var(--strong)' }}>{v.name}</span>
+                {v.watchedAt
+                  ? <span className="inline-flex items-center gap-1 tabular-nums" style={{ fontSize: 12.5, color: 'var(--strong)' }}><Ms name="check_circle" style={{ fontSize: 16, width: 16, color: 'inherit' }} />{new Date(v.watchedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+                  : <span style={{ fontSize: 12.5, color: 'var(--faint)' }}>Not yet</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+    </Field>
   )
 }
 
