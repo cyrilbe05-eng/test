@@ -60,6 +60,8 @@ import ClientOnboarding from '@/pages/workspace/ClientOnboarding'
 import AdminOnboardingQuestions from '@/pages/admin/AdminOnboardingQuestions'
 import AdminLeaderboard from '@/pages/admin/AdminLeaderboard'
 import AdminScriptReview from '@/pages/admin/AdminScriptReview'
+import AdminPlaybook from '@/pages/admin/AdminPlaybook'
+import { PLAYBOOK_PATH } from '@/lib/playbook'
 import TeamGallery from '@/pages/team/TeamGallery'
 import TeamMessages from '@/pages/team/TeamMessages'
 import TeamCalendar from '@/pages/team/TeamCalendar'
@@ -167,6 +169,7 @@ function ProductionApp() {
           <Route path="/admin/onboarding-questions" element={<ProtectedRoute allowedRoles={['admin']}><AdminOnboardingQuestions /></ProtectedRoute>} />
           <Route path="/admin/leaderboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminLeaderboard /></ProtectedRoute>} />
           <Route path="/admin/scripts" element={<ProtectedRoute allowedRoles={['admin']}><AdminScriptReview /></ProtectedRoute>} />
+          <Route path={`/admin/${PLAYBOOK_PATH}`} element={<ProtectedRoute allowedRoles={['admin']}><AdminPlaybook /></ProtectedRoute>} />
           <Route path="/admin/scripts/:clientId" element={<ProtectedRoute allowedRoles={['admin']}><AdminScriptReview /></ProtectedRoute>} />
 
           {/* Client home = dashboard; the video list (unchanged page) lives at /workspace/videos. */}

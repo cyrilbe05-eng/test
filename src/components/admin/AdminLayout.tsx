@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { ProfileMenu } from '@/components/ds/ProfileMenu'
 import { useCardTilt } from '@/hooks/useCardTilt'
 import { useScriptsBadge } from '@/hooks/useScripts'
+import { PLAYBOOK_NAME, PLAYBOOK_PATH } from '@/lib/playbook'
 
 // Admin frame (DESIGN.md): 236px sidebar with a single sliding indicator,
 // logo on top, profile + sign out at the bottom; no top bar on desktop.
@@ -37,6 +38,7 @@ const GROUPS: Item[][] = [
   [
     { to: '/admin/sops', label: 'SOPs', icon: 'menu_book', match: (p) => p.startsWith('/admin/sops') },
     { to: '/admin/scripts', label: 'Script Review', icon: 'rate_review', match: (p) => p.startsWith('/admin/scripts') },
+    { to: `/admin/${PLAYBOOK_PATH}`, label: PLAYBOOK_NAME, icon: 'video_library', match: (p) => p.startsWith(`/admin/${PLAYBOOK_PATH}`) },
     { to: '/admin/care', label: 'Client Care', icon: 'favorite', match: (p) => p.startsWith('/admin/care'), fullAdminOnly: true },
     { to: '/admin/onboarding-questions', label: 'Questions', icon: 'help', match: (p) => p.startsWith('/admin/onboarding-questions'), fullAdminOnly: true },
   ],

@@ -371,6 +371,38 @@ export async function uploadGalleryFile(
   }
 }
 
+/** Playbook upload (admins): videos of any size (big ones resumable, in
+ *  parts), thumbnails and attachment files. Returns the storage key; the
+ *  caller then saves it on the video / attachment. */
+export async function uploadPlaybookFile(
+  apiFetch: ReturnType<typeof useApiFetch>,
+  args: {
+    file: File | Blob
+    fileName: string
+    kind: 'video' | 'thumb' | 'file'
+    onProgress?: (percent: number) => void
+    onConnectionState?: (state: UploadConnectionState) => void
+  },
+): Promise<string> {
+  const { kind, onProgress, onConnectionState } = args
+  const file = args.file instanceof File ? args.file : new File([args.file], args.fileName, { type: args.file.type })
+  const releaseWakeLock = await acquireWakeLock()
+  try {
+    if (kind === 'video' && file.size >= MULTIPART_THRESHOLD) {
+      return await uploadMultipart({ file, onProgress, onConnectionState, apiFetch, playbook: true })
+    }
+    const reporter = createConnectionReporter(onConnectionState)
+    const requestUploadUrl = () => apiFetchResilient<{ uploadUrl: string; key: string }>(
+      apiFetch, '/api/playbook/upload-url',
+      { method: 'POST', body: JSON.stringify({ fileName: args.fileName, mimeType: file.type || 'application/octet-stream', kind }) },
+      { onNetworkWait: () => reporter.set('offline') },
+    )
+    return await singlePutResilient({ file, requestUploadUrl, reporter, onProgress })
+  } finally {
+    releaseWakeLock()
+  }
+}
+
 /** Resilient API call for post-upload bookkeeping (e.g. gallery register):
  *  the bytes are already safe in R2 — losing the DB row to a network blip
  *  would orphan them. */
@@ -412,8 +444,10 @@ async function uploadMultipart(args: {
   previewArtifact?: boolean
   /** Gallery ("drive") target instead of a project. */
   gallery?: { ownerId?: string | null }
+  /** Playbook video (admins) instead of a project. */
+  playbook?: boolean
 }): Promise<string> {
-  const { file, projectId, fileType, onProgress, onConnectionState, apiFetch, previewArtifact, gallery } = args
+  const { file, projectId, fileType, onProgress, onConnectionState, apiFetch, previewArtifact, gallery, playbook } = args
   const reporter = createConnectionReporter(onConnectionState)
 
   const partSize = computePartSize(file.size)
@@ -428,7 +462,9 @@ async function uploadMultipart(args: {
     partUrls: Array<{ partNumber: number; url: string }>
   }>(apiFetch, '/api/project-files/multipart/create', {
     method: 'POST',
-    body: JSON.stringify(gallery
+    body: JSON.stringify(playbook
+      ? { playbook: true, fileName: file.name, mimeType: file.type, fileSize: file.size, partCount }
+      : gallery
       ? {
           gallery: true,
           ownerId: gallery.ownerId ?? undefined,
