@@ -1,7 +1,8 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
 import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
+import { useClientDashboard } from '@/hooks/useClientDashboard'
 import { AppFrame, type FrameItem } from '@/components/ds/Frame'
 import { Ms } from '@/components/ds'
 import type { Project } from '@/types'
@@ -20,14 +21,20 @@ const count = (n: number) => n > 0
 export function ClientLayout({ children, bare }: ClientLayoutProps) {
   // Full-package clients record the scripts on their Home: no free "New video".
   const canCreate = useCanCreateVideo()
-  const { profile } = useAuth()
+  const { profile, impersonating } = useAuth()
+  const { data: dash } = useClientDashboard()
   const { data: projects = [] } = useProjects()
   const { pathname } = useLocation()
 
   const active = (projects as Project[]).filter((p) => p.status !== 'client_approved')
   const at = (to: string, exact = false) => exact ? pathname === to : pathname.startsWith(to)
 
-  const groups: FrameItem[][] = [
+  // Until the questionnaire is finished, it is the whole app: no menu, and
+  // every other page sends them back to it (not when an admin views as them).
+  const locked = !!dash?.needs_onboarding && !impersonating
+  if (locked && pathname !== '/workspace/onboarding') return <Navigate to="/workspace/onboarding" replace />
+
+  const groups: FrameItem[][] = locked ? [] : [
     [
       // Home is also the Active list.
       { to: '/workspace', label: 'Home', icon: 'home', on: at('/workspace', true), badge: count(active.length) },
@@ -47,7 +54,7 @@ export function ClientLayout({ children, bare }: ClientLayoutProps) {
   ]
 
   // Phone bottom bar: Home = dashboard; Videos = the project list.
-  const bottom: FrameItem[] = [
+  const bottom: FrameItem[] = locked ? [] : [
     { to: '/workspace', label: 'Home', icon: 'home', on: at('/workspace', true) },
     { to: '/workspace/videos', label: 'Videos', icon: 'movie', on: at('/workspace/videos') },
     { to: '/workspace/messages', label: 'Messages', icon: 'chat_bubble', on: at('/workspace/messages') },
@@ -62,7 +69,7 @@ export function ClientLayout({ children, bare }: ClientLayoutProps) {
       subtitle={profile?.email}
       viewingAs="client"
       bare={bare}
-      footer={canCreate ? (close) => (
+      footer={canCreate && !locked ? (close) => (
         <Link to="/workspace/new" onClick={close} className="ds-primary justify-center" style={{ width: '100%' }}>
           <Ms name="add" style={{ color: 'inherit' }} />New video
         </Link>

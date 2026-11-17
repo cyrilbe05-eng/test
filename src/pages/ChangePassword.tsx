@@ -19,7 +19,7 @@ const passwordSchema = z
 
 const schema = z
   .object({
-    current: z.string().min(1, 'Required'),
+    current: z.string().optional(),
     password: passwordSchema,
     confirm: z.string(),
   })
@@ -32,20 +32,25 @@ export default function ChangePassword() {
   const navigate = useNavigate()
   const apiFetch = useApiFetch()
   const qc = useQueryClient()
-  const { impersonating, stopImpersonating } = useAuth()
+  const { profile, impersonating, stopImpersonating } = useAuth()
+  // First login (temporary password): they just typed it to sign in, so
+  // they only create the new one. Later changes still ask for the current.
+  const firstTime = !!profile && !profile.password_changed && !impersonating
 
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<FormData>({ resolver: zodResolver(schema) })
 
   const onSubmit = async (data: FormData) => {
+    if (!firstTime && !data.current) { setError('current', { message: 'Required' }); return }
     setLoading(true)
     try {
       const updated = await apiFetch<{ password_changed: boolean; role: string; token?: string }>('/api/auth/change-password', {
         method: 'POST',
-        body: JSON.stringify({ password: data.password, current_password: data.current }),
+        body: JSON.stringify(firstTime ? { password: data.password } : { password: data.password, current_password: data.current }),
       })
       // Other devices are signed out; this one continues with the new token.
       if (updated.token) setToken(updated.token)
@@ -90,7 +95,7 @@ export default function ChangePassword() {
 
         <div className="clay-card p-7">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <div className="space-y-1.5">
+            {!firstTime && <div className="space-y-1.5">
               <label className="text-sm font-medium">Current password</label>
               <input
                 type="password"
@@ -99,7 +104,7 @@ export default function ChangePassword() {
                 className="w-full px-3.5 py-2.5 bg-muted border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 text-sm transition-all"
               />
               {errors.current && <p className="text-destructive text-xs">{errors.current.message}</p>}
-            </div>
+            </div>}
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium">New password</label>

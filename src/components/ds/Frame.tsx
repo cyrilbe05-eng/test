@@ -134,15 +134,15 @@ export function AppFrame({ groups, bottom, subtitle, viewingAs, footer, bare, ch
         </div>
       </div>
 
-      {/* Phone bottom bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex items-stretch h-16 safe-area-bottom" style={{ background: 'var(--bg)', borderTop: '1px solid var(--line)' }}>
+      {/* Phone bottom bar (none while a client is locked into onboarding) */}
+      {bottom.length > 0 && <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex items-stretch h-16 safe-area-bottom" style={{ background: 'var(--bg)', borderTop: '1px solid var(--line)' }}>
         {bottom.map((item) => (
           <Link key={item.to} to={item.to} className={cn('ds-nav flex-1 flex-col justify-center !gap-0.5 !h-auto !px-0 min-w-0', item.on && 'on')} style={{ fontSize: 10.5 }} aria-current={item.on ? 'page' : undefined}>
             <Ms name={item.icon} />
             <span className="truncate max-w-full">{item.label}</span>
           </Link>
         ))}
-      </nav>
+      </nav>}
 
       <ProductionChatPanel />
     </div>

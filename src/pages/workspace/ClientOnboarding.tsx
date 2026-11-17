@@ -165,6 +165,14 @@ function Done({ data }: { data: Data }) {
 
 export default function ClientOnboarding() {
   const { data, isLoading, error } = useClientOnboarding()
+  const save = useSaveClientOnboarding()
+  const qc = useQueryClient()
+  // No questions for their package: nothing to fill in, so it's done (and
+  // the app unlocks).
+  const empty = !!data && !data.questions.length && data.status !== 'done'
+  useEffect(() => {
+    if (empty) save.mutate({ done: true }, { onSuccess: () => qc.setQueryData<ClientDashboard>(['client', 'dashboard'], (d) => (d ? { ...d, needs_onboarding: false } : d)) })
+  }, [empty]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <ClientLayout>
       <main className="px-4 md:px-6 py-5 md:py-8 max-w-2xl">

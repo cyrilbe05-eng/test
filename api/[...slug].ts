@@ -4389,11 +4389,14 @@ async function handleAuthChangePassword(req: VercelRequest, res: VercelResponse)
     if (!password || password.length < 12) { res.status(400).json({ error: 'Password must be at least 12 characters' }); return }
 
     // The current password is required, so a borrowed or stolen session
-    // can't lock the owner out.
-    const [me] = await dbQuery<{ password_hash: string | null; email: string }>('SELECT password_hash, email FROM profiles WHERE id = ?', [clerkUserId])
+    // can't lock the owner out. Except on first login (temporary password,
+    // password_changed = 0): they just signed in with it, so they only
+    // create the new one.
+    const [me] = await dbQuery<{ password_hash: string | null; email: string; password_changed: number | null }>('SELECT password_hash, email, password_changed FROM profiles WHERE id = ?', [clerkUserId])
     const keys = attemptKeys(me?.email ?? clerkUserId, req.headers['x-forwarded-for'])
     if (await isLocked(keys)) { res.status(429).json({ error: 'Too many attempts. Try again in 15 minutes.' }); return }
-    if (!me?.password_hash || !current_password || !(await comparePassword(current_password, me.password_hash))) {
+    const firstTime = !!me && !me.password_changed
+    if (!me?.password_hash || (!firstTime && (!current_password || !(await comparePassword(current_password, me.password_hash))))) {
       await recordFailure(keys)
       res.status(400).json({ error: 'Current password is incorrect' }); return
     }
