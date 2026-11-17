@@ -123,14 +123,18 @@ function AddVideo({ section, actions, onClose }: { section: PlaybookSection; act
   const up = useVideoUpload()
   const fileRef = useRef<HTMLInputElement>(null)
   const ready = title.trim() && (mode === 'link' ? link.trim() : up.state?.done)
-  const save = (close: () => void) => actions.addVideo.mutate(
+  // Add is always pressable: say what's missing rather than sit greyed out.
+  const missing = !title.trim() ? 'Add a title'
+    : mode === 'link' ? (!link.trim() ? 'Paste a YouTube or Loom link' : null)
+    : !up.state ? 'Choose a video' : up.state.error ? 'The upload failed — choose the file again' : !up.state.done ? 'Wait for the upload to finish' : null
+  const save = (close: () => void) => missing ? toast(missing) : actions.addVideo.mutate(
     { sectionId: section.id, title: title.trim(), ...(mode === 'link' ? { link: link.trim() } : { upload: up.state!.done!, thumbnailKey: up.state?.thumbKey ?? null }) },
     { onSuccess: () => { toast.success('Video added as a draft'); close() }, onError: (e) => toast.error(errMsg(e)) })
   return (
     <Sheet title="Add video" onClose={onClose} foot={(close) => (
       <>
         <button type="button" className="ds-ghost-btn" onClick={close}>Cancel</button>
-        <button type="button" className="ds-primary" style={{ paddingLeft: 14 }} disabled={!ready || actions.addVideo.isPending} onClick={() => save(close)}>Add</button>
+        <button type="button" className={cn('ds-primary', !ready && 'opacity-60')} style={{ paddingLeft: 14 }} disabled={actions.addVideo.isPending} onClick={() => save(close)}>Add</button>
       </>
     )}>
       <p style={{ fontSize: 13, color: 'var(--faint)' }}>{section.title}</p>
@@ -139,7 +143,15 @@ function AddVideo({ section, actions, onClose }: { section: PlaybookSection; act
       {mode === 'upload' ? (
         <div className="space-y-3">
           <input ref={fileRef} type="file" accept="video/*" className="hidden" aria-label="Video file"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) void up.start(f); e.target.value = '' }} />
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) {
+                // No title yet: start from the file name (editable).
+                if (!title.trim()) setTitle(f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim())
+                void up.start(f)
+              }
+              e.target.value = ''
+            }} />
           {up.state && <UploadStatus s={up.state} />}
           <button type="button" className="ds-ghost-btn inline-flex items-center gap-1.5" onClick={() => fileRef.current?.click()}>
             <Ms name="upload" style={{ fontSize: 17, width: 17, color: 'inherit' }} />{up.state ? 'Choose another file' : 'Choose video'}
