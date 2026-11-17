@@ -33,6 +33,7 @@ import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleScoreboardRoute } from './_helpers/scoreboard/routes.js'
 import { handleScriptsRoute } from './_helpers/scripts/routes.js'
+import { handlePlaybookRoute } from './_helpers/playbook/routes.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
 import { isValidAvatar } from './_helpers/avatar.js'
 import { attemptKeys, isLocked, recordFailure, clearFailures, endSessions } from './_helpers/login-guard.js'
@@ -1530,6 +1531,11 @@ async function handleGetProjectFileUploadUrl(req: VercelRequest, res: VercelResp
  * supplying a key + uploadId they observed elsewhere.
  */
 async function authorizeKeyForUpload(profile: any, key: string): Promise<void> {
+  // Playbook videos (admins only) — see api/_helpers/playbook/routes.ts.
+  if (key.startsWith('playbook/')) {
+    if (profile.role === 'admin' && /^playbook\/video\/[^/]+$/.test(key)) return
+    const e: any = new Error('forbidden'); e.status = 403; throw e
+  }
   // Gallery keys: gallery/{ownerId}/{ts}-{name} — the owner (or an admin
   // uploading on their behalf) may operate on the multipart upload.
   const g = /^gallery\/([^/]+)\//.exec(key)
@@ -1572,7 +1578,16 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     const { profile } = await requireAuth(req)
-    const { projectId, fileType, fileName, fileSize, partCount, mimeType, previewArtifact, gallery, ownerId } = req.body
+    const { projectId, fileType, fileName, fileSize, partCount, mimeType, previewArtifact, gallery, ownerId, playbook } = req.body
+    // Playbook videos (admins only): same resumable upload, own key space.
+    if (playbook) {
+      if (profile.role !== 'admin') { res.status(403).json({ error: 'Forbidden' }); return }
+      if (!fileName || typeof partCount !== 'number' || partCount < 1 || partCount > 10000) { res.status(400).json({ error: 'fileName, partCount required' }); return }
+      const key = `playbook/video/${Date.now()}-${newId().slice(0, 8)}-${sanitizeFileName(fileName)}`
+      const uploadId = await createMultipartUpload(key, inferPlaybackMimeType(fileName, mimeType))
+      const partUrls = await Promise.all(Array.from({ length: partCount }, (_, i) => getPresignedPartUrl(key, uploadId, i + 1).then((url) => ({ partNumber: i + 1, url }))))
+      res.json({ key, uploadId, partUrls }); return
+    }
     // Two targets share the multipart machinery: project files and gallery
     // ("drive") files. Gallery was previously single-PUT only with a 2-minute
     // wall clock — large gallery videos could never finish on a slow link.
@@ -4860,6 +4875,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleEditorLimit(req, res)
   }
   // Client time saved (automatic) — see api/_helpers/care/time-saved.ts
+  // Playbook (training videos for clients) — see api/_helpers/playbook/routes.ts
+  if (slug[0] === 'playbook') {
+    return handlePlaybookRoute(req, res, slug.slice(1))
+  }
   // Script-writing workspace — see api/_helpers/scripts/routes.ts
   if (slug[0] === 'scripts') {
     return handleScriptsRoute(req, res, slug.slice(1))
