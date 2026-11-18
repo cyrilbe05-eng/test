@@ -33,7 +33,8 @@ import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleScoreboardRoute } from './_helpers/scoreboard/routes.js'
 import { handleScriptsRoute } from './_helpers/scripts/routes.js'
-import { handleSettingsRoute } from './_helpers/settings/routes.js'
+import { handleSettingsRoute, loadSettings } from './_helpers/settings/routes.js'
+import { handleBatchRoute, batchStorageAllowed } from './_helpers/batch/routes.js'
 import { handlePlaybookRoute } from './_helpers/playbook/routes.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
 import { isValidAvatar } from './_helpers/avatar.js'
@@ -666,7 +667,10 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
 
     const rows = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [id])
 
-    // Notify all admins about the new project
+    // Notify all admins about the new project. (Batch upload sends one
+    // grouped notification instead: api/_helpers/batch/routes.ts sets this
+    // flag on its own internal call; it can't come from a request body.)
+    if (!(req as { __batchQuiet?: boolean }).__batchQuiet) {
     const admins = await dbQuery<{ id: string }>('SELECT id FROM profiles WHERE role = ? AND disabled = 0', ['admin'])
     const newProjectMsg = `New project submitted: "${title}"`
     await Promise.all(admins.map(async (admin) => {
@@ -680,6 +684,7 @@ async function handleCreateProject(req: VercelRequest, res: VercelResponse) {
       subject: newProjectMsg,
       text: `${newProjectMsg}\n\nView it here: ${projectUrl(id, 'admin')}`,
     })))
+    }
 
     res.status(201).json(rows[0])
   } catch (e: any) {
@@ -1537,6 +1542,12 @@ async function authorizeKeyForUpload(profile: any, key: string): Promise<void> {
     if (profile.role === 'admin' && /^playbook\/video\/[^/]+$/.test(key)) return
     const e: any = new Error('forbidden'); e.status = 403; throw e
   }
+  // Batch upload waiting spot: batch/{clientId}/{file} — that client only.
+  if (key.startsWith('batch/')) {
+    const bk = /^batch\/([^/]+)\/[^/]+$/.exec(key)
+    if (bk && profile.role === 'client' && bk[1] === profile.id) return
+    const e: any = new Error('forbidden'); e.status = 403; throw e
+  }
   // Gallery keys: gallery/{ownerId}/{ts}-{name} — the owner (or an admin
   // uploading on their behalf) may operate on the multipart upload.
   const g = /^gallery\/([^/]+)\//.exec(key)
@@ -1579,7 +1590,20 @@ async function handleMultipartCreate(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   try {
     const { profile } = await requireAuth(req)
-    const { projectId, fileType, fileName, fileSize, partCount, mimeType, previewArtifact, gallery, ownerId, playbook } = req.body
+    const { projectId, fileType, fileName, fileSize, partCount, mimeType, previewArtifact, gallery, ownerId, playbook, batch } = req.body
+    // Batch upload (clients, while the admin switch is on): same resumable
+    // upload into the client's waiting spot; the project is created with the
+    // file once it has arrived (api/_helpers/batch/routes.ts).
+    if (batch) {
+      if (profile.role !== 'client' || !(await loadSettings()).batchUpload) { res.status(403).json({ error: 'Forbidden' }); return }
+      if (!fileName || typeof partCount !== 'number' || partCount < 1 || partCount > 10000) { res.status(400).json({ error: 'fileName, partCount required' }); return }
+      if (await isFullPackage(profile.id)) { res.status(403).json({ error: 'full_package_needs_script' }); return }
+      if (!(await batchStorageAllowed(profile, fileSize))) { res.status(403).json({ error: 'storage_limit_reached' }); return }
+      const key = `batch/${profile.id}/${Date.now()}-${newId().slice(0, 8)}-${sanitizeFileName(fileName)}`
+      const uploadId = await createMultipartUpload(key, inferPlaybackMimeType(fileName, mimeType))
+      const partUrls = await Promise.all(Array.from({ length: partCount }, (_, i) => getPresignedPartUrl(key, uploadId, i + 1).then((url) => ({ partNumber: i + 1, url }))))
+      res.json({ key, uploadId, partUrls }); return
+    }
     // Playbook videos (admins only): same resumable upload, own key space.
     if (playbook) {
       if (profile.role !== 'admin') { res.status(403).json({ error: 'Forbidden' }); return }
@@ -4879,6 +4903,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleEditorLimit(req, res)
   }
   // Client time saved (automatic) — see api/_helpers/care/time-saved.ts
+  // Batch upload (clients) — see api/_helpers/batch/routes.ts
+  if (slug[0] === 'batch') {
+    return handleBatchRoute(req, res, slug.slice(1), handleCreateProject)
+  }
   // App-wide on/off switches — see api/_helpers/settings/routes.ts
   if (slug[0] === 'settings') {
     return handleSettingsRoute(req, res, slug.slice(1))

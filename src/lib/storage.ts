@@ -371,6 +371,26 @@ export async function uploadGalleryFile(
   }
 }
 
+/** Batch upload (clients): one video into the client's waiting spot with the
+ *  same resumable upload (always in parts, whatever the size). Returns the
+ *  storage key; the batch page then asks for the project with it
+ *  (POST /api/batch/projects). Used only by the batch page. */
+export async function uploadBatchFile(
+  apiFetch: ReturnType<typeof useApiFetch>,
+  args: {
+    file: File
+    onProgress?: (percent: number) => void
+    onConnectionState?: (state: UploadConnectionState) => void
+  },
+): Promise<string> {
+  const releaseWakeLock = await acquireWakeLock()
+  try {
+    return await uploadMultipart({ file: args.file, onProgress: args.onProgress, onConnectionState: args.onConnectionState, apiFetch, batch: true })
+  } finally {
+    releaseWakeLock()
+  }
+}
+
 /** Playbook upload (admins): videos of any size (big ones resumable, in
  *  parts), thumbnails and attachment files. Returns the storage key; the
  *  caller then saves it on the video / attachment. */
@@ -446,8 +466,10 @@ async function uploadMultipart(args: {
   gallery?: { ownerId?: string | null }
   /** Playbook video (admins) instead of a project. */
   playbook?: boolean
+  /** Batch upload waiting spot (clients) instead of a project. */
+  batch?: boolean
 }): Promise<string> {
-  const { file, projectId, fileType, onProgress, onConnectionState, apiFetch, previewArtifact, gallery, playbook } = args
+  const { file, projectId, fileType, onProgress, onConnectionState, apiFetch, previewArtifact, gallery, playbook, batch } = args
   const reporter = createConnectionReporter(onConnectionState)
 
   const partSize = computePartSize(file.size)
@@ -462,7 +484,9 @@ async function uploadMultipart(args: {
     partUrls: Array<{ partNumber: number; url: string }>
   }>(apiFetch, '/api/project-files/multipart/create', {
     method: 'POST',
-    body: JSON.stringify(playbook
+    body: JSON.stringify(batch
+      ? { batch: true, fileName: file.name, mimeType: file.type, fileSize: file.size, partCount }
+      : playbook
       ? { playbook: true, fileName: file.name, mimeType: file.type, fileSize: file.size, partCount }
       : gallery
       ? {
