@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useApiFetch } from '@/lib/api'
-import { useGalleryFiles, useGallerySignedUrl } from '@/hooks/useGallery'
+import { useGalleryFiles, useGalleryFolders, useGallerySignedUrl } from '@/hooks/useGallery'
 import { useGalleryThumbs } from '@/hooks/useGalleryThumbs'
 import { grabFrame, isVideoFile, saveThumbnail } from '@/lib/thumbnail'
 import { cn } from '@/lib/utils'
-import type { GalleryFile } from '@/types'
+import type { GalleryFile, GalleryFolder } from '@/types'
 
 // Clips already tried this session (so a clip that can't be read isn't retried on every open).
 const tried = new Set<string>()
@@ -108,6 +108,19 @@ function Tile({ file, thumb, selected, onToggle }: {
   )
 }
 
+function FolderTile({ folder, count, onOpen }: { folder: GalleryFolder; count: number; onOpen: () => void }) {
+  return (
+    <button type="button" onClick={onOpen} aria-label={`Open folder ${folder.name}`}
+      className="relative rounded-xl overflow-hidden bg-muted aspect-square flex flex-col items-center justify-center gap-2 px-3 hover:brightness-95">
+      <svg className="w-9 h-9 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+      </svg>
+      <span className="text-sm font-medium truncate max-w-full">{folder.name}</span>
+      <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
+    </button>
+  )
+}
+
 export function GalleryPickerModal({ ownerId, alreadySelected, onSelect, onClose }: {
   ownerId: string
   alreadySelected: string[]
@@ -115,8 +128,18 @@ export function GalleryPickerModal({ ownerId, alreadySelected, onSelect, onClose
   onClose: () => void
 }) {
   const { data: files = [] } = useGalleryFiles(ownerId)
+  const { data: folders = [] } = useGalleryFolders(ownerId)
   const { data: thumbs } = useGalleryThumbs(ownerId)
   const [selected, setSelected] = useState<Set<string>>(new Set(alreadySelected))
+  // Browse like My Gallery: top level first, tap a folder to go in.
+  const [at, setAt] = useState<string | null>(null)
+  const here = folders.find((f) => f.id === at) ?? null
+  const known = new Set(folders.map((f) => f.id))
+  const subfolders = folders.filter((f) => (f.parent_id ?? null) === at).sort((a, b) => a.name.localeCompare(b.name))
+  // A file whose folder is gone shows at the top level rather than vanishing.
+  const shown = files.filter((f) => (f.folder_id && known.has(f.folder_id) ? f.folder_id : null) === at)
+  const inside = (id: string): number => files.filter((f) => f.folder_id === id).length
+    + folders.filter((f) => f.parent_id === id).reduce((n, c) => n + inside(c.id), 0)
   useBackfill(ownerId, files, thumbs)
 
   const toggle = (id: string) => setSelected((prev) => {
@@ -138,16 +161,27 @@ export function GalleryPickerModal({ ownerId, alreadySelected, onSelect, onClose
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pl-5 pr-2 py-1.5 border-b border-border flex-shrink-0">
-          <h2 className="font-heading font-semibold text-base">Pick from Gallery</h2>
+          {here ? (
+            <div className="flex items-center gap-1 min-w-0 -ml-3">
+              <button type="button" onClick={() => setAt(here.parent_id ?? null)} aria-label="Back"
+                className="w-11 h-11 flex-shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <h2 className="font-heading font-semibold text-base truncate">{here.name}</h2>
+            </div>
+          ) : <h2 className="font-heading font-semibold text-base">Pick from Gallery</h2>}
           <button type="button" onClick={onClose} className="w-11 h-11 flex items-center justify-center text-muted-foreground hover:text-foreground text-xl leading-none" aria-label="Close">×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-          {files.length === 0 ? (
+          {files.length === 0 && folders.length === 0 ? (
             <p className="text-center text-muted-foreground text-sm py-10">Your gallery is empty.</p>
+          ) : subfolders.length === 0 && shown.length === 0 ? (
+            <p className="text-center text-muted-foreground text-sm py-10">Empty folder</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-              {files.map((f) => (
+              {subfolders.map((f) => <FolderTile key={f.id} folder={f} count={inside(f.id)} onOpen={() => setAt(f.id)} />)}
+              {shown.map((f) => (
                 <Tile key={f.id} file={f} thumb={thumbs?.[f.id]} selected={selected.has(f.id)} onToggle={() => toggle(f.id)} />
               ))}
             </div>
