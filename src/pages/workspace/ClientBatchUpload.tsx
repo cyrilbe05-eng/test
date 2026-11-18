@@ -17,11 +17,15 @@ import type { Plan, Project } from '@/types'
 // switch is on). Same look as "New video".
 
 const input = 'w-full min-h-[44px] px-3 bg-muted border border-border rounded-xl text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30'
+const clear = 'absolute right-0 w-11 h-11 flex items-center justify-center rounded-xl text-lg leading-none text-muted-foreground hover:text-destructive'
 const small = 'min-h-[36px] px-3 inline-flex items-center justify-center rounded-lg border border-border text-xs font-medium hover:bg-muted'
 
 function Row({ r, many, onRetry }: { r: BatchRow; many: boolean; onRetry: () => void }) {
-  const [showLink, setShowLink] = useState(!!r.link)
-  const [showScript, setShowScript] = useState(!!r.script)
+  const [openLink, setOpenLink] = useState(false)
+  const [openScript, setOpenScript] = useState(false)
+  // Shown when opened, or when it has text (e.g. after "Apply to all").
+  const showLink = openLink || !!r.link
+  const showScript = openScript || !!r.script
   const editable = r.status === 'ready' || r.status === 'over' || (r.status === 'failed' && !r.key)
   const sending = r.status === 'queued' || r.status === 'uploading' || r.status === 'creating'
   return (
@@ -43,11 +47,21 @@ function Row({ r, many, onRetry }: { r: BatchRow; many: boolean; onRetry: () => 
       {editable && (
         <>
           <textarea aria-label="Notes" rows={2} placeholder="Notes" className={cn(input, 'py-2.5 resize-y')} value={r.notes} onChange={(e) => editRow(r.id, { notes: e.target.value })} />
-          {showLink && <input aria-label="Link" type="text" inputMode="url" placeholder="https://" className={input} value={r.link} onChange={(e) => editRow(r.id, { link: e.target.value })} />}
-          {showScript && <textarea aria-label="Script" rows={3} placeholder="Script" className={cn(input, 'py-2.5 resize-y')} value={r.script} onChange={(e) => editRow(r.id, { script: e.target.value })} />}
+          {showLink && (
+            <div className="relative">
+              <input aria-label="Link" type="text" inputMode="url" placeholder="https://" className={cn(input, 'pr-12')} value={r.link} onChange={(e) => editRow(r.id, { link: e.target.value })} />
+              <button type="button" aria-label="Remove link" onClick={() => { editRow(r.id, { link: '' }); setOpenLink(false) }} className={clear} style={{ top: 0 }}>×</button>
+            </div>
+          )}
+          {showScript && (
+            <div className="relative">
+              <textarea aria-label="Script" rows={3} placeholder="Script" className={cn(input, 'py-2.5 pr-12 resize-y')} value={r.script} onChange={(e) => editRow(r.id, { script: e.target.value })} />
+              <button type="button" aria-label="Remove script" onClick={() => { editRow(r.id, { script: '' }); setOpenScript(false) }} className={clear} style={{ top: 0 }}>×</button>
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5">
-            {!showLink && <button type="button" className={small} onClick={() => setShowLink(true)}>+ Link</button>}
-            {!showScript && <button type="button" className={small} onClick={() => setShowScript(true)}>+ Script</button>}
+            {!showLink && <button type="button" className={small} onClick={() => setOpenLink(true)}>+ Link</button>}
+            {!showScript && <button type="button" className={small} onClick={() => setOpenScript(true)}>+ Script</button>}
             {many && <button type="button" className={cn(small, 'ml-auto')} onClick={() => applyToAll(r.id)}>Apply to all</button>}
           </div>
         </>
