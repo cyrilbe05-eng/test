@@ -1,14 +1,18 @@
 import { useSyncExternalStore } from 'react'
 import type { useApiFetch } from '@/lib/api'
 import { uploadBatchFile } from '@/lib/storage'
+import type { EnqueueItem, UploadRunArgs, UploadTask } from '@/lib/uploadManager'
 import { grabFrame } from '@/lib/playbook'
 
-// Batch upload: many videos → one project each. The batch lives here, outside
-// the page, so it keeps going (and its rows stay) while the client looks at
-// other pages. Each file uses the normal resumable upload into the client's
-// waiting spot (uploadBatchFile); as soon as it has arrived its project is
-// created (POST /api/batch/projects). 2 files at a time; a failed file is
-// tried once more by itself, then waits for "Retry".
+// Batch upload: many videos → one project each. Each file is handed to the
+// app's normal upload queue (useUploadManager().enqueue, unchanged): so it
+// shows in the bottom-right upload panel like any upload, runs 2 at a time
+// with everything else, and keeps going while the client looks at other
+// pages. Inside the queue, a file uses the normal resumable upload into the
+// client's waiting spot (uploadBatchFile); as soon as it has arrived its
+// project is created (POST /api/batch/projects). A failed file is tried once
+// more by itself, then waits for Retry (on its row or in the panel).
+// The rows live here, outside the page, so they're still there on return.
 
 export type RowStatus = 'ready' | 'queued' | 'uploading' | 'creating' | 'created' | 'failed' | 'over'
 export interface BatchRow {
@@ -24,11 +28,13 @@ export interface BatchRow {
   key?: string
   projectId?: string
   error?: string
+  /** The label it was queued under (finds its task in the upload panel). */
+  queuedAs?: string
 }
 type ApiFetch = ReturnType<typeof useApiFetch>
+type Enqueue = (items: EnqueueItem[]) => void
 interface State { owner: string | null; rows: BatchRow[]; first: string | null; doneSent: boolean }
 
-const FILES_AT_ONCE = 2
 let state: State = { owner: null, rows: [], first: null, doneSent: false }
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((l) => l())
@@ -44,7 +50,8 @@ export function useBatch(owner: string | undefined) {
   return state
 }
 
-// Warn before closing the page while anything is still going.
+// Warn before closing the page while anything is still going (the queue
+// warns too while it uploads; this also covers "creating the project").
 const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
 let guarded = false
 function guardUnload() {
@@ -89,19 +96,43 @@ export function applyToAll(id: string) {
   set({ rows: state.rows.map((x) => (x.id === id || x.status === 'created' || busy(x) ? x : { ...x, notes: r.notes, link: r.link, script: r.script })) })
 }
 
-/** Start every row that is ready. `slots` = how many more videos the plan
- *  allows (Infinity when unlimited): the rest are marked, not uploaded. */
-export function startAll(apiFetch: ApiFetch, slots: number, onCreated: () => void) {
-  let free = slots - state.rows.filter((r) => busy(r)).length
-  set({ rows: state.rows.map((r) => (r.status === 'ready' || r.status === 'over' ? (free-- > 0 ? { ...r, status: 'queued', error: undefined } : { ...r, status: 'over' }) : r)) })
-  pump(apiFetch, onCreated)
+function queue(ids: string[], enqueue: Enqueue, apiFetch: ApiFetch, onCreated: () => void) {
+  const items: EnqueueItem[] = []
+  for (const id of ids) {
+    const r = row(id)!
+    const label = r.title.trim()
+    patch(id, { status: 'queued', error: undefined, queuedAs: label })
+    items.push({
+      file: r.file,
+      label,
+      invalidate: [['projects'], ['client', 'dashboard']],
+      run: (args) => run(id, args, apiFetch, onCreated),
+    })
+  }
+  enqueue(items)
 }
 
-export function retryRow(id: string, apiFetch: ApiFetch, onCreated: () => void) {
+/** Start every row that is ready. `slots` = how many more videos the plan
+ *  allows (Infinity when unlimited): the rest are marked, not uploaded. */
+export function startAll(enqueue: Enqueue, apiFetch: ApiFetch, slots: number, onCreated: () => void) {
+  let free = slots - state.rows.filter((r) => busy(r)).length
+  const go: string[] = []
+  for (const r of state.rows) {
+    if (r.status !== 'ready' && r.status !== 'over') continue
+    if (free-- > 0) go.push(r.id)
+    else patch(r.id, { status: 'over' })
+  }
+  queue(go, enqueue, apiFetch, onCreated)
+}
+
+/** Retry one row: the same task in the upload panel when it's still there
+ *  (so it isn't listed twice), otherwise queued again. */
+export function retryRow(id: string, tasks: UploadTask[], retryTask: (taskId: string) => void, enqueue: Enqueue, apiFetch: ApiFetch, onCreated: () => void) {
   const r = row(id)
   if (!r || r.status !== 'failed') return
-  patch(id, { status: 'queued', error: undefined, progress: r.key ? 100 : 0 })
-  pump(apiFetch, onCreated)
+  const task = tasks.find((t) => t.status === 'error' && t.name === r.file.name && t.label === r.queuedAs)
+  if (task) { patch(id, { status: 'queued', error: undefined }); retryTask(task.id) }
+  else queue([id], enqueue, apiFetch, onCreated)
 }
 
 /** Clear a finished batch (nothing running). */
@@ -111,10 +142,7 @@ export function clearBatch() {
   set({ rows: [], first: null, doneSent: false })
 }
 
-function pump(apiFetch: ApiFetch, onCreated: () => void) {
-  const running = state.rows.filter((r) => r.status === 'uploading' || r.status === 'creating').length
-  const next = state.rows.filter((r) => r.status === 'queued').slice(0, Math.max(0, FILES_AT_ONCE - running))
-  for (const r of next) void send(r.id, apiFetch, onCreated)
+function maybeDone(apiFetch: ApiFetch) {
   if (!state.rows.some(busy) && state.first && !state.doneSent) {
     // The whole batch has finished: one email to the team.
     set({ doneSent: true })
@@ -134,27 +162,32 @@ const final = (e: unknown) => { const s = (e as { status?: number })?.status; re
 // known before the next (one grouped notification).
 let creating: Promise<unknown> = Promise.resolve()
 
-async function send(id: string, apiFetch: ApiFetch, onCreated: () => void) {
-  let r = row(id)
+/** What the upload queue runs for one row. Throws when it failed, so the
+ *  panel shows it as failed with its Retry. */
+async function run(id: string, args: UploadRunArgs, apiFetch: ApiFetch, onCreated: () => void) {
+  const r = row(id)
   if (!r) return
+  patch(id, { status: r.key ? 'creating' : 'uploading', error: undefined })
   try {
     // 1. The file, unless it already arrived (a retry after a creation error).
     if (!r.key) {
-      patch(id, { status: 'uploading' })
       let key: string | undefined
       for (let attempt = 1; !key; attempt++) {
         try {
-          key = await uploadBatchFile(apiFetch, { file: r.file, onProgress: (p) => patch(id, { progress: p }) })
+          key = await uploadBatchFile(apiFetch, {
+            file: r.file,
+            onProgress: (p) => { args.onProgress(p); patch(id, { progress: p }) },
+            onConnectionState: args.onConnectionState,
+          })
         } catch (e) {
           if (attempt >= 2 || final(e)) throw e // tried twice: wait for Retry
-          patch(id, { progress: 0 })
+          patch(id, { progress: 0 }); args.onProgress(0)
         }
       }
       patch(id, { key, progress: 100 })
     }
     // 2. Its project, right away.
     patch(id, { status: 'creating' })
-    r = row(id)!
     const job = creating.catch(() => undefined).then(async (): Promise<{ id: string }> => {
       const cur = row(id)!
       let lastError: unknown
@@ -184,7 +217,8 @@ async function send(id: string, apiFetch: ApiFetch, onCreated: () => void) {
     onCreated()
   } catch (e) {
     patch(id, { status: 'failed', error: friendly(e), ...(final(e) ? { key: undefined } : {}) })
+    throw new Error(friendly(e))
   } finally {
-    pump(apiFetch, onCreated)
+    maybeDone(apiFetch)
   }
 }

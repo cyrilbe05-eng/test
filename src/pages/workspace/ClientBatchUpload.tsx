@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useIsFullPackage } from '@/hooks/useCanCreateVideo'
 import { useProjects } from '@/hooks/useProjects'
 import { useApiFetch } from '@/lib/api'
+import { useUploadManager } from '@/lib/uploadManager'
 import { isVideo } from '@/lib/autoTitle'
 import { addFiles, applyToAll, clearBatch, editRow, removeRow, retryRow, startAll, useBatch, type BatchRow } from '@/lib/batchUpload'
 import { cn } from '@/lib/utils'
@@ -111,6 +112,7 @@ export default function ClientBatchUpload() {
     enabled: !!profile?.plan_id,
   })
   const batch = useBatch(profile?.id)
+  const { enqueue, tasks, retry } = useUploadManager()
   const fileInput = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -139,7 +141,7 @@ export default function ClientBatchUpload() {
     if (ready.some((r) => r.link.trim() && !/^https?:\/\/\S+$/i.test(r.link.trim()))) { toast.error('Link must start with https://'); return }
     const active = (projects as Project[]).filter((p) => p.status !== 'client_approved').length
     const slots = !plan || plan.max_active_projects === -1 ? Infinity : Math.max(0, plan.max_active_projects - active)
-    startAll(apiFetch, slots, onCreated)
+    startAll(enqueue, apiFetch, slots, onCreated)
   }
 
   return (
@@ -165,7 +167,7 @@ export default function ClientBatchUpload() {
 
         {rows.length > 0 && (
           <ul className="space-y-2.5">
-            {rows.map((r) => <Row key={r.id} r={r} many={rows.length > 1} onRetry={() => retryRow(r.id, apiFetch, onCreated)} />)}
+            {rows.map((r) => <Row key={r.id} r={r} many={rows.length > 1} onRetry={() => retryRow(r.id, tasks, retry, enqueue, apiFetch, onCreated)} />)}
           </ul>
         )}
 
