@@ -41,6 +41,7 @@ const GROUPS: Item[][] = [
     { to: `/admin/${PLAYBOOK_PATH}`, label: PLAYBOOK_NAME, icon: 'video_library', match: (p) => p.startsWith(`/admin/${PLAYBOOK_PATH}`) },
     { to: '/admin/care', label: 'Client Care', icon: 'favorite', match: (p) => p.startsWith('/admin/care'), fullAdminOnly: true },
     { to: '/admin/onboarding-questions', label: 'Questions', icon: 'help', match: (p) => p.startsWith('/admin/onboarding-questions'), fullAdminOnly: true },
+    { to: '/admin/settings', label: 'Settings', icon: 'settings', match: (p) => p.startsWith('/admin/settings'), fullAdminOnly: true },
   ],
 ]
 

@@ -41,6 +41,9 @@ import AdminLibrary from '@/pages/admin/AdminLibrary'
 import AdminPlans from '@/pages/admin/AdminPlans'
 import ClientWorkspace from '@/pages/workspace/ClientWorkspace'
 import ClientUpload from '@/pages/workspace/ClientUpload'
+import ClientNewChoice from '@/pages/workspace/ClientNewChoice'
+import ClientBatchUpload from '@/pages/workspace/ClientBatchUpload'
+import AdminSettings from '@/pages/admin/AdminSettings'
 import ClientProjectDetail from '@/pages/workspace/ClientProjectDetail'
 import TeamDashboard from '@/pages/team/TeamDashboard'
 import TeamHome from '@/pages/team/TeamHome'
@@ -170,6 +173,7 @@ function ProductionApp() {
           <Route path="/admin/onboarding-questions" element={<ProtectedRoute allowedRoles={['admin']}><AdminOnboardingQuestions /></ProtectedRoute>} />
           <Route path="/admin/leaderboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminLeaderboard /></ProtectedRoute>} />
           <Route path="/admin/scripts" element={<ProtectedRoute allowedRoles={['admin']}><AdminScriptReview /></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin']}><AdminSettings /></ProtectedRoute>} />
           <Route path={`/admin/${PLAYBOOK_PATH}`} element={<ProtectedRoute allowedRoles={['admin']}><AdminPlaybook /></ProtectedRoute>} />
           <Route path="/admin/scripts/:clientId" element={<ProtectedRoute allowedRoles={['admin']}><AdminScriptReview /></ProtectedRoute>} />
 
@@ -179,6 +183,8 @@ function ProductionApp() {
           <Route path="/workspace/onboarding" element={<ProtectedRoute allowedRoles={['client']}><ClientOnboarding /></ProtectedRoute>} />
           {/* One-step upload (Part 4). The old form, ClientNewProject, stays in the code unused. */}
           <Route path="/workspace/new" element={<ProtectedRoute allowedRoles={['client']}><ClientUpload /></ProtectedRoute>} />
+          <Route path="/workspace/start" element={<ProtectedRoute allowedRoles={['client']}><ClientNewChoice /></ProtectedRoute>} />
+          <Route path="/workspace/batch" element={<ProtectedRoute allowedRoles={['client']}><ClientBatchUpload /></ProtectedRoute>} />
           <Route path="/workspace/projects/:id" element={<ProtectedRoute allowedRoles={['client']}><ClientProjectDetail /></ProtectedRoute>} />
           <Route path="/workspace/gallery" element={<ProtectedRoute allowedRoles={['client']}><ClientGallery /></ProtectedRoute>} />
           <Route path="/workspace/messages" element={<ProtectedRoute allowedRoles={['client']}><ClientMessages /></ProtectedRoute>} />

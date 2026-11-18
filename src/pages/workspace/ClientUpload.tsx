@@ -55,9 +55,11 @@ export default function ClientUpload() {
   const storage = useStorageAdapter()
   const { enqueue } = useUploadManager()
   const { data: projects = [] } = useProjects()
-  const prefill = ((useLocation().state as { prefill?: Prefill } | null)?.prefill) ?? {}
+  const navState = useLocation().state as { prefill?: Prefill; kind?: Kind } | null
+  const prefill = navState?.prefill ?? {}
 
-  const [kind, setKind] = useState<Kind>('video')
+  // "Carousel" from the New choices opens with Carousel already picked.
+  const [kind, setKind] = useState<Kind>(navState?.kind === 'carousel' ? 'carousel' : 'video')
   const [slides, setSlides] = useState<Slide[]>([])
   const [preparing, setPreparing] = useState(false)
   const slidesRef = useRef(slides)

@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProjects } from '@/hooks/useProjects'
 import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
 import { useClientDashboard } from '@/hooks/useClientDashboard'
+import { useNewVideoPath } from '@/hooks/useAppSettings'
 import { AppFrame, type FrameItem } from '@/components/ds/Frame'
 import { Ms } from '@/components/ds'
 import type { Project } from '@/types'
@@ -23,6 +24,7 @@ export function ClientLayout({ children, bare }: ClientLayoutProps) {
   const canCreate = useCanCreateVideo()
   const { profile, impersonating } = useAuth()
   const { data: dash } = useClientDashboard()
+  const newVideo = useNewVideoPath()
   const { data: projects = [] } = useProjects()
   const { pathname } = useLocation()
 
@@ -59,7 +61,7 @@ export function ClientLayout({ children, bare }: ClientLayoutProps) {
     { to: '/workspace/videos', label: 'Videos', icon: 'movie', on: at('/workspace/videos') },
     { to: '/workspace/messages', label: 'Messages', icon: 'chat_bubble', on: at('/workspace/messages') },
     { to: '/workspace/calendar', label: 'Calendar', icon: 'calendar_month', on: at('/workspace/calendar') },
-    ...(canCreate ? [{ to: '/workspace/new', label: 'New video', icon: 'add', on: at('/workspace/new') }] : []),
+    ...(canCreate ? [{ to: newVideo, label: 'New video', icon: 'add', on: at('/workspace/new') || at('/workspace/start') || at('/workspace/batch') }] : []),
   ]
 
   return (
@@ -70,7 +72,7 @@ export function ClientLayout({ children, bare }: ClientLayoutProps) {
       viewingAs="client"
       bare={bare}
       footer={canCreate && !locked ? (close) => (
-        <Link to="/workspace/new" onClick={close} className="ds-primary justify-center" style={{ width: '100%' }}>
+        <Link to={newVideo} onClick={close} className="ds-primary justify-center" style={{ width: '100%' }}>
           <Ms name="add" style={{ color: 'inherit' }} />New video
         </Link>
       ) : undefined}

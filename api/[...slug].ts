@@ -33,6 +33,7 @@ import { handleTeamRoute } from './_helpers/care/plan-routes.js'
 import { handleClientRoute } from './_helpers/care/client-dashboard.js'
 import { handleScoreboardRoute } from './_helpers/scoreboard/routes.js'
 import { handleScriptsRoute } from './_helpers/scripts/routes.js'
+import { handleSettingsRoute } from './_helpers/settings/routes.js'
 import { handlePlaybookRoute } from './_helpers/playbook/routes.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
 import { isValidAvatar } from './_helpers/avatar.js'
@@ -4878,6 +4879,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleEditorLimit(req, res)
   }
   // Client time saved (automatic) — see api/_helpers/care/time-saved.ts
+  // App-wide on/off switches — see api/_helpers/settings/routes.ts
+  if (slug[0] === 'settings') {
+    return handleSettingsRoute(req, res, slug.slice(1))
+  }
   // Playbook (training videos for clients) — see api/_helpers/playbook/routes.ts
   if (slug[0] === 'playbook') {
     return handlePlaybookRoute(req, res, slug.slice(1))

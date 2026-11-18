@@ -9,6 +9,7 @@ import { Ms } from '@/components/ds'
 import { ClientStats } from '@/components/workspace/ClientStats'
 import { MarkPosted } from '@/components/project/MarkPosted'
 import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
+import { useNewVideoPath } from '@/hooks/useAppSettings'
 import { ProjectStatusBadge } from '@/components/project/ProjectStatusBadge'
 import { useProjects } from '@/hooks/useProjects'
 import { projectTimeLabel } from '@/lib/utils'
@@ -151,6 +152,7 @@ function Plan({ steps }: { steps: Dashboard['plan'] }) {
 export default function ClientDashboard() {
   const { data, isLoading, error } = useClientDashboard()
   const canCreate = useCanCreateVideo()
+  const newVideo = useNewVideoPath()
   const { data: projects } = useProjects()
   // Approved in the last 30 days and not marked posted yet.
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
@@ -175,7 +177,7 @@ export default function ClientDashboard() {
                 <Ms name="dashboard" style={{ fontSize: 18, width: 18, color: 'inherit' }} /><span className="hidden sm:inline">Miro board</span><Ms name="north_east" className="hidden sm:inline-block" style={{ fontSize: 15, width: 15, color: 'var(--faint)' }} />
               </a>
             )}
-            {canCreate && <Link to="/workspace/new" className="min-h-[44px] px-4 inline-flex items-center rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 flex-shrink-0">
+            {canCreate && <Link to={newVideo} className="min-h-[44px] px-4 inline-flex items-center rounded-lg bg-primary text-white text-sm font-semibold hover:brightness-110 flex-shrink-0">
               + New video
             </Link>}
           </div>

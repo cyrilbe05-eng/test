@@ -8,6 +8,7 @@ import { Ms } from '@/components/ds'
 import { projectTimeLabel } from '@/lib/utils'
 import type { Project, Plan, ProjectStatus } from '@/types'
 import { useCanCreateVideo } from '@/hooks/useCanCreateVideo'
+import { useNewVideoPath } from '@/hooks/useAppSettings'
 
 // Client "Videos": the tiles filter the list (active / completed / all).
 
@@ -46,6 +47,7 @@ function Tile({ label, value, icon, on, onClick }: { label: string; value: strin
 export default function ClientWorkspace() {
   const { data: projects, isLoading } = useProjects()
   const canCreate = useCanCreateVideo()
+  const newVideo = useNewVideoPath()
   const { profile } = useAuth()
   const apiFetch = useApiFetch()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -80,7 +82,7 @@ export default function ClientWorkspace() {
           <h1 style={{ fontSize: 24, fontWeight: 650, letterSpacing: '-.02em', color: 'var(--strong)' }}>Videos</h1>
           {canCreate && (projectLimitReached
             ? <span className="ds-primary opacity-40 pointer-events-none" title={`${plan!.max_active_projects}/${plan!.max_active_projects} active videos on the ${plan!.name} plan`}><Ms name="add" style={{ color: 'inherit' }} />New video</span>
-            : <Link to="/workspace/new" className="ds-primary"><Ms name="add" style={{ color: 'inherit' }} />New video</Link>)}
+            : <Link to={newVideo} className="ds-primary"><Ms name="add" style={{ color: 'inherit' }} />New video</Link>)}
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
@@ -98,7 +100,7 @@ export default function ClientWorkspace() {
               {tab === 'completed' ? 'No completed videos yet' : tab === 'active' ? 'No active videos' : 'No videos yet'}
             </p>
             {tab !== 'completed' && !projectLimitReached && canCreate && (
-              <Link to="/workspace/new" className="ds-ghost-btn mt-4 inline-flex">Create your first video</Link>
+              <Link to={newVideo} className="ds-ghost-btn mt-4 inline-flex">Create your first video</Link>
             )}
           </div>
         ) : (
