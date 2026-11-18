@@ -11,14 +11,19 @@ function formatBytes(bytes: number): string {
 /** Floating upload panel, pinned bottom-right across every page.
  *  Uploads run in the app-level manager, so the user can navigate freely
  *  while files transfer — this is the only place progress is shown. */
+// Phones: the panel sits above the bottom bar and starts as its one-line
+// summary (tap to open), so it never covers the bar or the page's buttons.
+const isPhone = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+
 export function UploadDock() {
   const { tasks, retry, clearFinished, activeCount } = useUploadManager()
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(isPhone)
 
   // Re-open the panel whenever a fresh batch starts, so new uploads are never
-  // silently hidden behind a collapsed dock.
+  // silently hidden behind a collapsed dock (computers; phones keep the
+  // one-line summary, which shows the progress).
   useEffect(() => {
-    if (activeCount > 0) setCollapsed(false)
+    if (activeCount > 0 && !isPhone()) setCollapsed(false)
   }, [activeCount > 0]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (tasks.length === 0) return null
@@ -26,9 +31,11 @@ export function UploadDock() {
   const doneCount = tasks.filter((t) => t.status === 'done').length
   const failedCount = tasks.filter((t) => t.status === 'error').length
   const allFinished = activeCount === 0
+  // Overall progress, for the one-line summary on phones.
+  const overall = Math.round(tasks.reduce((n, t) => n + (t.status === 'done' ? 100 : t.progress), 0) / tasks.length)
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9998] w-[min(22rem,calc(100vw-2rem))] clay-card shadow-2xl overflow-hidden border border-border">
+    <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-4 right-4 z-[9998] w-[min(22rem,calc(100vw-2rem))] clay-card shadow-2xl overflow-hidden border border-border">
       {/* Header */}
       <button
         onClick={() => setCollapsed((c) => !c)}
@@ -47,7 +54,7 @@ export function UploadDock() {
         )}
         <span className="text-xs font-semibold flex-1 truncate">
           {activeCount > 0
-            ? `Uploading ${doneCount + 1} of ${tasks.length}…`
+            ? `Uploading ${doneCount + 1} of ${tasks.length}…${collapsed && isPhone() ? ` · ${overall}%` : ''}`
             : failedCount > 0
               ? `${doneCount} uploaded · ${failedCount} failed`
               : `${doneCount} upload${doneCount > 1 ? 's' : ''} complete`}

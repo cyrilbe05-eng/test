@@ -73,7 +73,7 @@ function Row({ r, many, onRetry }: { r: BatchRow; many: boolean; onRetry: () => 
           {(r.status === 'queued' || r.status === 'uploading' || r.status === 'creating') && (
             <>
               <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(r.progress)}>
-                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${r.status === 'queued' ? 0 : r.progress}%` }} />
+                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${r.status === 'queued' ? 0 : r.status === 'creating' ? 100 : r.progress}%` }} />
               </div>
               <span className="text-xs tabular-nums text-muted-foreground w-16 text-right">
                 {r.status === 'queued' ? 'Waiting' : r.status === 'creating' ? '100%' : `${Math.round(r.progress)}%`}
@@ -146,7 +146,7 @@ export default function ClientBatchUpload() {
 
   return (
     <ClientLayout>
-      <main className="max-w-2xl px-4 md:px-6 pt-5 pb-24 md:py-8 space-y-4">
+      <main className="max-w-2xl px-4 md:px-6 pt-5 pb-40 md:py-8 space-y-4">
         <h1 className="text-xl md:text-2xl font-heading font-semibold tracking-tight">Batch upload</h1>
 
         <div
