@@ -414,7 +414,10 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
             inside this div. React must never reconcile other children in here,
             or insertBefore/removeChild would hit a moved node and throw. */}
         <div ref={videoHostRef}>
-          <video ref={videoRef} playsInline preload="metadata" className="w-full max-h-[80vh] object-contain" />
+          {/* Phones: cap the height so a vertical (9:16) video's control bar —
+              and its pause button, which opens the revision box — sits above
+              the fixed bottom menu instead of underneath it. */}
+          <video ref={videoRef} playsInline preload="metadata" className="w-full max-h-[55svh] md:max-h-[80vh] object-contain" />
         </div>
         {buffering && !loadingSource && !urlError && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2.5 bg-black/45 pointer-events-none">
