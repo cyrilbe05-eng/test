@@ -27,6 +27,12 @@ function toSqlValue(v: unknown): unknown {
 }
 
 export async function localQuery<T>(file: string, sql: string, params: unknown[] = []): Promise<T[]> {
+  // Same limit as Cloudflare D1: more than 100 bound parameters is refused.
+  // (Local SQLite allows far more, which hid that production failure.)
+  if (params.length > 100) {
+    console.error(`[D1 limit] ${params.length} parameters: ${sql.replace(/\s+/g, ' ').slice(0, 200)}`)
+    throw new Error(`D1 error: ${JSON.stringify([{ code: 7500, message: `too many SQL variables (${params.length} > 100)` }])}`)
+  }
   const db = await open(file)
   try {
     const stmt = db.prepare(sql)

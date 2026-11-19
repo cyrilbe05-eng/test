@@ -2899,10 +2899,10 @@ function projectLifecycleColor(status: string, hasDeliverable: boolean, hasClien
 /** Which of these project ids have something the client uploaded. */
 async function projectsWithClientUploads(projectIds: string[]): Promise<Set<string>> {
   if (projectIds.length === 0) return new Set()
-  const rows = await dbQuery<{ project_id: string }>(
-    `SELECT DISTINCT pf.project_id FROM project_files pf JOIN projects pr ON pr.id = pf.project_id
+  const rows = await dbQueryIn<{ project_id: string }>(
+    (ph) => `SELECT DISTINCT pf.project_id FROM project_files pf JOIN projects pr ON pr.id = pf.project_id
      WHERE pf.file_type IN ('source_video', 'attachment') AND pf.uploader_id = pr.client_id
-       AND pf.project_id IN (${projectIds.map(() => '?').join(',')})`,
+       AND pf.project_id IN (${ph})`,
     projectIds,
   )
   return new Set(rows.map((r) => r.project_id))

@@ -5,7 +5,7 @@
 // so the client dashboard, the copywriter page and Client Care alerts always
 // agree: a step is never "overdue" when its footage is actually uploaded.
 
-import { dbQuery, dbExecute, newId } from '../db.js'
+import { dbQuery, dbQueryIn, dbExecute, newId } from '../db.js'
 import { PLAN_TEMPLATE } from './config.js'
 
 export type PlanOwner = 'pingu' | 'client' | 'both'
@@ -111,10 +111,11 @@ export async function loadPlanItems(contractIds: string[]): Promise<Map<string, 
   const map = new Map<string, PlanItem[]>()
   if (!contractIds.length) return map
   try {
-    const rows = await dbQuery<PlanItem>(
-      `SELECT id, contract_id, client_id, date, title, owner, done, done_at, done_by, auto_rule, sort_order
-       FROM production_plan_items WHERE contract_id IN (${contractIds.map(() => '?').join(',')})
-       ORDER BY sort_order ASC, date ASC`, contractIds)
+    // Sliced under D1's 100-parameter cap; order restored below.
+    const rows = (await dbQueryIn<PlanItem>(
+      (ph) => `SELECT id, contract_id, client_id, date, title, owner, done, done_at, done_by, auto_rule, sort_order
+       FROM production_plan_items WHERE contract_id IN (${ph})`, contractIds))
+      .sort((a, b) => (a.sort_order - b.sort_order) || String(a.date).localeCompare(String(b.date)))
     for (const r of rows) (map.get(r.contract_id) ?? map.set(r.contract_id, []).get(r.contract_id)!).push(r)
   } catch (e: any) {
     console.warn('[care] production plans unavailable:', e?.message)

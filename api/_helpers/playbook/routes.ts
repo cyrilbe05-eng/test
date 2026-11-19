@@ -67,19 +67,22 @@ async function overview(c: Caller) {
   const sections = await dbQuery<any>(
     `SELECT s.* FROM playbook_sections s ${c.isAdmin ? '' : `WHERE ${VISIBLE_SECTIONS}`} ORDER BY s.sort_order, s.created_at`,
     c.isAdmin ? [] : [c.id])
-  const ids = sections.map((s) => s.id)
-  const inList = ids.map(() => '?').join(',')
-  const videos = ids.length ? await dbQuery<any>(
-    `SELECT * FROM playbook_videos WHERE section_id IN (${inList}) ${c.isAdmin ? '' : "AND status = 'published'"} ORDER BY sort_order, created_at`, ids) : []
+  // No IN (?, ?, …) lists here: Cloudflare D1 refuses more than 100 bound
+  // parameters, so everything is read by join / per client and filtered here.
+  const shown = new Set(sections.map((s) => s.id))
+  const videos = (await dbQuery<any>(
+    `SELECT v.* FROM playbook_videos v JOIN playbook_sections s ON s.id = v.section_id
+     ${c.isAdmin ? '' : `WHERE ${VISIBLE_SECTIONS} AND v.status = 'published'`} ORDER BY v.sort_order, v.created_at`,
+    c.isAdmin ? [] : [c.id])).filter((v) => shown.has(v.section_id))
   const vIds = videos.map((v) => v.id)
-  const vList = vIds.map(() => '?').join(',')
-  const attachments = vIds.length ? await dbQuery<any>(`SELECT * FROM playbook_attachments WHERE video_id IN (${vList}) ORDER BY sort_order, created_at`, vIds) : []
-  const audience = c.isAdmin && ids.length ? await dbQuery<{ section_id: string; client_id: string }>(`SELECT section_id, client_id FROM playbook_section_clients WHERE section_id IN (${inList})`, ids) : []
+  const vSet = new Set<string>(vIds)
+  const attachments = vIds.length ? (await dbQuery<any>('SELECT * FROM playbook_attachments ORDER BY sort_order, created_at')).filter((a) => vSet.has(a.video_id)) : []
+  const audience = c.isAdmin && shown.size ? (await dbQuery<{ section_id: string; client_id: string }>('SELECT section_id, client_id FROM playbook_section_clients')).filter((a) => shown.has(a.section_id)) : []
   const watched = !c.isAdmin && vIds.length
-    ? new Map((await dbQuery<{ video_id: string; watched_at: string }>(`SELECT video_id, watched_at FROM playbook_views WHERE client_id = ? AND video_id IN (${vList})`, [c.id, ...vIds])).map((w) => [w.video_id, w.watched_at]))
+    ? new Map((await dbQuery<{ video_id: string; watched_at: string }>('SELECT video_id, watched_at FROM playbook_views WHERE client_id = ?', [c.id])).filter((w) => vSet.has(w.video_id)).map((w) => [w.video_id, w.watched_at]))
     : new Map<string, string>()
   const viewCounts = c.isAdmin && vIds.length
-    ? new Map((await dbQuery<{ video_id: string; n: number }>(`SELECT video_id, COUNT(*) AS n FROM playbook_views WHERE video_id IN (${vList}) GROUP BY video_id`, vIds)).map((r) => [r.video_id, r.n]))
+    ? new Map((await dbQuery<{ video_id: string; n: number }>('SELECT video_id, COUNT(*) AS n FROM playbook_views GROUP BY video_id')).filter((r) => vSet.has(r.video_id)).map((r) => [r.video_id, r.n]))
     : new Map<string, number>()
   const thumbs = new Map(await Promise.all(videos.map(async (v) => [v.id, await signThumb(v.thumbnail_key)] as const)))
 

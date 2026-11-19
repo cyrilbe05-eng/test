@@ -9,7 +9,7 @@
 //     into the most similar SOP rule of the same client + category, or
 //     creates a new rule. One-off rules unseen for 60 days are archived.
 
-import { dbQuery, dbExecute, newId, nowIso } from '../db.js'
+import { dbQuery, dbQueryIn, dbExecute, newId, nowIso } from '../db.js'
 import { CARE_CONFIG, REVISION_CATEGORY_KEYS, type RevisionCategory } from './config.js'
 import { cleanNote, getMatcher, type EngineName } from './similarity.js'
 
@@ -89,9 +89,9 @@ export async function processPendingRevisions(opts: { clientId?: string } = {}):
     auto.forEach((e, i) => { e.category = picked[i] })
 
     const clientIds = [...new Set(entries.map((e) => e.client_id))]
-    const rules = await dbQuery<RuleRow>(
-      `SELECT id, client_id, category, text, count, first_seen, last_seen FROM client_sop_rules
-       WHERE archived = 0 AND client_id IN (${clientIds.map(() => '?').join(',')})`,
+    const rules = await dbQueryIn<RuleRow>(
+      (ph) => `SELECT id, client_id, category, text, count, first_seen, last_seen FROM client_sop_rules
+       WHERE archived = 0 AND client_id IN (${ph})`,
       clientIds,
     )
 

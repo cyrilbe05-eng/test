@@ -27,14 +27,14 @@ async function loadClient(id: string): Promise<Client> {
   return c
 }
 
-const inList = (n: number) => Array(n).fill('?').join(',')
 
 /** Every R2 key that belongs to this client. */
 async function clientKeys(clientId: string, projectIds: string[]): Promise<string[]> {
   const keys: string[] = []
   if (projectIds.length) {
+    // By sub-search, not an id list (D1 refuses more than 100 parameters).
     const files = await dbQuery<{ storage_key: string; preview_storage_key: string | null }>(
-      `SELECT storage_key, preview_storage_key FROM project_files WHERE project_id IN (${inList(projectIds.length)})`, projectIds)
+      'SELECT storage_key, preview_storage_key FROM project_files WHERE project_id IN (SELECT id FROM projects WHERE client_id = ?)', [clientId])
     for (const f of files) { keys.push(f.storage_key); if (f.preview_storage_key) keys.push(f.preview_storage_key) }
   }
   const gallery = await dbQuery<Record<string, string | null>>('SELECT * FROM gallery_files WHERE owner_id = ?', [clientId])
@@ -66,10 +66,11 @@ async function deleteClient(clientId: string): Promise<{ projects: number; files
   const keys = await clientKeys(clientId, projectIds)
 
   if (projectIds.length) {
-    const q = inList(projectIds.length)
-    // No ON DELETE CASCADE from notifications → projects.
-    await dbExecute(`DELETE FROM notifications WHERE project_id IN (${q})`, projectIds)
-    await dbExecute(`UPDATE calendar_events SET project_id = NULL WHERE project_id IN (${q})`, projectIds)
+    // No ON DELETE CASCADE from notifications → projects. By sub-search, not
+    // an id list (D1 refuses more than 100 parameters).
+    const mine = 'SELECT id FROM projects WHERE client_id = ?'
+    await dbExecute(`DELETE FROM notifications WHERE project_id IN (${mine})`, [clientId])
+    await dbExecute(`UPDATE calendar_events SET project_id = NULL WHERE project_id IN (${mine})`, [clientId])
   }
   await dbExecute('DELETE FROM notifications WHERE recipient_id = ?', [clientId])
   // Rows that point at the client without a cascade (anywhere they appear).
