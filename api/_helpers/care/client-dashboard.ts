@@ -86,6 +86,7 @@ async function dashboardFor(clientId: string) {
       `SELECT e.id, e.title, e.date, e.script, e.caption, e.comments, e.inspiration_url
        FROM calendar_events e
        WHERE e.project_id IS NULL AND COALESCE(e.posted, 0) = 0 AND TRIM(COALESCE(e.script, '')) <> ''
+         AND e.date >= date('now', '-7 days')
          AND (e.owner_id = ? OR EXISTS (SELECT 1 FROM calendar_event_participants c
                WHERE c.event_id = e.id AND c.profile_id = ? AND c.role = 'client'))
        ORDER BY e.date, e.created_at`, [clientId, clientId])
