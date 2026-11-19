@@ -247,6 +247,12 @@ async function handleCreateUser(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // New clients are held on the onboarding questionnaire until they finish
+    // it (migration 027). Before the migration: created as usual, never held.
+    if (role === 'client') {
+      try { await dbExecute('UPDATE profiles SET onboarding_required = 1 WHERE id = ?', [userId]) } catch { /* pre-migration */ }
+    }
+
     if (role === 'team') {
       try {
         await dbExecute('UPDATE profiles SET team_role = ? WHERE id = ?', [team_role ?? 'editor', userId])

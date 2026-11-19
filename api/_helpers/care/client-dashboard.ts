@@ -90,8 +90,16 @@ async function dashboardFor(clientId: string) {
                WHERE c.event_id = e.id AND c.profile_id = ? AND c.role = 'client'))
        ORDER BY e.date, e.created_at`, [clientId, clientId])
   } catch { /* pre-migration */ }
+  // Only NEW client accounts (migration 027) are held on the questionnaire;
+  // existing clients see their Home as usual. Missing column = nobody held.
+  let required = false
+  try {
+    const [p] = await dbQuery<{ onboarding_required: number | null }>('SELECT onboarding_required FROM profiles WHERE id = ?', [clientId])
+    required = p?.onboarding_required === 1
+  } catch { /* pre-migration */ }
+  const dash = buildDashboard(client, Date.now())
   // Miro board, SOPs, style — same brief the copywriter sees.
-  return { ...buildDashboard(client, Date.now()), scripts, ...(await loadBrief(clientId)) }
+  return { ...dash, needs_onboarding: dash.needs_onboarding && required, scripts, ...(await loadBrief(clientId)) }
 }
 
 /** Router entry. `rest` = path after /api/client. */

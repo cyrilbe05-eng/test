@@ -11,7 +11,7 @@
 //
 // Local only. It saves a copy of the local database first and puts it back
 // at the end (even if something fails), so it leaves no test projects.
-// Needs: the local app running, Microsoft Edge, Python 3 (for the database).
+// Needs: the local app running, Microsoft Edge or Google Chrome, Python 3.
 const { chromium } = require('playwright-core')
 const fs = require('fs'); const path = require('path'); const crypto = require('crypto')
 const { execFileSync } = require('child_process')
@@ -95,7 +95,11 @@ const check = (r, file, label) => {
 async function run() {
   const small = makeFile('small.mp4', 3), big = makeFile('big.mp4', 40), big2 = makeFile('big2.mp4', 36), big3 = makeFile('big3.mp4', 34), big4 = makeFile('big4.mp4', 38)
   const stamp = Date.now().toString(36)
-  const b = await chromium.launch({ channel: 'msedge' })
+  // Microsoft Edge, or Google Chrome when Edge can't start (e.g. mid-update).
+  let b
+  for (const channel of ['msedge', 'chrome']) {
+    try { b = await chromium.launch({ channel }); break } catch (e) { if (channel === 'chrome') throw e }
+  }
   try {
     // 1. Normal upload
     { const { ctx, p } = await session(b); const t = `Guard small ${stamp}`
