@@ -278,7 +278,7 @@ async function waitDone(key, id, maxChecks = 12) {
       for (const u of folder.json.uploads) finished.push(u.status === 'done' ? { json: { upload: u } } : await waitDone(KEY, u.id))
       ok(finished.every((f) => f.json?.upload?.status === 'done'), 'every video in the folder → done')
       const titles = finished.map((f) => sql('select title, instructions, client_id from projects where id = ?', f.json.upload.project.id)[0])
-      ok(JSON.stringify(titles.map((t) => t.title).sort()) === JSON.stringify(['Gym shoot · B roll', 'Gym shoot · Gym A']), 'one project per video, titled with the file name: ' + titles.map((t) => t.title).join(', '))
+      ok(JSON.stringify(titles.map((t) => t.title).sort()) === JSON.stringify(['Gym shoot · Day 2 · B roll', 'Gym shoot · Gym A']), 'one project per video, titled with its folder and file name: ' + titles.map((t) => t.title).join(', '))
       ok(titles.every((t) => t.instructions === 'Same style for all' && t.client_id === orbit.id), "instructions on every project; all for the key's client")
       const bytesA = await storedBytesOf(finished.find((f) => f.json.upload.file_name === 'Gym A.mov').json.upload.project.id, admin)
       ok(sha(bytesA) === sha(DRIVE.files['1DriveVideoA000001'][1]), 'folder video stored byte for byte')

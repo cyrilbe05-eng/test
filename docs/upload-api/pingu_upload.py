@@ -190,7 +190,7 @@ def upload_folder(folder, fields):
         if st != 200: fail(st, r)
     failed = []
     for i, rel in enumerate(todo, 1):
-        stem = os.path.splitext(os.path.basename(rel))[0]
+        stem = " · ".join(os.path.splitext(rel)[0].split("/"))     # "Vid 3/After.mp4" -> "Vid 3 · After"
         print(f"[{i}/{len(todo)}] {rel}", flush=True)
         f = dict(fields, title=f"{fields['title']} · {stem}" if fields.get("title") else stem)
         try:

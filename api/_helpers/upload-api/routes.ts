@@ -101,6 +101,12 @@ function projectFields(body: any) {
 }
 
 const titleFrom = (fileName: string) => fileName.replace(/\.[^.]+$/, '').trim().slice(0, 200) || 'Video'
+/** Title for a video inside a folder: the folders it sits in, then its name ("Vid 3 · After"). */
+const folderTitle = (path: string) => {
+  const parts = path.split('/').map((p) => p.trim()).filter(Boolean)
+  const name = parts.pop() ?? ''
+  return [...parts, hasVideoExtension(name) ? name.replace(/\.[^.]+$/, '') : name].join(' · ').trim().slice(0, 200) || 'Video'
+}
 
 function view(row: UploadRow) {
   return {
@@ -465,7 +471,7 @@ export async function handleUploadApiRoute(req: VercelRequest, res: VercelRespon
       const ids: string[] = []
       for (const v of listing.videos) {
         const rowId = newId()
-        const name = titleFrom(v.name)
+        const name = folderTitle(v.path)
         await dbExecute(
           `INSERT INTO api_uploads (id, key_id, client_id, kind, status, source_url, file_name, file_size, bytes_done, title, instructions, video_script, inspiration_url, attempts, created_at, updated_at)
            VALUES (?, ?, ?, 'link', 'queued', ?, ?, ?, 0, ?, ?, ?, ?, 0, ?, ?)`,

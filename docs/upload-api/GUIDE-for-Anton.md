@@ -27,7 +27,7 @@ python pingu_upload.py "/path/to/video.mov" --title "Gym tour" --instructions "F
 ```
 python pingu_upload.py "/path/to/folder" --title "Gym shoot" --instructions "Same style for all"
 ```
-One project per video, titled with the file name; with `--title`, it's used as a prefix: "Gym shoot · IMG_0412". Photos, documents and other non-video files are skipped and listed. The script first checks the account has room for all the videos; if not, it uploads nothing and says why.
+One project per video, titled with the folder it's in and the file name, like "Day 2 · IMG_0412" (a video directly in the folder is just "IMG_0412"). With `--title`, it's added in front: "Gym shoot · Day 2 · IMG_0412". Photos, documents and other non-video files are skipped and listed. The script first checks the account has room for all the videos; if not, it uploads nothing and says why.
 
 **3. One video at a link** (Google Drive, Dropbox, or any direct download link; our server downloads it, so nothing goes through this computer)
 ```
@@ -41,7 +41,7 @@ python pingu_upload.py --link "https://drive.google.com/drive/folders/…" --tit
 Same as option 2: one project per video, others skipped and listed, the account is checked first. Our server downloads the videos.
 
 ### Rules for all 4
-- `--title` is optional. Without it, the file name is the project title. Other optional extras: `--instructions` (notes for the editor), `--script` (the video script), `--inspiration` (a link to a reference video). For folders, these apply to every video.
+- `--title` is optional. Without it, the file name is the project title (for folders: the folder and file name). Other optional extras: `--instructions` (notes for the editor), `--script` (the video script), `--inspiration` (a link to a reference video). For folders, these apply to every video.
 - **Links must be shared as "Anyone with the link".** Folder links work for **Google Drive only**. For Dropbox, send one link per video.
 - **At most 100 videos per folder.** For more, upload the sub-folders one at a time.
 - **When it finishes, the script prints one line of JSON.**
@@ -286,7 +286,7 @@ def upload_folder(folder, fields):
         if st != 200: fail(st, r)
     failed = []
     for i, rel in enumerate(todo, 1):
-        stem = os.path.splitext(os.path.basename(rel))[0]
+        stem = " · ".join(os.path.splitext(rel)[0].split("/"))     # "Vid 3/After.mp4" -> "Vid 3 · After"
         print(f"[{i}/{len(todo)}] {rel}", flush=True)
         f = dict(fields, title=f"{fields['title']} · {stem}" if fields.get("title") else stem)
         try:
