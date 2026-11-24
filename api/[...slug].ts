@@ -35,6 +35,7 @@ import { handleScoreboardRoute } from './_helpers/scoreboard/routes.js'
 import { handleScriptsRoute } from './_helpers/scripts/routes.js'
 import { handleSettingsRoute, loadSettings } from './_helpers/settings/routes.js'
 import { handleBatchRoute, batchStorageAllowed } from './_helpers/batch/routes.js'
+import { handleUploadApiRoute, handleApiKeysAdminRoute } from './_helpers/upload-api/routes.js'
 import { handlePlaybookRoute } from './_helpers/playbook/routes.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
 import { isValidAvatar } from './_helpers/avatar.js'
@@ -4919,6 +4920,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleEditorLimit(req, res)
   }
   // Client time saved (automatic) — see api/_helpers/care/time-saved.ts
+  // Upload API (clients' API keys) — see api/_helpers/upload-api/routes.ts
+  if (slug[0] === 'v1') {
+    return handleUploadApiRoute(req, res, slug.slice(1), handleCreateProject)
+  }
+  if (slug[0] === 'api-keys') {
+    return handleApiKeysAdminRoute(req, res, slug.slice(1))
+  }
   // Batch upload (clients) — see api/_helpers/batch/routes.ts
   if (slug[0] === 'batch') {
     return handleBatchRoute(req, res, slug.slice(1), handleCreateProject)

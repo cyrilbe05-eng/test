@@ -16,6 +16,7 @@ import { HealthBadge } from '@/components/care/HealthBadge'
 import { Block } from '@/components/care/Block'
 import { SopRules, RevisionBacklog } from '@/components/care/RevisionSections'
 import { OnboardingAnswers } from '@/components/onboarding/OnboardingAnswers'
+import { ApiKeysSection } from '@/components/care/ApiKeysSection'
 import type { ClientCareDetail, Contract, ContractPackage, OnboardingStep, RenewalStatus } from '@/types/care'
 
 // Client detail: side panel on desktop, full screen on phones. All numbers
@@ -530,6 +531,7 @@ export function ClientCarePanel({ clientId, onClose }: { clientId: string; onClo
                 <Contracts detail={data} />
                 <InstagramSection detail={data} />
                 <NotesForm detail={data} />
+                <ApiKeysSection clientId={data.client.id} />
               </>
             )
           ) : null}
