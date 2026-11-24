@@ -38,6 +38,7 @@ import {
 } from './keys.js'
 import { fileNameFrom, hasVideoExtension, normalizeLink, openLink, safeFileName, sniffVideo, VIDEO_EXTENSIONS } from './links.js'
 import { driveFileDownloadUrl, listDriveFolder, parseDriveFolder } from './drive.js'
+import { Pieces } from './pieces.js'
 
 type CreateProject = (req: VercelRequest, res: VercelResponse) => Promise<void>
 
@@ -288,13 +289,9 @@ async function workOnLink(id: string, deadline: number, req: VercelRequest, crea
       }
       if (total != null && total > MAX_FILE_BYTES) throw new PermanentError('The file is bigger than the 100 GB limit.')
 
-      let buffered: Buffer[] = []
-      let bufferedBytes = 0
+      const pending = new Pieces(LINK_PART)                     // every piece exactly LINK_PART bytes (storage needs this)
       let sent = from
-      const flush = async () => {
-        if (!bufferedBytes) return
-        const chunk = Buffer.concat(buffered, bufferedBytes)
-        buffered = []; bufferedBytes = 0
+      const sendPiece = async (chunk: Buffer) => {
         const partNumber = parts.length + 1
         const url = absolute(await getPresignedPartUrl(row.storage_key!, row.upload_id!, partNumber, PART_URL_TTL))
         const put = await fetch(url, { method: 'PUT', body: chunk })
@@ -307,11 +304,11 @@ async function workOnLink(id: string, deadline: number, req: VercelRequest, crea
       }
 
       for await (const piece of body as AsyncIterable<Buffer>) {
-        buffered.push(piece); bufferedBytes += piece.length
+        pending.add(piece)
         if (!row.upload_id) {
-          if (bufferedBytes < 512) continue
+          if (pending.bytes < 512) continue
           // First bytes of the file: is it a video? Then open the storage upload.
-          const head = Buffer.concat(buffered, bufferedBytes)
+          const head = pending.peek()
           const kind = sniffVideo(head)
           if (!kind) throw new PermanentError('The link does not point to a video file.')
           const fileName = fileNameFrom(link.headers, link.finalUrl, kind.ext)
@@ -323,15 +320,16 @@ async function workOnLink(id: string, deadline: number, req: VercelRequest, crea
           const uploadId = await createMultipartUpload(storageKey, inferPlaybackMimeType(fileName, mime))
           await save({ storage_key: storageKey, upload_id: uploadId, file_name: fileName, file_size: total, mime_type: mime, part_size: LINK_PART, parts_json: '[]' })
         }
-        if (sent + bufferedBytes > MAX_FILE_BYTES) throw new PermanentError('The file is bigger than the 100 GB limit.')
-        if (bufferedBytes >= LINK_PART) await flush()
+        if (sent + pending.bytes > MAX_FILE_BYTES) throw new PermanentError('The file is bigger than the 100 GB limit.')
+        for (let chunk; (chunk = pending.full());) await sendPiece(chunk)
         if (Date.now() > deadline) { body.destroy(); await release(); return }
       }
       if (!row.upload_id) {
-        if (bufferedBytes === 0) throw new PermanentError('The link returned an empty file.')
+        if (pending.bytes === 0) throw new PermanentError('The link returned an empty file.')
         throw new PermanentError('The link does not point to a video file.')
       }
-      await flush()
+      const tail = pending.last()
+      if (tail) await sendPiece(tail)
       if (total != null && sent !== total) throw new Error(`The download stopped early (${sent} of ${total} bytes).`)
       if (total == null) await save({ file_size: sent })
     }
