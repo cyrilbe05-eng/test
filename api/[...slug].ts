@@ -1791,12 +1791,22 @@ async function handleDeleteProjectFile(req: VercelRequest, res: VercelResponse) 
     if (!rows[0]) { res.status(404).json({ error: 'File not found' }); return }
     const file = rows[0]
 
+    // Admins: any file, any time. Editors ASSIGNED to the project: any
+    // deliverable on it (also one another editor or an admin uploaded, e.g.
+    // an older version), only while it's in progress or revision requested.
+    // Other files: only their own, same stages.
     if (profile.role !== 'admin') {
-      // Team members can only delete their own deliverables when project allows edits
-      if (profile.role !== 'team') { res.status(403).json({ error: 'Forbidden' }); return }
-      if (file.uploader_id !== clerkUserId) { res.status(403).json({ error: 'You can only delete your own files' }); return }
+      if (profile.role !== 'team' || (profile as any).team_role === 'copywriter') { res.status(403).json({ error: 'Forbidden' }); return }
       if (!['in_progress', 'revision_requested'].includes(file.project_status)) {
-        res.status(403).json({ error: 'Cannot delete files once project is under review' }); return
+        res.status(403).json({ error: 'Files can only be deleted while the project is in progress or has a revision requested' }); return
+      }
+      if (file.file_type === 'deliverable') {
+        const [assigned] = await dbQuery<{ id: string }>(
+          'SELECT id FROM project_assignments WHERE project_id = ? AND team_member_id = ?',
+          [file.project_id, clerkUserId])
+        if (!assigned) { res.status(403).json({ error: 'Only editors assigned to this project can delete its deliverables' }); return }
+      } else if (file.uploader_id !== clerkUserId) {
+        res.status(403).json({ error: 'You can only delete your own files' }); return
       }
     }
 
@@ -2761,9 +2771,15 @@ async function handleGetGallerySignedUrl(req: VercelRequest, res: VercelResponse
     }
 
     const wantDownload = String((req.query as any).download ?? '') === '1'
+    // quick=1 (thumbnail making): answer at once with the playback type set on
+    // the link, instead of first rewriting a mislabelled .mov in storage —
+    // that one-time copy of the whole video can take up to 25 s per file.
+    const quick = String((req.query as any).quick ?? '') === '1'
     const url = wantDownload
       ? await getPresignedDownloadUrl(file.storage_key, DOWNLOAD_URL_TTL_SECONDS, file.file_name, inferMimeType(file.file_name, file.mime_type))
-      : await getPresignedDownloadUrl(file.storage_key, STREAM_URL_TTL_SECONDS, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
+      : quick
+        ? await getPresignedDownloadUrl(file.storage_key, STREAM_URL_TTL_SECONDS, undefined, inferPlaybackMimeType(file.file_name, file.mime_type))
+        : await getPresignedDownloadUrl(file.storage_key, STREAM_URL_TTL_SECONDS, undefined, await ensurePlayableObject(file.storage_key, file.file_name, file.mime_type))
     res.json({ url })
   } catch (e: any) {
     res.status(e?.status ?? 500).json({ error: e?.message ?? 'Internal error' })

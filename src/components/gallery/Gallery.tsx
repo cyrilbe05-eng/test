@@ -7,7 +7,9 @@ import { useApiFetch } from '@/lib/api'
 import { useUploadManager } from '@/lib/uploadManager'
 import { uploadGalleryFile, apiFetchResilient } from '@/lib/storage'
 import { downloadAll } from '@/lib/zipDownload'
-import { grabFrame, saveThumbnail } from '@/lib/thumbnail'
+import { grabFrame, isVideoFile, saveThumbnail } from '@/lib/thumbnail'
+import { useGalleryThumbs } from '@/hooks/useGalleryThumbs'
+import { useThumbnailBackfill } from '@/hooks/useThumbnailBackfill'
 import {
   useGalleryFiles,
   useGalleryFolders,
@@ -246,6 +248,7 @@ function useNearViewport<T extends HTMLElement>(): [React.RefObject<T>, boolean]
 
 function FileCard({
   file,
+  thumb,
   viewMode,
   canDownload,
   downloading,
@@ -259,6 +262,8 @@ function FileCard({
   onPreview,
 }: {
   file: GalleryFile
+  /** Signed URL of the clip's still-frame thumbnail, when one exists. */
+  thumb?: string
   viewMode: 'grid' | 'list'
   canDownload: boolean
   downloading?: boolean
@@ -273,25 +278,45 @@ function FileCard({
   onPreview: (file: GalleryFile, url: string) => void
 }) {
   const isImage = file.mime_type.startsWith('image/')
-  const isVideo = file.mime_type.startsWith('video/')
+  const isVideo = !isImage && isVideoFile(file)
 
-  // Signed URL is fetched only once the card approaches the viewport — see
+  // Images: signed URL fetched once the card approaches the viewport — see
   // useNearViewport for why (large galleries used to self-DDoS on mount).
+  // Videos show their still-frame thumbnail and only fetch the clip itself
+  // when someone presses play: loading every clip just to draw a tile was
+  // slow (a mislabelled .mov is repaired in storage first, up to 25 s each)
+  // and stayed black in browsers that can't decode iPhone (HEVC) video.
   const [cardRef, near] = useNearViewport<HTMLDivElement>()
   const longPress = useLongPress((x, y) => onLongPress(x, y, file.id))
   const apiFetch = useApiFetch()
+  const [armed, setArmed] = useState(false)
   const { data: signedUrl } = useQuery({
     queryKey: ['gallery_signed_url', file.id],
     queryFn: () => apiFetch<{ url: string }>(`/api/gallery/${file.id}/signed-url`),
     staleTime: 1000 * 60 * 4,
-    enabled: near && (isImage || isVideo),
+    enabled: near && (isImage || (isVideo && armed)),
   })
 
   const [playing, setPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  // First press of play: the clip arrives a moment later, then starts.
+  useEffect(() => {
+    if (playing && signedUrl?.url) videoRef.current?.play().catch(() => setPlaying(false))
+  }, [playing, signedUrl?.url])
+
+  const openFullscreen = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const url = signedUrl?.url ?? (await apiFetch<{ url: string }>(`/api/gallery/${file.id}/signed-url`)).url
+      onPreview(file, url)
+    } catch {
+      toast.error('Could not open this file')
+    }
+  }
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (!armed) { setArmed(true); setPlaying(true); return }
     if (!videoRef.current) return
     if (playing) {
       videoRef.current.pause()
@@ -323,9 +348,9 @@ function FileCard({
         <div className="w-10 h-10 flex-shrink-0 rounded-[9px] overflow-hidden flex items-center justify-center relative" style={{ background: 'var(--panel)', boxShadow: 'inset 0 0 0 1px var(--panel-ring)' }}>
           {isImage && signedUrl?.url ? (
             <img src={signedUrl.url} alt={file.file_name} className="w-full h-full object-cover" />
-          ) : isVideo && signedUrl?.url ? (
+          ) : isVideo && thumb ? (
             <>
-              <video ref={videoRef} src={signedUrl.url} className="w-full h-full object-cover" muted preload="metadata" onEnded={() => setPlaying(false)} />
+              <img src={thumb} alt={file.file_name} className="w-full h-full object-cover" loading="lazy" />
               <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                 <div className="w-4 h-4 rounded-full bg-white/90 flex items-center justify-center">
                   <svg className="w-2 h-2 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
@@ -390,16 +415,24 @@ function FileCard({
               </svg>
             </button>
           </>
-        ) : isVideo && signedUrl?.url ? (
+        ) : isVideo ? (
           <>
-            <video
-              ref={videoRef}
-              src={signedUrl.url}
-              className="w-full h-full object-cover"
-              muted
-              preload="metadata"
-              onEnded={() => setPlaying(false)}
-            />
+            {armed && signedUrl?.url ? (
+              <video
+                ref={videoRef}
+                src={signedUrl.url}
+                poster={thumb}
+                className="w-full h-full object-cover"
+                muted
+                playsInline
+                preload="metadata"
+                onEnded={() => setPlaying(false)}
+              />
+            ) : thumb ? (
+              <img src={thumb} alt={file.file_name} className="w-full h-full object-cover" loading="lazy" />
+            ) : (
+              <TypeMark mime={file.mime_type || 'video/mp4'} />
+            )}
             {/* Play/pause overlay */}
             <button
               onClick={togglePlay}
@@ -419,7 +452,7 @@ function FileCard({
             </button>
             {/* Fullscreen button */}
             <button
-              onClick={(e) => { e.stopPropagation(); onPreview(file, signedUrl.url) }}
+              onClick={openFullscreen}
               className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/50 text-white flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/70"
               title="Fullscreen"
             >
@@ -561,6 +594,9 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
   // Data
   const { data: allFiles = [], isLoading: filesLoading } = useGalleryFiles(ownerId)
   const { data: allFolders = [], isLoading: foldersLoading } = useGalleryFolders(ownerId)
+  // Still-frame thumbnails for clips; missing ones are made in the background.
+  const { data: thumbs } = useGalleryThumbs(ownerId)
+  useThumbnailBackfill(ownerId, allFiles, thumbs)
 
   const createFolder = useCreateFolder()
   const deleteFolder = useDeleteFolder()
@@ -1019,6 +1055,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
               <FileCard
                 key={file.id}
                 file={file}
+                thumb={thumbs?.[file.id]}
                 viewMode="grid"
                 canDownload={canDownload}
                 downloading={!!downloading[file.id]}
@@ -1067,6 +1104,7 @@ export function Gallery({ ownerId, currentUserId: _currentUserId, storageLimitMb
               <FileCard
                 key={file.id}
                 file={file}
+                thumb={thumbs?.[file.id]}
                 viewMode="list"
                 canDownload={canDownload}
                 downloading={!!downloading[file.id]}

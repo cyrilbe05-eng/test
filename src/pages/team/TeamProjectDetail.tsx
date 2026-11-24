@@ -107,7 +107,9 @@ function FileRow({ name, size, fileId, badge, canDelete, onDelete }: {
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+    if (!confirm(`Permanently delete "${name}"?
+
+The video will be deleted from storage for good, for everyone. It cannot be recovered.`)) return
     setDeleting(true)
     try {
       await apiFetch(`/api/project-files/${fileId}`, { method: 'DELETE' })
@@ -232,6 +234,10 @@ export default function TeamProjectDetail() {
   const canUpload = (project?.status === 'in_progress' || project?.status === 'revision_requested' || project?.status === 'pending_assignment')
     && !isCopywriter && (profile?.team_role !== 'editor' || isAssignedToMe)
   const canSubmitReview = canUpload && deliverables.length > 0
+  // Same rule as the server: an assigned editor may delete any deliverable
+  // (older versions too) while the project is in progress / revision requested.
+  const canDeleteDeliverables = (project?.status === 'in_progress' || project?.status === 'revision_requested')
+    && !isCopywriter && isAssignedToMe
 
   // Start Processing assigns the editor first (the server checks their
   // active-video limit), then starts the project.
@@ -466,7 +472,7 @@ export default function TeamProjectDetail() {
                       name={f.file_name}
                       size={f.file_size}
                       fileId={f.id}
-                      canDelete={canUpload}
+                      canDelete={canDeleteDeliverables}
                       onDelete={() => { refetchFiles(); qc.invalidateQueries({ queryKey: ['project_files', id] }) }}
                     />
                     <ReviewCopyControl

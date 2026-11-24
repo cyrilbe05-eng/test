@@ -1,40 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { useApiFetch } from '@/lib/api'
 import { useGalleryFiles, useGalleryFolders, useGallerySignedUrl } from '@/hooks/useGallery'
 import { useGalleryThumbs } from '@/hooks/useGalleryThumbs'
-import { grabFrame, isVideoFile, saveThumbnail } from '@/lib/thumbnail'
+import { isVideoFile } from '@/lib/thumbnail'
+import { useThumbnailBackfill } from '@/hooks/useThumbnailBackfill'
 import { cn } from '@/lib/utils'
 import type { GalleryFile, GalleryFolder } from '@/types'
-
-// Clips already tried this session (so a clip that can't be read isn't retried on every open).
-const tried = new Set<string>()
-
-/** Makes thumbnails for older clips that don't have one yet, one at a time. */
-function useBackfill(ownerId: string, files: GalleryFile[], thumbs: Record<string, string> | undefined) {
-  const apiFetch = useApiFetch()
-  const qc = useQueryClient()
-  useEffect(() => {
-    if (!thumbs) return
-    const todo = files.filter((f) => isVideoFile(f) && !thumbs[f.id] && !tried.has(f.id))
-    if (!todo.length) return
-    let stop = false
-    ;(async () => {
-      let made = 0
-      for (const f of todo) {
-        if (stop) break
-        tried.add(f.id)
-        try {
-          const { url } = await apiFetch<{ url: string }>(`/api/gallery/${f.id}/signed-url`)
-          await saveThumbnail(apiFetch, f.id, await grabFrame(url, { crossOrigin: true }))
-          made++
-        } catch { /* best effort */ }
-      }
-      if (made) qc.invalidateQueries({ queryKey: ['gallery_thumbs', ownerId] })
-    })()
-    return () => { stop = true }
-  }, [ownerId, files, thumbs, apiFetch, qc])
-}
 
 const Check = () => (
   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,7 +110,7 @@ export function GalleryPickerModal({ ownerId, alreadySelected, onSelect, onClose
   const shown = files.filter((f) => (f.folder_id && known.has(f.folder_id) ? f.folder_id : null) === at)
   const inside = (id: string): number => files.filter((f) => f.folder_id === id).length
     + folders.filter((f) => f.parent_id === id).reduce((n, c) => n + inside(c.id), 0)
-  useBackfill(ownerId, files, thumbs)
+  useThumbnailBackfill(ownerId, files, thumbs)
 
   const toggle = (id: string) => setSelected((prev) => {
     const next = new Set(prev)

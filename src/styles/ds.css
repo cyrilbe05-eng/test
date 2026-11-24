@@ -103,6 +103,15 @@ html.dark .ds {
 .ds-lane.over .ds-slot{border-color:var(--focus);color:var(--strong)}
 @keyframes ds-rise{from{opacity:0;transform:perspective(900px) translateY(14px) scale(.96)}to{opacity:1}}
 @keyframes ds-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* Touch screens (no hover, so no tilt anyway) and phones: flat cards. A 3D
+   transform gives every card its own GPU layer, and hundreds of them use more
+   graphics memory than mobile Safari allows a tab, which then gets killed. */
+@keyframes ds-rise-flat{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+@media (hover:none),(max-width:767px){
+  .ds-card{transform:none;animation-name:ds-rise-flat}
+  .ds-card.landed{animation-name:ds-rise-flat}
+  .ds-card::after{display:none}
+}
 
 /* ── List view ── */
 .ds-lrow{all:unset;box-sizing:border-box;display:grid;grid-template-columns:minmax(220px,2.4fr) minmax(150px,1.4fr) minmax(150px,1.3fr) minmax(150px,1.3fr) 90px;gap:16px;align-items:center;height:52px;padding:0 20px;border-radius:12px;cursor:pointer;font-size:13.5px;transition:background .2s;animation:ds-fade .5s var(--out) backwards}

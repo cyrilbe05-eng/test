@@ -9,6 +9,11 @@ import { COLUMNS, columnLabel, type BoardProject } from '@/lib/board'
 import { ClientMark, EditorAvatar, StatusDot } from '@/components/ds'
 import { useSheetClose } from '@/hooks/useSheetClose'
 
+// Cards drawn per column before "Show more". Phones can't hold hundreds of
+// cards at once (the Client approved column alone passes 600), and the tab
+// gets killed; search and the List view still reach every project.
+const PAGE = 30
+
 // Admins can move a card to ANY column. Backwards (an earlier stage outside
 // the normal flow) asks first, and the API sends no notifications for it.
 
@@ -75,6 +80,8 @@ export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine
   // undone if it fails.
   const [moved, setMoved] = useState<Record<string, ProjectStatus>>({})
   const [landed, setLanded] = useState<string | null>(null)
+  // How many cards each column shows (grows by PAGE per "Show more").
+  const [limits, setLimits] = useState<Record<string, number>>({})
   const updateStatus = useUpdateProjectStatus()
 
   // Drop the local override once the server's list agrees.
@@ -131,8 +138,12 @@ export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine
           // (client_approved is terminal, so updated_at is the completion moment.
           // Other columns keep the API's created_at ordering.)
           if (col.dropTarget === 'client_approved') {
-            cards.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+            // A card just moved here counts as newest, so it stays in view.
+            const at = (p: BoardProject) => (moved[p.id] ? Infinity : new Date(p.updated_at).getTime())
+            cards.sort((a, b) => at(b) - at(a))
           }
+          const limit = limits[col.dropTarget] ?? PAGE
+          const hidden = Math.max(0, cards.length - limit)
           return (
             <section
               key={col.dropTarget}
@@ -148,7 +159,7 @@ export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine
                 <span style={{ fontSize: 12.5, color: 'var(--faint)', padding: '1px 7px', borderRadius: 999, background: 'var(--pill)' }}>{cards.length}</span>
               </div>
 
-              {cards.map((project, i) => {
+              {cards.slice(0, limit).map((project, i) => {
                 const client = project.profiles?.full_name ?? '—'
                 const editors = project.assigned_team_names ?? ''
                 const first = editors.split(',')[0]?.trim()
@@ -187,6 +198,17 @@ export function KanbanBoard({ projects, base = '/admin/projects', readOnly, mine
                   </article>
                 )
               })}
+
+              {hidden > 0 && (
+                <button
+                  type="button"
+                  className="ds-ghost-btn ds-tap"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => setLimits((l) => ({ ...l, [col.dropTarget]: limit + PAGE }))}
+                >
+                  Show more ({hidden})
+                </button>
+              )}
 
               {cards.length === 0 && <div className="ds-slot">{readOnly ? 'Empty' : 'Drop a project here'}</div>}
             </section>

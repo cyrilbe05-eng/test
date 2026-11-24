@@ -153,6 +153,34 @@ function FileRow({ name, size, fileId, iconOnly }: { name: string; size: number 
   )
 }
 
+/** Admins can delete any deliverable (older versions too) at any stage. */
+function DeleteDeliverableButton({ fileId, name, onDeleted }: { fileId: string; name: string; onDeleted: () => void }) {
+  const apiFetch = useApiFetch()
+  const [deleting, setDeleting] = useState(false)
+  const handleDelete = async () => {
+    if (!confirm(`Permanently delete "${name}"?
+
+The video will be deleted from storage for good, for everyone. It cannot be recovered.`)) return
+    setDeleting(true)
+    try {
+      await apiFetch(`/api/project-files/${fileId}`, { method: 'DELETE' })
+      toast.success('Deliverable deleted')
+      onDeleted()
+    } catch (err) {
+      toast.error((err as Error).message ?? 'Failed to delete deliverable')
+    } finally {
+      setDeleting(false)
+    }
+  }
+  return (
+    <button type="button" onClick={handleDelete} disabled={deleting} className="ds-ibtn ds-danger flex-shrink-0 disabled:opacity-50" title="Delete deliverable" aria-label={`Delete ${name}`} style={{ width: 34, height: 34 }}>
+      {deleting
+        ? <div className="w-4 h-4 rounded-full border border-current border-t-transparent animate-spin" />
+        : <Ms name="delete" style={{ fontSize: 18, width: 18, color: 'inherit' }} />}
+    </button>
+  )
+}
+
 export default function AdminProjectDetail() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
@@ -519,7 +547,14 @@ export default function AdminProjectDetail() {
                   ? <p className="ds-empty px-2">None uploaded</p>
                   : deliverables.map((f) => (
                       <div key={f.id}>
-                        <FileRow name={f.file_name} size={f.file_size} fileId={f.id} />
+                        <div className="flex items-center gap-1">
+                          <div className="flex-1 min-w-0"><FileRow name={f.file_name} size={f.file_size} fileId={f.id} /></div>
+                          <DeleteDeliverableButton
+                            fileId={f.id}
+                            name={f.file_name}
+                            onDeleted={() => { qc.invalidateQueries({ queryKey: ['project_files', id] }); qc.invalidateQueries({ queryKey: ['project', id] }); qc.invalidateQueries({ queryKey: ['projects'] }) }}
+                          />
+                        </div>
                         <ReviewCopyControl
                           file={f}
                           projectId={project.id}
