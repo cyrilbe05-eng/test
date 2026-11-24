@@ -18,8 +18,9 @@ const { driveFileDownloadUrl, listDriveFolder, parseDriveFolder, parseEmbeddedFo
 
 const ROOT = '1RootFolderAbcdefgh'
 const SUB = '1SubFolderAbcdefghi'
-const entry = (id: string, name: string, folder = false) =>
-  `<div class="flip-entry" id="entry-${id}" tabindex="0" role="link"><div class="flip-entry-info"><a href="https://drive.google.com/${folder ? `drive/folders/${id}` : `file/d/${id}/view?usp=drive_web`}" target="_blank"><div class="flip-entry-visual"><img src="x"></div><div class="flip-entry-title">${name}</div></a></div></div>`
+// Same shape as Google's real page, including the small file-type icon.
+const entry = (id: string, name: string, folder = false, type = '') =>
+  `<div class="flip-entry" id="entry-${id}" tabindex="0" role="link"><div class="flip-entry-info"><a href="https://drive.google.com/${folder ? `drive/folders/${id}` : `file/d/${id}/view?usp=drive_web`}" target="_blank"><div class="flip-entry-visual"><img src="x"></div>${type ? `<div class="flip-entry-list-icon"><img src="https://drive-thirdparty.googleusercontent.com/16/type/${type}" alt=""/></div>` : ''}<div class="flip-entry-title">${name}</div></a></div></div>`
 const page = (...entries: string[]) => `<html><body><div class="flip-list">${entries.join('')}</div></body></html>`
 
 afterEach(() => { pages.clear(); delete process.env.GOOGLE_DRIVE_API_KEY })
@@ -43,9 +44,9 @@ describe("Google's folder page (no API key)", () => {
   it('reads files and sub-folders, decoding names', () => {
     const items = parseEmbeddedFolderHtml(page(entry('1aaaaaaaaaaa', 'Day &amp; night.MOV'), entry(SUB, 'B-roll', true), entry('1bbbbbbbbbbb', 'notes.pdf')))
     expect(items).toEqual([
-      { id: '1aaaaaaaaaaa', name: 'Day & night.MOV', folder: false, resourceKey: null },
-      { id: SUB, name: 'B-roll', folder: true, resourceKey: null },
-      { id: '1bbbbbbbbbbb', name: 'notes.pdf', folder: false, resourceKey: null },
+      { id: '1aaaaaaaaaaa', name: 'Day & night.MOV', folder: false, resourceKey: null, mimeType: null },
+      { id: SUB, name: 'B-roll', folder: true, resourceKey: null, mimeType: null },
+      { id: '1bbbbbbbbbbb', name: 'notes.pdf', folder: false, resourceKey: null, mimeType: null },
     ])
   })
   it('lists videos in the folder and the folders inside it, skipping other files', async () => {
@@ -56,6 +57,14 @@ describe("Google's folder page (no API key)", () => {
     expect(r.videos.map((v) => v.path)).toEqual(['A.mov', 'Day 2/B.mp4', 'Day 2/C.MP4'])
     expect(r.skipped).toEqual(['cover.jpg'])
     expect(r.truncated).toBe(false)
+  })
+  it("finds videos whose names have no extension, from Google's file-type icon", async () => {
+    pages.set(`embeddedfolderview?id=${ROOT}`, { status: 200, body: page(
+      entry('1aaaaaaaaaaa', 'Raw footage', false, 'video/mp4'), entry('1bbbbbbbbbbb', 'EDITED VIDEO', false, 'video/quicktime'),
+      entry('1ccccccccccc', 'Extra Details', false, 'application/vnd.google-apps.document'), entry('1ddddddddddd', 'IMG_5104.PNG', false, 'image/jpeg')) })
+    const r = await listDriveFolder({ id: ROOT, resourceKey: null }, 100)
+    expect(r.videos.map((v) => v.path)).toEqual(['Raw footage', 'EDITED VIDEO'])
+    expect(r.skipped).toEqual(['Extra Details', 'IMG_5104.PNG'])
   })
   it('says clearly when the folder is not shared', async () => {
     pages.set(`embeddedfolderview?id=${ROOT}`, { status: 200, body: '<html>Sign in to continue to Google Drive</html>' })

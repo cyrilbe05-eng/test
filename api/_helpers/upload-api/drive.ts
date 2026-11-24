@@ -52,20 +52,23 @@ const decodeHtml = (s: string) => s
   .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
 
 /** Entries of Google's embedded folder page: files and sub-folders. */
-export function parseEmbeddedFolderHtml(html: string): { id: string; name: string; folder: boolean; resourceKey: string | null }[] {
-  const out: { id: string; name: string; folder: boolean; resourceKey: string | null }[] = []
+export function parseEmbeddedFolderHtml(html: string): { id: string; name: string; folder: boolean; resourceKey: string | null; mimeType: string | null }[] {
+  const out: { id: string; name: string; folder: boolean; resourceKey: string | null; mimeType: string | null }[] = []
   const seen = new Set<string>()
   // Each entry: <div class="flip-entry" id="entry-ID" …><a href="…/file/d/ID/…" or "…/drive/folders/ID…"> … <div class="flip-entry-title">NAME</div>
-  const entry = /<div class="flip-entry"[^>]*id="entry-([A-Za-z0-9_-]+)"[\s\S]*?<a href="([^"]+)"[\s\S]*?<div class="flip-entry-title">([\s\S]*?)<\/div>/g
+  // The entry's small icon names the file type (…/16/type/video/mp4), so videos whose names
+  // have no extension ("Raw footage") are still found.
+  const entry = /<div class="flip-entry"[^>]*id="entry-([A-Za-z0-9_-]+)"[\s\S]*?<a href="([^"]+)"([\s\S]*?)<div class="flip-entry-title">([\s\S]*?)<\/div>/g
   for (let m; (m = entry.exec(html));) {
-    const [, id, href, rawName] = m
+    const [, id, href, between, rawName] = m
+    const mimeType = /\/type\/([a-z0-9.+-]+\/[a-z0-9.+-]+)/i.exec(between)?.[1]?.toLowerCase() ?? null
     if (seen.has(id)) continue
     seen.add(id)
     const link = decodeHtml(href)
     const folder = /\/drive\/(?:u\/\d+\/)?folders\//.test(link)
     let resourceKey: string | null = null
     try { resourceKey = new URL(link, 'https://drive.google.com').searchParams.get('resourcekey') } catch { /* none */ }
-    out.push({ id, name: decodeHtml(rawName.replace(/<[^>]*>/g, '')).trim(), folder, resourceKey })
+    out.push({ id, name: decodeHtml(rawName.replace(/<[^>]*>/g, '')).trim(), folder, resourceKey, mimeType })
   }
   return out
 }
@@ -121,7 +124,7 @@ export async function listDriveFolder(ref: DriveFolderRef, limit: number): Promi
         if (e.folder) {
           if (depth < MAX_DEPTH) await walk({ id: e.id, resourceKey: e.resourceKey }, path + '/', depth + 1)
           else skipped.push(path + '/ (too deep)')
-        } else if (hasVideoExtension(e.name)) {
+        } else if (e.mimeType?.startsWith('video/') || hasVideoExtension(e.name)) {
           if (videos.length >= limit) { truncated = true; return }
           videos.push({ id: e.id, name: e.name, path, size: null, resourceKey: e.resourceKey })
         } else skipped.push(path)
