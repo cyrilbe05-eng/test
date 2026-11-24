@@ -8,10 +8,11 @@
 Needs the API key in the environment:  PINGU_API_KEY=pgk_...
 Python 3.8+, nothing to install. Safe to run again after a crash or a lost
 connection: a file upload resumes where it stopped (progress is kept next to
-the file in FILE.pingu-upload.json), and a folder upload skips videos it
-already uploaded (FOLDER/.pingu-folder-upload.json). Both are deleted when done.
+the file in FILE.pingu-upload.json), a folder upload skips videos it already
+uploaded (FOLDER/.pingu-folder-upload.json), and a link upload picks up the
+downloads it already started (~/.pingu-upload/). All are deleted when done.
 """
-import argparse, json, os, sys, time, urllib.error, urllib.request
+import argparse, hashlib, json, os, sys, time, urllib.error, urllib.request
 
 API = os.environ.get("PINGU_API_URL", "https://dashboard.projectpingu.com/api/v1").rstrip("/")
 KEY = os.environ.get("PINGU_API_KEY", "")
@@ -151,18 +152,39 @@ def wait_for(uploads):
 
 
 def upload_link(link, fields):
-    st, r = call("POST", "/imports", {"url": link, **fields})
-    if st not in (201, 202, 422): fail(st, r)
+    # Remember what this command started, so running it again waits for the same
+    # downloads instead of starting them twice.
+    sig = hashlib.sha256(json.dumps([API, KEY[-8:], link, fields], sort_keys=True).encode()).hexdigest()[:16]
+    state_file = os.path.join(os.path.expanduser("~"), ".pingu-upload", f"link-{sig}.json")
+    r = None
+    if os.path.exists(state_file):
+        saved = json.load(open(state_file))
+        ups = []
+        for uid in saved["ids"]:
+            st, got = call("GET", f"/imports/{uid}")
+            if st not in (200, 201, 202, 422): ups = None; break
+            ups.append(got["upload"])
+        if ups:
+            print(f"Picking up the {len(ups)} download(s) this command already started...", flush=True)
+            r = {"folder": saved["folder"], "uploads": ups} if saved.get("folder") else {"upload": ups[0]}
+    if r is None:
+        st, r = call("POST", "/imports", {"url": link, **fields})
+        if st not in (201, 202, 422) or not ("uploads" in r or "upload" in r): fail(st, r)
+        ids = [u["id"] for u in r["uploads"]] if "folder" in r else [r["upload"]["id"]]
+        os.makedirs(os.path.dirname(state_file), exist_ok=True)
+        json.dump({"link": link, "ids": ids, "folder": r.get("folder")}, open(state_file, "w"))
     if "folder" in r:                                           # a Google Drive folder: one project per video
         f = r["folder"]
         print(f"Drive folder: {f['videos']} video(s) found, {len(f['skipped'])} other file(s) skipped. Our server is downloading them...", flush=True)
         ups = wait_for(r["uploads"])
+        os.remove(state_file)                                   # every download has its final result
         summary([done_line(u) for u in ups if u["status"] == "done"],
                 [{"file_name": u["file_name"], "error": u["error"]} for u in ups if u["status"] != "done"], f["skipped"])
         return
     up = r["upload"]
     print(f"Link accepted ({up['id']}); our server is downloading it...", flush=True)
     up = wait_for([up])[0]
+    os.remove(state_file)
     if up["status"] == "failed": raise SystemExit(f"The link download failed: {up['error']}")
     print(json.dumps({"status": "done", **done_line(up)}))
 
