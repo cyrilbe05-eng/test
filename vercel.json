@@ -53,10 +53,6 @@
   },
   "crons": [
     {
-      "path": "/api/cron/budget-nudge",
-      "schedule": "0 9 * * 1"
-    },
-    {
       "path": "/api/v1/cron/imports",
       "schedule": "* * * * *"
     }
