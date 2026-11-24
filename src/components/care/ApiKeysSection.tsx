@@ -15,7 +15,7 @@ interface ApiKeyEvent { id: string; key_name: string | null; action: string; sta
 const ACTIONS: Record<string, string> = {
   key_created: 'Key created', key_revoked: 'Key turned off', me: 'Checked key', list: 'Listed uploads',
   upload_start: 'Started upload', upload_parts: 'Asked for more upload addresses', upload_complete: 'Finished upload',
-  upload_cancel: 'Cancelled upload', import_start: 'Sent a link', import_done: 'Link downloaded', import_failed: 'Link failed', status: 'Checked status',
+  upload_cancel: 'Cancelled upload', import_start: 'Sent a link', import_folder: 'Sent a Drive folder', check: 'Checked a folder fits', import_done: 'Link downloaded', import_failed: 'Link failed', status: 'Checked status',
 }
 
 const ago = (iso: string | null) => (iso ? formatDistanceToNow(new Date(iso), { addSuffix: true }) : 'never')

@@ -21,9 +21,10 @@ export function normalizeLink(input: string): string {
 
   if (host === 'drive.google.com' || host === 'docs.google.com' || host === 'drive.usercontent.google.com') {
     const id = /\/file\/d\/([A-Za-z0-9_-]{10,})/.exec(u.pathname)?.[1] ?? u.searchParams.get('id')
-    if (!id || !/^[A-Za-z0-9_-]{10,}$/.test(id)) throw new Error('This Google Drive link has no file in it. Use the "Share → Copy link" link of one video file.')
+    if (!id || !/^[A-Za-z0-9_-]{10,}$/.test(id)) throw new Error('This Google Drive link has no file or folder in it. Use "Share → Copy link" on a video file or a folder.')
     // confirm=t skips Drive's "can't scan this file for viruses" page on big files.
-    return `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`
+    const rk = u.searchParams.get('resourcekey')
+    return `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t${rk ? `&resourcekey=${encodeURIComponent(rk)}` : ''}`
   }
   if (host === 'www.dropbox.com' || host === 'dropbox.com') {
     u.searchParams.delete('dl'); u.searchParams.delete('raw')
@@ -82,7 +83,7 @@ const MAX_REDIRECTS = 6
 
 /** GET a link (optionally from a byte offset), following redirects; every hop
  *  goes through the address guard. Caller must consume or destroy `body`. */
-export async function openLink(url: string, opts: { from?: number; timeoutMs?: number } = {}): Promise<LinkResponse> {
+export async function openLink(url: string, opts: { from?: number; timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<LinkResponse> {
   let current = url
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const u = new URL(current)
@@ -98,6 +99,7 @@ export async function openLink(url: string, opts: { from?: number; timeoutMs?: n
           'user-agent': 'PinguStudio-UploadAPI/1.0',
           accept: '*/*',
           ...(opts.from ? { range: `bytes=${opts.from}-` } : {}),
+          ...(hop === 0 ? opts.headers : {}),
         },
         timeout: opts.timeoutMs ?? 30_000,
       }, resolve)

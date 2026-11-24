@@ -1,12 +1,13 @@
 // Upload API test: proves an API key can ONLY upload videos for its own
 // client, and that direct uploads and link downloads work end to end.
 //
-//   1. In one terminal:   set UPLOAD_API_ALLOW_PRIVATE_LINKS=1 (PowerShell:
-//                         $env:UPLOAD_API_ALLOW_PRIVATE_LINKS='1') then npm run local:dev
+//   1. In one terminal (PowerShell):
+//        $env:UPLOAD_API_ALLOW_PRIVATE_LINKS='1'; $env:UPLOAD_API_GOOGLE_BASE='http://127.0.0.1:47811'; npm run local:dev
 //   2. In another:        npm run test:upload-api
 //
-// (The variable lets the local server download from this test's own little
-// file server on 127.0.0.1; it only works on the local app, never online.)
+// (The variables let the local server download from this test's own little
+// file servers on 127.0.0.1, including a stand-in for Google Drive on port
+// 47811. They only work on the local app, never online.)
 //
 // Local only. Saves a copy of the local database first and puts it back at
 // the end, so it leaves no keys or projects behind.
@@ -60,6 +61,32 @@ const FILES = {
   '/archive.zip': Buffer.concat([Buffer.from([0x50, 0x4b, 3, 4]), Buffer.alloc(4000)]),
 }
 let flakyDrops = 1
+
+// ── stand-in for Google Drive (port 47811) ──────────────────────────────────
+const GOOGLE_PORT = 47811
+const DRIVE = {
+  root: '1TestRootFolder0001', sub: '1TestSubFolder00002', closed: '1TestClosedFolder03', empty: '1TestEmptyFolder004',
+  files: { '1DriveVideoA000001': ['Gym A.mov', videoBytes(18, 'qt  ')], '1DriveVideoB000002': ['B roll.mp4', videoBytes(20)] },
+}
+const flip = (id, name, folder) => `<div class="flip-entry" id="entry-${id}" tabindex="0" role="link"><div class="flip-entry-info"><a href="https://drive.google.com/${folder ? `drive/folders/${id}` : `file/d/${id}/view?usp=drive_web`}" target="_blank"><div class="flip-entry-visual"></div><div class="flip-entry-title">${name}</div></a></div></div>`
+const flipPage = (...e) => `<!DOCTYPE html><html><body><div class="flip-list">${e.join('')}</div></body></html>`
+function google(req, res) {
+  const u = new URL(req.url, 'http://x')
+  const id = u.searchParams.get('id')
+  if (u.pathname === '/embeddedfolderview') {
+    const html = id === DRIVE.root ? flipPage(flip('1DriveVideoA000001', 'Gym A.mov'), flip(DRIVE.sub, 'Day 2', true), flip('1DriveCover0000003', 'cover.jpg'))
+      : id === DRIVE.sub ? flipPage(flip('1DriveVideoB000002', 'B roll.mp4'), flip('1DriveNotes0000004', 'notes.pdf'))
+      : id === DRIVE.empty ? flipPage(flip('1DriveCover0000003', 'cover.jpg'))
+      : '<html><body>Sign in - Google Accounts</body></html>'
+    res.writeHead(200, { 'content-type': 'text/html' }); res.end(html); return
+  }
+  if (u.pathname === '/download' && DRIVE.files[id]) {
+    const [name, body] = DRIVE.files[id]
+    res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': body.length, 'content-disposition': `attachment; filename="${name}"` })
+    res.end(body); return
+  }
+  res.writeHead(404); res.end()
+}
 function serve(req, res) {
   const u = new URL(req.url, 'http://x')
   if (u.pathname === '/redirect') { res.writeHead(302, { location: '/direct.mp4' }); res.end(); return }
@@ -113,9 +140,12 @@ async function waitDone(key, id, maxChecks = 12) {
 
 ;(async () => {
   py(`import sqlite3;c=sqlite3.connect(${JSON.stringify(DB)});c.executescript(open(${JSON.stringify(path.join(ROOT, 'db/migrations/029_upload_api.sql').replace(/\\/g, '/'))}).read());c.commit()`)
-  snapshot('save')
   const files = http.createServer(serve)
   await new Promise((r) => files.listen(0, '127.0.0.1', r))
+  const googleServer = http.createServer(google)
+  await new Promise((r, j) => googleServer.once('error', j).listen(GOOGLE_PORT, '127.0.0.1', r))
+    .catch((e) => { console.log(`FAIL port ${GOOGLE_PORT} is busy (${e.code}): stop whatever uses it and run again`); process.exit(1) })
+  snapshot('save')
   const LINK = `http://127.0.0.1:${files.address().port}`
   try {
     const admin = await login('admin@pingu.local')
@@ -235,6 +265,45 @@ async function waitDone(key, id, maxChecks = 12) {
       ok((await call('POST', '/api/v1/imports', { token: KEY, body: { url: 'file:///etc/passwd' } })).json?.code === 'invalid_link', 'non-web link refused')
       ok((await call('GET', `/api/v1/imports/${imp.json.upload.id}`, { token: novaKey })).status === 404, "another client's key can't see a link download")
     }
+    // ── Google Drive folders ────────────────────────────────────────────
+    console.log('— Google Drive folders (stand-in for Google)')
+    const folder = await call('POST', '/api/v1/imports', { token: KEY, body: { url: `https://drive.google.com/drive/folders/${DRIVE.root}?usp=sharing`, title: 'Gym shoot', instructions: 'Same style for all' } })
+    if (folder.json?.code === 'folder_unreadable') {
+      console.log('     ! start the local app with UPLOAD_API_GOOGLE_BASE=http://127.0.0.1:47811 to run the Drive folder tests'); fails++
+    } else {
+      ok(folder.status === 202 && folder.json.folder.videos === 2 && folder.json.uploads.length === 2, 'folder link → 2 videos found (incl. the one in the folder inside it)')
+      ok(JSON.stringify([...folder.json.folder.skipped].sort()) === JSON.stringify(['Day 2/notes.pdf', 'cover.jpg']), 'non-videos skipped and listed: ' + JSON.stringify(folder.json.folder.skipped))
+      ok(folder.json.folder.listed_with === 'simple', 'listed the simple way (no API key set)')
+      const finished = []
+      for (const u of folder.json.uploads) finished.push(u.status === 'done' ? { json: { upload: u } } : await waitDone(KEY, u.id))
+      ok(finished.every((f) => f.json?.upload?.status === 'done'), 'every video in the folder → done')
+      const titles = finished.map((f) => sql('select title, instructions, client_id from projects where id = ?', f.json.upload.project.id)[0])
+      ok(JSON.stringify(titles.map((t) => t.title).sort()) === JSON.stringify(['Gym shoot · B roll', 'Gym shoot · Gym A']), 'one project per video, titled with the file name: ' + titles.map((t) => t.title).join(', '))
+      ok(titles.every((t) => t.instructions === 'Same style for all' && t.client_id === orbit.id), "instructions on every project; all for the key's client")
+      const bytesA = await storedBytesOf(finished.find((f) => f.json.upload.file_name === 'Gym A.mov').json.upload.project.id, admin)
+      ok(sha(bytesA) === sha(DRIVE.files['1DriveVideoA000001'][1]), 'folder video stored byte for byte')
+      const closed = await call('POST', '/api/v1/imports', { token: KEY, body: { url: `https://drive.google.com/drive/folders/${DRIVE.closed}` } })
+      ok(closed.status === 422 && /Anyone with the link/.test(closed.json.error), 'folder not shared → clear error')
+      const empty = await call('POST', '/api/v1/imports', { token: KEY, body: { url: `https://drive.google.com/drive/folders/${DRIVE.empty}` } })
+      ok(empty.json?.code === 'no_videos' && /cover\.jpg/.test(empty.json.error), 'folder without videos → clear error listing what was skipped')
+    }
+
+    // ── account limits for several videos at once ───────────────────────
+    console.log('— account limits for folders')
+    const [harbor] = sql("select id, plan_id from profiles where email = 'harbor@client.local'")
+    const active = sql("select count(*) n from projects where client_id = ? and status not in ('client_approved')", harbor.id)[0].n
+    sqlRun('update plans set max_active_projects = ? where id = ?', active + 1, harbor.plan_id)
+    const harborKey = (await call('POST', '/api/api-keys', { token: admin, body: { clientId: harbor.id, name: 'Limit test' } })).json.key
+    const two = [{ file_name: 'a.mp4', file_size: 1000 }, { file_name: 'b.mov', file_size: 1000 }]
+    const chk = await call('POST', '/api/v1/check', { token: harborKey, body: { files: two } })
+    ok(chk.status === 403 && chk.json.code === 'active_project_limit_reached' && /1 more video.*has 2.*Nothing was uploaded/.test(chk.json.error), 'local folder check: 2 videos but room for 1 → refused up front')
+    ok((await call('POST', '/api/v1/check', { token: harborKey, body: { files: two.slice(0, 1) } })).status === 200, 'local folder check: 1 video fits → ok')
+    const before = sql('select count(*) n from api_uploads where client_id = ?', harbor.id)[0].n
+    const hf = await call('POST', '/api/v1/imports', { token: harborKey, body: { url: `https://drive.google.com/drive/folders/${DRIVE.root}` } })
+    ok(hf.status === 403 && hf.json.code === 'active_project_limit_reached' && sql('select count(*) n from api_uploads where client_id = ?', harbor.id)[0].n === before, 'Drive folder that does not fit → refused, nothing started')
+    ok((await call('POST', '/api/v1/check', { token: KEY, body: { files: [{ file_name: 'x.pdf', file_size: 10 }] } })).json?.code === 'not_a_video', 'check refuses non-video names')
+    ok((await call('POST', '/api/v1/check', { token: KEY, body: { files: Array.from({ length: 101 }, (_, i) => ({ file_name: `${i}.mp4`, file_size: 10 })) } })).json?.code === 'too_many_videos', 'more than 100 videos at once refused')
+
     const cron = await call('GET', '/api/v1/cron/imports')
     ok(cron.status === 200 && cron.json.ok, 'once-a-minute job runs')
 
@@ -252,7 +321,7 @@ async function waitDone(key, id, maxChecks = 12) {
     console.log('— activity log and rate limit')
     const ev = sql('select action, status, ip from api_key_events where key_id = ? order by created_at', made.json.id)
     const acts = new Set(ev.map((e) => e.action))
-    const missing = ['key_created', 'me', 'upload_start', 'upload_parts', 'upload_complete', 'upload_cancel', 'import_start', 'import_done', 'import_failed', 'status'].filter((a) => !acts.has(a))
+    const missing = ['key_created', 'me', 'upload_start', 'upload_parts', 'upload_complete', 'upload_cancel', 'import_start', 'import_folder', 'import_done', 'import_failed', 'check', 'status'].filter((a) => !acts.has(a))
     ok(missing.length === 0, `every action is logged (${ev.length} entries${missing.length ? '; missing: ' + missing.join(', ') : ''})`)
     const refusals = sql('select action, status from api_key_events where status >= 400')
     const noIp = ev.filter((e) => !['import_done', 'import_failed'].includes(e.action) && !e.ip).map((e) => e.action)
@@ -269,6 +338,7 @@ async function waitDone(key, id, maxChecks = 12) {
     console.log('FAIL crashed:', e); fails++
   } finally {
     files.close()
+    try { googleServer.close() } catch { /* not started */ }
     snapshot('restore')
     // Remove this test's files from local storage (keys apiuploads/…).
     const R2 = path.join(DATA, 'r2'); let removed = 0

@@ -9,7 +9,8 @@
 //   POST   /api/v1/uploads/:id/parts          fresh upload addresses for some pieces
 //   POST   /api/v1/uploads/:id/complete       all pieces sent → project created
 //   DELETE /api/v1/uploads/:id                cancel an unfinished direct upload
-//   POST   /api/v1/imports                    give a link → our server downloads it
+//   POST   /api/v1/check                      { files:[{file_name,file_size}] } → would these fit the account? (local folders)
+//   POST   /api/v1/imports                    give a link (file, or Google Drive folder) → our server downloads it
 //   GET    /api/v1/imports/:id                status of a link download
 //   GET    /api/v1/cron/imports               (Vercel cron, once a minute) continue link downloads
 //
@@ -36,6 +37,7 @@ import {
   REQUESTS_PER_MINUTE, type ApiError, type KeyCaller,
 } from './keys.js'
 import { fileNameFrom, hasVideoExtension, normalizeLink, openLink, safeFileName, sniffVideo, VIDEO_EXTENSIONS } from './links.js'
+import { driveFileDownloadUrl, listDriveFolder, parseDriveFolder } from './drive.js'
 
 type CreateProject = (req: VercelRequest, res: VercelResponse) => Promise<void>
 
@@ -51,6 +53,7 @@ const CRON_BUDGET_MS = 240_000                           // < 300 s function lim
 const LEASE_MS = 290_000
 const MAX_LINK_ATTEMPTS = 8
 const ABANDON_AFTER_DAYS = 7
+export const MAX_FOLDER_VIDEOS = 100
 
 interface UploadRow {
   id: string; key_id: string; client_id: string; kind: 'file' | 'link'; status: string
@@ -131,22 +134,31 @@ async function partUrls(row: UploadRow, numbers: number[]) {
   return Promise.all(numbers.map(async (n) => ({ part_number: n, url: absolute(await getPresignedPartUrl(row.storage_key!, row.upload_id!, n, PART_URL_TTL)) })))
 }
 
-/** The same checks the website makes before accepting a new video. */
-async function precheck(caller: KeyCaller, fileSize: number | null) {
+/** The same checks the website makes before accepting new videos, for
+ *  `count` videos at once (a folder is accepted whole or not at all). */
+async function checkBatch(caller: KeyCaller, count: number, totalBytes: number | null) {
   if (await isFullPackage(caller.clientId)) {
     throw apiError(403, 'full_package_needs_script', 'This account is on the full package: videos are recorded from scripts, so please upload on the website from the script.')
   }
-  if (fileSize != null && !(await batchStorageAllowed({ id: caller.clientId, plan_id: caller.planId }, fileSize))) {
-    throw apiError(403, 'storage_limit_reached', 'This upload would go over the account\'s storage limit.')
+  if (totalBytes != null && !(await batchStorageAllowed({ id: caller.clientId, plan_id: caller.planId }, totalBytes))) {
+    throw apiError(403, 'storage_limit_reached', count > 1
+      ? `These ${count} videos would go over the account's storage limit. Nothing was uploaded.`
+      : "This upload would go over the account's storage limit.")
   }
   if (caller.planId) {
     const [plan] = await dbQuery<{ max_active_projects: number }>('SELECT max_active_projects FROM plans WHERE id = ?', [caller.planId])
     if (plan && plan.max_active_projects !== -1) {
       const [c] = await dbQuery<{ n: number }>("SELECT COUNT(*) AS n FROM projects WHERE client_id = ? AND status NOT IN ('client_approved')", [caller.clientId])
-      if ((c?.n ?? 0) >= plan.max_active_projects) throw apiError(403, 'active_project_limit_reached', 'The account already has its maximum number of videos in progress.')
+      const free = plan.max_active_projects - (c?.n ?? 0)
+      if (count > free) {
+        throw apiError(403, 'active_project_limit_reached', count > 1
+          ? `The account can take ${Math.max(0, free)} more video${free === 1 ? '' : 's'} in progress right now, but this has ${count}. Nothing was uploaded.`
+          : 'The account already has its maximum number of videos in progress.')
+      }
     }
   }
 }
+const precheck = (caller: KeyCaller, fileSize: number | null) => checkBatch(caller, 1, fileSize)
 
 /** Runs the website's own "new video" handler as this client. */
 async function createProjectAs(clientId: string, fields: Record<string, unknown>, req: VercelRequest, createProject: CreateProject) {
@@ -174,8 +186,9 @@ async function finishIntoProject(row: UploadRow, req: VercelRequest, createProje
   if (row.file_size != null && head.size !== row.file_size) {
     throw new PermanentError(`The file arrived with ${head.size} bytes but ${row.file_size} were announced.`)
   }
+  const title = row.title || titleFrom(row.file_name ?? 'Video')
   const made = await createProjectAs(row.client_id, {
-    title: row.title || titleFrom(row.file_name ?? 'Video'),
+    title,
     instructions: row.instructions, video_script: row.video_script, inspiration_url: row.inspiration_url,
   }, req, createProject)
   if (made.status >= 400 || !made.out?.id) {
@@ -192,9 +205,9 @@ async function finishIntoProject(row: UploadRow, req: VercelRequest, createProje
     throw e
   }
   const now = nowIso()
-  await dbExecute("UPDATE api_uploads SET status = 'done', project_id = ?, file_size = ?, error = NULL, lease_until = NULL, updated_at = ?, finished_at = ? WHERE id = ?",
-    [projectId, head.size, now, now, row.id])
-  return { ...row, status: 'done', project_id: projectId, file_size: head.size, error: null, updated_at: now, finished_at: now }
+  await dbExecute("UPDATE api_uploads SET status = 'done', project_id = ?, title = ?, file_size = ?, error = NULL, lease_until = NULL, updated_at = ?, finished_at = ? WHERE id = ?",
+    [projectId, title, head.size, now, now, row.id])
+  return { ...row, status: 'done', project_id: projectId, title, file_size: head.size, error: null, updated_at: now, finished_at: now }
 }
 
 async function markFailed(row: UploadRow, message: string, opts: { deleteFile?: boolean } = {}) {
@@ -409,6 +422,69 @@ export async function handleUploadApiRoute(req: VercelRequest, res: VercelRespon
         next: `PUT bytes [(n-1)*${partSize}, n*${partSize}) to part n's url, keep each response's ETag header, then POST /api/v1/uploads/${row.id}/complete with {"parts":[{"part_number":n,"etag":"…"}]}`,
       })
       await logEvent({ keyId: caller.keyId, clientId: caller.clientId, action, status: 201, uploadId: row.id, detail: `${fileName} (${fileSize} bytes)`, ip: caller.ip })
+      return
+    }
+
+    // Would these videos fit? (The script asks before uploading a local folder.)
+    if (a === 'check' && rest.length === 1 && req.method === 'POST') {
+      action = 'check'
+      const files = body.files
+      if (!Array.isArray(files) || files.length < 1) throw apiError(400, 'invalid_request', 'files must be a list of {"file_name", "file_size"}.')
+      if (files.length > MAX_FOLDER_VIDEOS) throw apiError(400, 'too_many_videos', `At most ${MAX_FOLDER_VIDEOS} videos at a time (this has ${files.length}). Split the folder.`)
+      let total = 0
+      for (const f of files) {
+        const name = typeof f?.file_name === 'string' ? f.file_name : ''
+        const size = f?.file_size
+        if (!hasVideoExtension(name)) throw apiError(400, 'not_a_video', `"${name}" is not a video file name.`)
+        if (typeof size !== 'number' || !Number.isInteger(size) || size < 1) throw apiError(400, 'invalid_request', `file_size missing for "${name}".`)
+        if (size > MAX_FILE_BYTES) throw apiError(400, 'file_too_large', `"${name}" is over 100 GB.`)
+        total += size
+      }
+      await checkBatch(caller, files.length, total)
+      send(res, 200, { ok: true, videos: files.length, total_bytes: total })
+      await logEvent({ keyId: caller.keyId, clientId: caller.clientId, action, status: 200, detail: `${files.length} videos, ${total} bytes`, ip: caller.ip })
+      return
+    }
+
+    // Google Drive FOLDER link: one link download (→ one project) per video.
+    if (a === 'imports' && rest.length === 1 && req.method === 'POST' && typeof body.url === 'string' && parseDriveFolder(body.url)) {
+      action = 'import_folder'
+      const ref = parseDriveFolder(body.url)!
+      const fields = projectFields(body)
+      let listing
+      try { listing = await listDriveFolder(ref, MAX_FOLDER_VIDEOS) } catch (e) { throw apiError(422, 'folder_unreadable', (e as Error).message) }
+      if (listing.truncated) throw apiError(400, 'too_many_videos', `This folder has more than ${MAX_FOLDER_VIDEOS} videos. Send smaller folders (or sub-folders) one at a time.`)
+      if (!listing.videos.length) {
+        const sk = listing.skipped
+        throw apiError(400, 'no_videos', `No video files found in this folder${sk.length ? ` (skipped: ${sk.slice(0, 10).join(', ')}${sk.length > 10 ? '…' : ''})` : ''}.`)
+      }
+      const sizes = listing.videos.map((v) => v.size)
+      const total = sizes.every((n) => n != null) ? sizes.reduce((sum: number, n) => sum + (n as number), 0) : null
+      await checkBatch(caller, listing.videos.length, total)
+      const now = nowIso()
+      const ids: string[] = []
+      for (const v of listing.videos) {
+        const rowId = newId()
+        const name = titleFrom(v.name)
+        await dbExecute(
+          `INSERT INTO api_uploads (id, key_id, client_id, kind, status, source_url, file_name, file_size, bytes_done, title, instructions, video_script, inspiration_url, attempts, created_at, updated_at)
+           VALUES (?, ?, ?, 'link', 'queued', ?, ?, ?, 0, ?, ?, ?, ?, 0, ?, ?)`,
+          [rowId, caller.keyId, caller.clientId, driveFileDownloadUrl(v.id, v.resourceKey), safeFileName(v.name), v.size,
+            fields.title ? `${fields.title} · ${name}`.slice(0, 200) : name, fields.instructions, fields.video_script, fields.inspiration_url, now, now])
+        ids.push(rowId)
+      }
+      await logEvent({ keyId: caller.keyId, clientId: caller.clientId, action, status: 202,
+        detail: `${listing.videos.length} videos (${listing.method}) from ${body.url}`, ip: caller.ip })
+      // Start on them while we're here; the rest continues in the background.
+      const deadline = Date.now() + LINK_SLICE_ON_REQUEST_MS
+      for (const rowId of ids) { if (Date.now() > deadline - 2_000) break; await workOnLink(rowId, deadline, req, createProject) }
+      const clientId = caller.clientId
+      const rows = await Promise.all(ids.map((rowId) => loadRow(rowId, clientId)))
+      send(res, 202, {
+        folder: { videos: listing.videos.length, paths: listing.videos.map((v) => v.path), skipped: listing.skipped, listed_with: listing.method },
+        uploads: rows.map(view),
+        next: 'Each video becomes its own project. Check GET /api/v1/imports/{id} for each upload every 30–60 seconds until all are "done" (or "failed").',
+      })
       return
     }
 

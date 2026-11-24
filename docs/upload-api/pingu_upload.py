@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
-"""Upload a video to Pingu Studio (creates a new video project).
+"""Upload videos to Pingu Studio. Every video becomes its own new project.
 
-  python pingu_upload.py FILE [--title T] [--instructions I] [--script S] [--inspiration URL]
-  python pingu_upload.py --link URL [--title T] [--instructions I] [--script S] [--inspiration URL]
+  python pingu_upload.py FILE        [--title T] [--instructions I] [--script S] [--inspiration URL]
+  python pingu_upload.py FOLDER      [same options]   every video in the folder and its sub-folders
+  python pingu_upload.py --link URL  [same options]   one video, or a Google Drive folder
 
 Needs the API key in the environment:  PINGU_API_KEY=pgk_...
 Python 3.8+, nothing to install. Safe to run again after a crash or a lost
 connection: a file upload resumes where it stopped (progress is kept next to
-the file in FILE.pingu-upload.json and deleted when done).
+the file in FILE.pingu-upload.json), and a folder upload skips videos it
+already uploaded (FOLDER/.pingu-folder-upload.json). Both are deleted when done.
 """
 import argparse, json, os, sys, time, urllib.error, urllib.request
 
 API = os.environ.get("PINGU_API_URL", "https://dashboard.projectpingu.com/api/v1").rstrip("/")
 KEY = os.environ.get("PINGU_API_KEY", "")
+try: sys.stdout.reconfigure(errors="replace")       # odd file names never crash the progress lines
+except Exception: pass
 
 
 def call(method, path, body=None, tries=6):
@@ -114,37 +118,108 @@ def upload_file(path, fields):
     return r["upload"]
 
 
+VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi", ".mts", ".m2ts", ".3gp", ".mxf"}
+MAX_FOLDER = 100
+
+
+def done_line(up):
+    return {"title": up["title"], "file_name": up["file_name"], "project_id": up["project"]["id"], "project_url": up["project"]["url"]}
+
+
+def summary(projects, failed, skipped):
+    print(json.dumps({"status": "done" if not failed else "partial", "projects": projects, "failed": failed, "skipped": skipped}))
+    if failed: sys.exit(1)
+
+
+def wait_for(uploads):
+    """Polls link downloads until each is done or failed; prints progress."""
+    pending = {u["id"]: u for u in uploads}
+    final = {}
+    for u in uploads:
+        if u["status"] in ("done", "failed"): final[u["id"]] = pending.pop(u["id"])
+    while pending:
+        time.sleep(30)
+        for uid in list(pending):
+            st, r = call("GET", f"/imports/{uid}")
+            if st != 200: fail(st, r)
+            up = r["upload"]
+            got = (up.get("bytes_received") or 0) / 1e6
+            total = f" of {up['file_size'] / 1e6:.0f}" if up.get("file_size") else ""
+            print(f"  {up['file_name'] or up['title'] or uid}: {up['status']}, {got:.0f}{total} MB", flush=True)
+            if up["status"] in ("done", "failed"): final[uid] = pending.pop(uid)
+    return [final[u["id"]] for u in uploads]
+
+
 def upload_link(link, fields):
     st, r = call("POST", "/imports", {"url": link, **fields})
     if st not in (201, 202, 422): fail(st, r)
+    if "folder" in r:                                           # a Google Drive folder: one project per video
+        f = r["folder"]
+        print(f"Drive folder: {f['videos']} video(s) found, {len(f['skipped'])} other file(s) skipped. Our server is downloading them...", flush=True)
+        ups = wait_for(r["uploads"])
+        summary([done_line(u) for u in ups if u["status"] == "done"],
+                [{"file_name": u["file_name"], "error": u["error"]} for u in ups if u["status"] != "done"], f["skipped"])
+        return
     up = r["upload"]
     print(f"Link accepted ({up['id']}); our server is downloading it...", flush=True)
-    while up["status"] not in ("done", "failed"):
-        time.sleep(30)
-        st, r = call("GET", f"/imports/{up['id']}")
-        if st != 200: fail(st, r)
-        up = r["upload"]
-        got = (up.get("bytes_received") or 0) / 1e6
-        total = f" of {up['file_size'] / 1e6:.0f}" if up.get("file_size") else ""
-        print(f"  {up['status']}: {got:.0f}{total} MB", flush=True)
+    up = wait_for([up])[0]
     if up["status"] == "failed": raise SystemExit(f"The link download failed: {up['error']}")
-    return up
+    print(json.dumps({"status": "done", **done_line(up)}))
+
+
+def upload_folder(folder, fields):
+    """Every video in a folder on this computer (sub-folders too): one project each."""
+    folder = os.path.abspath(folder)
+    videos, skipped = [], []
+    for root, dirs, files in os.walk(folder):
+        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+        for name in sorted(files):
+            if name.startswith(".") or name.endswith(".pingu-upload.json"): continue
+            rel = os.path.relpath(os.path.join(root, name), folder).replace(os.sep, "/")
+            (videos if os.path.splitext(name)[1].lower() in VIDEO_EXTS else skipped).append(rel)
+    state_file = os.path.join(folder, ".pingu-folder-upload.json")
+    done = json.load(open(state_file)) if os.path.exists(state_file) else {}
+    sig = lambda rel: [os.path.getsize(os.path.join(folder, rel)), int(os.path.getmtime(os.path.join(folder, rel)))]
+    todo = [v for v in videos if done.get(v, {}).get("sig") != sig(v)]
+    if not videos: raise SystemExit(f"No video files in this folder (skipped: {', '.join(skipped[:10]) or 'nothing'}).")
+    if len(todo) > MAX_FOLDER: raise SystemExit(f"{len(todo)} videos: at most {MAX_FOLDER} at a time. Upload the sub-folders one by one.")
+    print(f"Folder: {len(videos)} video(s), {len(skipped)} other file(s) skipped"
+          + (f", {len(videos) - len(todo)} already uploaded earlier" if len(todo) < len(videos) else ""), flush=True)
+    if todo:                                                    # whole folder fits the account, or nothing starts
+        st, r = call("POST", "/check", {"files": [{"file_name": os.path.basename(v), "file_size": sig(v)[0]} for v in todo]})
+        if st != 200: fail(st, r)
+    failed = []
+    for i, rel in enumerate(todo, 1):
+        stem = os.path.splitext(os.path.basename(rel))[0]
+        print(f"[{i}/{len(todo)}] {rel}", flush=True)
+        f = dict(fields, title=f"{fields['title']} · {stem}" if fields.get("title") else stem)
+        try:
+            up = upload_file(os.path.join(folder, rel), f)
+        except SystemExit as e:
+            print(f"  failed: {e}", flush=True); failed.append({"file_name": rel, "error": str(e)}); continue
+        done[rel] = {"sig": sig(rel), **done_line(up)}
+        json.dump(done, open(state_file, "w"))
+    projects = [{k: v for k, v in done[rel].items() if k != "sig"} for rel in videos if rel in done]
+    if not failed and os.path.exists(state_file): os.remove(state_file)
+    summary(projects, failed, skipped)
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Upload a video to Pingu Studio.")
-    ap.add_argument("file", nargs="?", help="video file to upload")
-    ap.add_argument("--link", help="instead of a file: a Google Drive, Dropbox or direct download link")
+    ap = argparse.ArgumentParser(description="Upload videos to Pingu Studio (one new project per video).")
+    ap.add_argument("path", nargs="?", help="a video file, or a folder of videos on this computer")
+    ap.add_argument("--link", help="instead: a link to one video (Google Drive, Dropbox, direct) or a Google Drive folder")
     ap.add_argument("--title"); ap.add_argument("--instructions")
     ap.add_argument("--script", dest="video_script"); ap.add_argument("--inspiration", dest="inspiration_url")
     a = ap.parse_args()
     if not KEY.startswith("pgk_"): raise SystemExit("Set PINGU_API_KEY to your API key (it starts with pgk_).")
-    if bool(a.file) == bool(a.link): raise SystemExit("Give either a FILE or --link URL.")
+    if bool(a.path) == bool(a.link): raise SystemExit("Give either a FILE or FOLDER, or --link URL.")
     fields = {k: v for k, v in {"title": a.title, "instructions": a.instructions,
               "video_script": a.video_script, "inspiration_url": a.inspiration_url}.items() if v}
-    up = upload_file(a.file, fields) if a.file else upload_link(a.link, fields)
-    print(json.dumps({"status": "done", "project_id": up["project"]["id"], "project_url": up["project"]["url"],
-                      "title": up["title"], "file_name": up["file_name"]}))
+    if a.link: return upload_link(a.link, fields)
+    if os.path.isdir(a.path): return upload_folder(a.path, fields)
+    if not os.path.isfile(a.path): raise SystemExit(f"Not found: {a.path}")
+    up = upload_file(a.path, fields)
+    print(json.dumps({"status": "done", **done_line(up)}))
 
 
 if __name__ == "__main__":
