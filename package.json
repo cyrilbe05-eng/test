@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:uploads": "node tests/upload-safety/uploadguard.cjs",
     "test:upload-api": "node tests/upload-api/keyguard.cjs",
+    "test:notifications": "tsx tests/notifications/e2e.mts",
     "preview": "vite preview",
     "local:db": "node scripts/local/setup-db.mjs",
     "local:dev": "node scripts/local/dev.mjs"

@@ -26,6 +26,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAuth } from '../auth.js'
+import { appUrl, sendEmailNotifications } from '../email.js'
 import { dbExecute, dbQuery, newId, nowIso } from '../db.js'
 import { isAssigned } from '../care/plans.js'
 import { MAX_RICH_TEXT, cleanLinks, sanitizeRichText } from './richtext.js'
@@ -75,15 +76,23 @@ async function loadScript(id: string) {
   return s
 }
 
-async function notify(recipients: string[], message: string) {
+/** In-app notification + email (same style as the editors' notifications).
+ *  `link` is the page the email points to. */
+async function notify(recipients: string[], message: string, link: string) {
   const now = nowIso()
-  for (const r of [...new Set(recipients)]) {
+  const to = [...new Set(recipients)]
+  for (const r of to) {
     try {
       await dbExecute(
         'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, NULL, ?, ?, 0, ?)',
         [newId(), r, 'status_changed', message, now])
     } catch { /* a notification must never break the action */ }
   }
+  try {
+    await sendEmailNotifications(to.map((recipientId) => ({ recipientId, subject: message, text: `${message}
+
+Open it here: ${appUrl(link)}` })))
+  } catch { /* an email must never break the action */ }
 }
 
 function shapeScript(s: any) {
@@ -323,11 +332,15 @@ export async function handleScriptsRoute(req: VercelRequest, res: VercelResponse
       await dbExecute('UPDATE scripts SET status = ?, in_review_at = ? WHERE id = ?', [to, to === 'in_review' ? now : null, id])
       const [cl] = await dbQuery<{ full_name: string }>('SELECT full_name FROM profiles WHERE id = ?', [s.client_id])
       const label = `"${s.title}" (${cl?.full_name ?? 'client'})`
-      if (to === 'in_review') {
+      if (s.status === to) {
+        // Nothing changed (e.g. "approved" clicked twice): no new notification.
+      } else if (to === 'in_review') {
         const admins = await dbQuery<{ id: string }>("SELECT id FROM profiles WHERE role = 'admin' AND disabled = 0")
-        await notify(admins.map((x) => x.id).filter((x) => x !== c.id), `Script ready for review: ${label}`)
+        await notify(admins.map((x) => x.id).filter((x) => x !== c.id), `Script ready for review: ${label}`, `/admin/scripts/${s.client_id}`)
       } else if ((to === 'needs_changes' || to === 'approved') && s.created_by && s.created_by !== c.id) {
-        await notify([s.created_by], to === 'approved' ? `Script approved: ${label}` : `Script needs changes: ${label}`)
+        const [writer] = await dbQuery<{ role: string }>('SELECT role FROM profiles WHERE id = ?', [s.created_by])
+        await notify([s.created_by], to === 'approved' ? `Script approved: ${label}` : `Script needs changes: ${label}`,
+          `/${writer?.role === 'admin' ? 'admin' : 'team'}/scripts/${s.client_id}`)
       }
       res.json(await fresh()); return
     }

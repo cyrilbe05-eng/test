@@ -101,6 +101,11 @@ export async function sendEmailNotifications(
 // deploy environment. Strip any trailing slash so we don't produce //paths.
 const APP = (process.env.APP_ORIGIN || 'https://dashboard.projectpingu.com').replace(/\/$/, '')
 
+/** An absolute link to a page of the app, e.g. appUrl('/admin/scripts'). */
+export function appUrl(path: string): string {
+  return `${APP}${path.startsWith('/') ? '' : '/'}${path}`
+}
+
 export function projectUrl(projectId: string, role: 'admin' | 'team' | 'client'): string {
   if (role === 'admin') return `${APP}/admin/projects/${projectId}`
   if (role === 'team') return `${APP}/team/projects/${projectId}`

@@ -36,6 +36,7 @@ import { handleScriptsRoute } from './_helpers/scripts/routes.js'
 import { handleSettingsRoute, loadSettings } from './_helpers/settings/routes.js'
 import { handleBatchRoute, batchStorageAllowed } from './_helpers/batch/routes.js'
 import { handleUploadApiRoute, handleApiKeysAdminRoute } from './_helpers/upload-api/routes.js'
+import { handleDeadlineReminders } from './_helpers/reminders/deadlines.js'
 import { handlePlaybookRoute } from './_helpers/playbook/routes.js'
 import { publicProfile, stripSecrets } from './_helpers/secrets.js'
 import { isValidAvatar } from './_helpers/avatar.js'
@@ -782,13 +783,16 @@ async function handleAssignProject(req: VercelRequest, res: VercelResponse) {
     const now = nowIso()
     const assignmentId = newId()
 
-    const result = await dbExecute(
+    // RETURNING gives a row only when the assignment was actually added (not
+    // when this editor was already assigned). dbExecute's `changes` can't be
+    // used for this: it is always 0 on the D1 REST API.
+    const inserted = (await dbQuery<{ id: string }>(
       `INSERT OR IGNORE INTO project_assignments (id, project_id, team_member_id, assigned_by, assigned_at)
-       VALUES (?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?) RETURNING id`,
       [assignmentId, projectId, team_member_id, clerkUserId, now]
-    )
+    )).length > 0
 
-    if (result.changes > 0) {
+    if (inserted) {
       // Due at end of next calendar day (tomorrow 23:59 UTC)
       const tomorrow = new Date(now)
       tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
@@ -803,7 +807,7 @@ async function handleAssignProject(req: VercelRequest, res: VercelResponse) {
 
     const projects = await dbQuery<Project>('SELECT * FROM projects WHERE id = ?', [projectId])
 
-    if (result.changes > 0 && projects[0]) {
+    if (inserted && projects[0]) {
       const msg = `You have been assigned to "${projects[0].title}"`
       await dbExecute(
         'INSERT INTO notifications (id, recipient_id, project_id, type, message, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
@@ -4770,6 +4774,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // ── deadlines ──────────────────────────────────────────────────────────────
   if (slug[0] === 'deadlines') {
+    // Hourly reminder job (Vercel cron) — see api/_helpers/reminders/deadlines.ts
+    if (slug[1] === 'reminders' && slug.length === 2) {
+      return handleDeadlineReminders(req, res)
+    }
     if (slug[1] === 'my' && slug.length === 2) {
       return handleGetMyDeadlines(req, res)
     }
