@@ -20,6 +20,13 @@ function logPlayback(msg: string, extra?: unknown) {
   console.warn(`[playback] ${msg}`, extra ?? '')
 }
 
+/** Grows a text box with its text (CSS max-height caps it; then it scrolls). */
+function autoGrow(el: HTMLTextAreaElement | null) {
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight + 2}px`   // + the top and bottom border
+}
+
 const commentSchema = z.object({
   comment_text: z.string().min(1, 'Comment is required'),
 })
@@ -68,6 +75,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
   const [editText, setEditText] = useState('')
   const apiFetch = useApiFetch()
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CommentForm>({ resolver: zodResolver(commentSchema) })
+  const commentField = register('comment_text')
 
   // The player reads canComment inside event handlers. Keeping it in a ref
   // means a status/revision refetch flipping canComment does NOT tear down and
@@ -581,10 +589,12 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
           )}
 
           <textarea
-            {...register('comment_text')}
-            rows={2}
-            placeholder="Describe the change needed..."
-            className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+            {...commentField}
+            ref={(el) => { commentField.ref(el); autoGrow(el) }}
+            onChange={(e) => { void commentField.onChange(e); autoGrow(e.currentTarget) }}
+            rows={3}
+            placeholder="Describe the change needed... (long notes and lists are fine: press Enter for a new line)"
+            className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y max-h-[50svh] overflow-y-auto"
           />
           {errors.comment_text && <p className="text-destructive text-xs">{errors.comment_text.message}</p>}
           <div className="flex gap-2">
@@ -689,10 +699,11 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
                         {editingId === comment.id ? (
                           <div className="space-y-1.5">
                             <textarea
+                              ref={autoGrow}
                               value={editText}
                               onChange={(e) => setEditText(e.target.value)}
-                              rows={2}
-                              className="w-full px-2 py-1.5 bg-input border border-border rounded-lg text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                              rows={3}
+                              className="w-full px-2 py-1.5 bg-input border border-border rounded-lg text-xs leading-relaxed text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y max-h-[50svh] overflow-y-auto"
                             />
                             <div className="flex gap-2">
                               <button onClick={() => saveEdit(comment.id)} className="text-[10px] font-semibold text-primary hover:underline">Save</button>
@@ -700,7 +711,7 @@ export function TimelineCommentor({ fileId, projectId, comments, currentUserId, 
                             </div>
                           </div>
                         ) : (
-                          <p className={cn('text-xs text-foreground/80 leading-relaxed', comment.resolved ? 'line-through' : '')}>{comment.comment_text}</p>
+                          <p className={cn('text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap break-words', comment.resolved ? 'line-through' : '')}>{comment.comment_text}</p>
                         )}
                       </div>
                     ))}

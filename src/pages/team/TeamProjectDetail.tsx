@@ -436,7 +436,7 @@ export default function TeamProjectDetail() {
                         )}
                         <span className="ml-auto text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</span>
                       </div>
-                      <p className={cn('text-sm text-foreground/80 leading-relaxed pl-7', c.resolved && 'line-through')}>{c.comment_text}</p>
+                      <p className={cn('text-sm text-foreground/80 leading-relaxed pl-7 whitespace-pre-wrap break-words', c.resolved && 'line-through')}>{c.comment_text}</p>
                     </div>
                   ))}
                 </div>
